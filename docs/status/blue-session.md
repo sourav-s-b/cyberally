@@ -227,6 +227,51 @@ their EpisodeRunner/buffer/BasicMAC/PPOLearner and a plain stdlib logger.
   unexplained full-Windows freeze hit the very first attempt; two full runs
   since completed cleanly — cause undetermined, reruns are cheap, watch it.
 
+## Fresh-machine (WSL) rebuild — snapshot 2026-09-30
+
+Provenance: package lists below are `uv pip freeze` snapshots of the working
+Windows venvs, inlined here because Environment's canonical
+`environment/requirements-*.txt` drafts are uncommitted and do not transfer.
+Canonical pins remain Environment's call; this snapshot only unblocks a fresh
+clone. EPyMARL pin `cbc38c09` is also recorded in
+`docs/coordination/blue-epymarl-contract.md` (on main).
+
+```bash
+git clone git@github.com:sourav-s-b/cyberally.git && cd cyberally
+git checkout blue/mappo-training
+uv venv --python 3.12 .venv            # 3.10 may work here; 3.12 is proven
+uv venv --python 3.12 .venv-train
+uv pip install --python .venv-train/bin/python \
+  --index-url https://download.pytorch.org/whl/cpu torch
+uv pip install --python .venv/bin/python <sim pins below>
+uv pip install --python .venv-train/bin/python <train pins below>
+git clone https://github.com/uoe-agents/epymarl.git /tmp/epymarl
+git -C /tmp/epymarl checkout cbc38c09588064eab978501d0f12c2cf58fa7fc2
+mkdir -p third_party/epymarl
+cp -r /tmp/epymarl/src third_party/epymarl/src
+cp /tmp/epymarl/LICENSE /tmp/epymarl/NOTICE third_party/epymarl/
+echo "$PWD/third_party/epymarl/src" \
+  > .venv-train/lib/python3.12/site-packages/cyberally_epymarl.pth
+cd cage-challenge-4
+../.venv/bin/python -m pytest -q tests_blue                     # expect 41+1
+../.venv-train/bin/python -m pytest -q tests_blue/test_epymarl_conformance.py \
+  tests_blue/test_action_space_v2.py                            # expect 13
+```
+
+Sim pins (`.venv`): cloudpickle==3.1.2 colorama==0.4.6
+farama-notifications==0.0.6 gym==0.26.2 gym-notices==0.1.0
+gymnasium==0.28.1 iniconfig==2.3.0 jax-jumpy==1.0.0 networkx==3.2.1
+numpy==1.26.4 packaging==26.3 pluggy==1.6.0 prettytable==3.9.0 pygame==2.5.2
+pytest==8.0.0 pytest-mock==3.12.0 pyyaml==6.0.1 typing-extensions==4.16.0
+wcwidth==0.9.1. Train pins: same list plus filelock==3.32.3 fsspec==2026.7.0
+jinja2==3.1.6 markupsafe==3.0.3 mpmath==1.3.0 setuptools==78.1.0 sympy==1.14.0
+and torch==2.14.1+cpu (CUDA build optional later: WSL2 sees the RTX 3050).
+
+Notes: the `smaclite` stub lives in committed `blue_train_mappo.py`, nothing
+to install. Torch 2.14 prints upstream non-tuple-indexing deprecation
+warnings from EPyMARL's buffer — noise, do not patch `third_party/`. The one
+unexplained Windows freeze has no Linux relevance until observed there.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
@@ -240,11 +285,9 @@ their EpisodeRunner/buffer/BasicMAC/PPOLearner and a plain stdlib logger.
 > (PR #1 merged to main; stale remote `blue` deleted). The `environment/`
 > requirement/script drafts stay uncommitted for Environment; root `.gitignore`
 > (`.venv-train/`, `third_party/`) is committed. Do not reset or rewrite
-> shared history. If this is a fresh WSL clone, first rebuild: `uv venv`
-> both venvs + torch CPU + sim pins (see `environment/requirements-train.txt`
-> header), re-vendor EPyMARL `cbc38c09` to `third_party/epymarl/` + the
-> `.pth` link (see `third_party/epymarl/PIN.txt` on the old machine — NOT in
-> Git — or the recipe in this file's MAPPO section), then run both suites
+> shared history. If this is a fresh WSL clone, follow the "Fresh-machine
+> (WSL) rebuild" section in this file first (it inlines the venv pins because
+> `environment/requirements-*.txt` are uncommitted), then run both suites
 > green before anything else. Next tasks: seed cycling for training resets,
 > then longer multi-seed MAPPO runs until the policy beats round-robin; hand
 > Environment the vendor recipe. Never report an unreproduced number as a
