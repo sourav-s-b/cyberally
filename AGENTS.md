@@ -13,6 +13,8 @@ Read at session start:
 3. `docs/implementation-plan.md` and `docs/status/<your-role>.md`.
 4. Blue work: `cage-challenge-4/blue-agent-plan.md` and the correction at the
    beginning of `cage-challenge-4/handoff.md`.
+5. Blue conversation continuity: `docs/status/blue-session.md` (latest working
+   state, tests, outstanding work and a resume prompt).
 
 Current instructions and accepted contracts take priority over old handoff text.
 User instructions take priority over this file. Contracts marked proposed are
