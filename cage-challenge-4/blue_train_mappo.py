@@ -8,9 +8,10 @@ noted), env registration, the smaclite dead-import stub, torch seeding, and
 a run manifest. No training hyperparameter is hardcoded from stale docs:
 network shapes come from the env's get_env_info() inside run_sequential.
 
-Smoke defaults: 8 episodes x 100 steps on CPU, common team reward, fixed
-first-reset seed 7629 (later bare resets are CybORG-random; seed cycling is
-a follow-up, recorded in the manifest). Checkpoints + manifest land under
+Smoke defaults: 8 episodes x 100 steps on CPU, common team reward, seeds
+cycled per episode from train_seeds (first reset takes the first entry;
+EPyMARL's runner calls bare reset() every episode). Every applied seed is
+recorded in the manifest's reset_seeds. Checkpoints + manifest land under
 results/ (gitignored).
 """
 
@@ -59,17 +60,33 @@ import cc4_epymarl_wrapper as wrapper  # noqa: E402
 
 EPYMARL_PIN = "cbc38c09588064eab978501d0f12c2cf58fa7fc2"
 
-env_REGISTRY["cc4"] = lambda **kw: wrapper.CC4MARLEnv(**kw)
+# run_sequential builds its own training env internally through the factory
+# below, so stash the live instance to read back env.reset_seeds for the
+# manifest after the run. Exactly one env exists at a time (the probe below
+# is constructed directly and closed before training starts).
+_train_env_ref = {}
 
 
-def build_config(steps=100, t_max=800, seed=7, results="results"):
+def _make_train_env(**kw):
+    env = wrapper.CC4MARLEnv(**kw)
+    _train_env_ref["env"] = env
+    return env
+
+
+env_REGISTRY["cc4"] = _make_train_env
+
+
+def build_config(steps=100, t_max=800, seed=7, results="results",
+                 train_seeds=(7629, 7630, 7640), save_interval=2000):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
         "runner": "episode",
         "mac": "basic_mac",
         "env": "cc4",
-        "env_args": {"seed": 7629, "steps": steps, "mask_mode": "validity"},
+        "env_args": {"seed": train_seeds[0], "steps": steps,
+                     "mask_mode": "validity",
+                     "seed_cycle": list(train_seeds)},
         "common_reward": True,
         "reward_scalarisation": "sum",
         "batch_size_run": 1,
@@ -109,7 +126,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results"):
         "use_tensorboard": False,
         "use_wandb": False,
         "save_model": True,
-        "save_model_interval": t_max + 1,  # first + final checkpoints only
+        "save_model_interval": save_interval,  # periodic + first checkpoints
         "checkpoint_path": "",
         "evaluate": False,
         "render": False,
@@ -156,14 +173,25 @@ def train(config=None):
         "torch_version": th.__version__,
         "seeding": {
             "torch_numpy_random": config["seed"],
-            "env_first_reset": config["env_args"]["seed"],
-            "later_resets": "CybORG-random (bare reset); seed cycling follow-up",
+            "seed_cycle": config["env_args"]["seed_cycle"],
+            "env_first_reset": config["env_args"]["seed_cycle"][0],
+            "reset_seeds": None,  # filled post-run from the training env
         },
     }
     with open(os.path.join(run_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2, default=str)
 
     run_sequential(args=args, logger=logger)
+
+    train_env = _train_env_ref.get("env")
+    manifest["seeding"]["reset_seeds"] = (
+        list(train_env.reset_seeds) if train_env is not None else None)
+    manifest["seeding"]["n_episodes"] = len(manifest["seeding"]["reset_seeds"] or [])
+    manifest["seeding"]["note"] = ("chronological per env.reset(), train and "
+        "greedy test episodes interleaved; test episodes also consume cycle "
+        "slots")
+    with open(os.path.join(run_dir, "manifest.json"), "w") as f:
+        json.dump(manifest, f, indent=2, default=str)
 
     stats = {k: [(int(t), float(v)) for t, v in vals]
              for k, vals in logger.stats.items()}
@@ -179,5 +207,10 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--t-max", type=int, default=800)
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--train-seeds", type=int, nargs="+",
+                        default=[7629, 7630, 7640])
+    parser.add_argument("--save-interval", type=int, default=2000)
     cli = parser.parse_args()
-    train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed))
+    train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
+                       train_seeds=tuple(cli.train_seeds),
+                       save_interval=cli.save_interval))

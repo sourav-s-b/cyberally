@@ -54,8 +54,11 @@ this page is its short index.
   Also unresolved: how a `VERIFY` state resolves from Blue-visible evidence,
   and whole-agent primary-session loss, where native Monitor dereferences
   session 0 and needs a simulator-level decision from Environment.
-- Next: (1) longer MAPPO training (multi-seed, seed cycling per reset — bare
-  resets are currently CybORG-random and unrecorded); (2) hand Environment the
+- Next: (1) longer MAPPO training (multi-seed, now with per-episode
+  `seed_cycle` + recorded `reset_seeds` — bare-reset gap closed 2026-09-30,
+  uncommitted on `blue/mappo-training` with 6 new cycle tests, 47+1 green;
+  Linux rebuild verified: 8x100 short run + ckpt eval replicates the
+  Sleep-level score, round-robin still the bar); (2) hand Environment the
   per-agent bounds plus the EPyMARL vendor recipe (`third_party/`, .pth,
   smaclite stub) so the training venv is reproducible; (3) PR `blue/mappo-training`
   once the policy beats round-robin or a longer run is worth reviewing. PR #1

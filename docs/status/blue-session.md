@@ -272,6 +272,44 @@ to install. Torch 2.14 prints upstream non-tuple-indexing deprecation
 warnings from EPyMARL's buffer — noise, do not patch `third_party/`. The one
 unexplained Windows freeze has no Linux relevance until observed there.
 
+## Seed cycling + Linux rebuild (2026-09-30, `blue/mappo-training`, uncommitted)
+
+Fresh Linux checkout (no venvs) rebuilt from this file's recipe with
+uv 0.12.15 + CPython 3.12.14: `.venv/` sim pins, `.venv-train/` train pins +
+`torch==2.14.1+cpu`, EPyMARL `cbc38c09` vendored at `third_party/epymarl/`
+(+ `.pth` link). Suites: `.venv` 41 passed + 1 skipped; train-venv
+conformance + action-space-v2 13 passed; `.venv-train` full 42 passed (the
+torch-only skip runs there). Upstream torch deprecation warnings only.
+
+Seed cycling landed (the "bare resets are CybORG-random" follow-up):
+
+- `CC4MARLEnv(..., seed_cycle=None)`: per bare `reset()` consumes the next
+  entry (wraps), explicit `reset(seed=)`/`seed()` wins once without advancing
+  the pointer, every applied seed appended to `env.reset_seeds`. Default
+  `None` preserves v1/v2 behavior (ctor seed once, then RNG continuation —
+  confirmed `CybORG/env.py:218` keeps `np_random` when `seed=None`).
+- `CC4BlueWrapper` passes `seed_cycle` through, exposes `reset_seeds`.
+- `tests_blue/test_seed_cycle.py`: 6 tests (order/wrap, explicit override,
+  setter precedence, validation, default unchanged, cross-env reproducibility).
+  Full sim suite now 47 passed + 1 skipped.
+- `blue_train_mappo.py`: `build_config(..., train_seeds=(7629,7630,7640))`
+  (CLI `--train-seeds`), factory stashes the runner-built env, manifest gains
+  `seed_cycle` + chronological `reset_seeds` (+ train/test interleave note)
+  and `n_episodes`.
+- Verified end-to-end: 2x50 smoke (4 resets `[7629,7630,7640,7629]` — 3 train
+  + 1 greedy test; the test episode also consumes a slot, `while t_env <=
+  t_max` runs a 3rd train episode at t_env=98) and 8x100 short run (~3.5 min,
+  finite pg/critic losses, return_mean -46.9). Checkpoint eval on
+  7629/7630/7640 replicates the Windows finding: ckpt ~ Sleep
+  (-1651...-4139, roots 41-52 @200) vs round-robin (-85...-123, roots 9-13)
+  vs masked-random(seed 11) (-190...-276). Loop proven multi-seed; policy
+  still not a defender — needs volume.
+
+Changed, uncommitted, unpushed: `cc4_epymarl_wrapper.py`,
+`blue_train_mappo.py`, new `tests_blue/test_seed_cycle.py`.
+(`results/` checkpoints gitignored.) Next: longer multi-seed MAPPO volume
+until the policy beats round-robin; then update `blue.md` + push.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

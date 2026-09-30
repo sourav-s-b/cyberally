@@ -43,7 +43,8 @@ WRAPPER_VERSION = "foundation-v2"
 class CC4MARLEnv:
     def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
                  mask_mode="validity", common_reward=False,
-                 reward_scalarisation="sum", per_agent_bounds=False):
+                 reward_scalarisation="sum", per_agent_bounds=False,
+                 seed_cycle=None):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
@@ -61,6 +62,21 @@ class CC4MARLEnv:
         # below writes to the same value for the *next* reset.
         self._seed = seed
         self._seed_pending = False
+        if seed_cycle is not None:
+            seed_cycle = tuple(seed_cycle)
+            if (not seed_cycle or any(not isinstance(s, int)
+                                      or isinstance(s, bool)
+                                      for s in seed_cycle)):
+                raise ValueError("seed_cycle must be a non-empty "
+                                 "list/tuple of int seeds")
+        # Multi-episode training: EPyMARL's runner calls bare reset() every
+        # episode, so an explicit cycle consumes the next seed per bare
+        # reset (wrapping around) and records every applied seed in
+        # reset_seeds for the run manifest. Default None preserves the
+        # v1/v2 behaviour: constructor seed once, then RNG continuation.
+        self.seed_cycle = seed_cycle
+        self._cycle_pos = 0
+        self.reset_seeds = []
         self.common_reward = bool(common_reward)
         self.reward_scalarisation = reward_scalarisation
         self.per_agent_bounds = bool(per_agent_bounds)
@@ -97,8 +113,18 @@ class CC4MARLEnv:
         if seed is not None:
             self._seed = seed
             self._seed_pending = True
-        # First reset honors the constructor seed; an explicit seed()/reset(seed)
-        # applies once; otherwise seed=None advances the RNG.
+        elif self.seed_cycle is not None and not self._seed_pending:
+            # Bare reset under an active cycle: consume the next cycled
+            # seed (first reset takes cycle[0]; the constructor seed is
+            # only a fallback when no cycle is given). An explicit
+            # reset(seed=...) or pending seed() wins for that reset
+            # without advancing the cycle pointer.
+            self._seed = self.seed_cycle[self._cycle_pos % len(self.seed_cycle)]
+            self._cycle_pos += 1
+            self._seed_pending = True
+        # First reset honors the constructor/cycle seed; an explicit
+        # seed()/reset(seed) applies once; otherwise seed=None advances
+        # the RNG.
         reset_seed = (self._seed if seed is not None or not self._has_reset
                       or self._seed_pending else None)
         self._seed_pending = False
@@ -121,6 +147,7 @@ class CC4MARLEnv:
             self.trackers[agent] = BlueZoneTracker(hosts)
         self._has_reset = True
         self._finished = False
+        self.reset_seeds.append(reset_seed)
         return self.get_obs(), {}
 
     def _mask_agent(self, agent):
@@ -313,13 +340,14 @@ class CC4BlueWrapper:
     """
     def __init__(self, seed=7629, blue_id="blue_agent_0",
                  max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity",
-                 per_agent_bounds=False):
+                 per_agent_bounds=False, seed_cycle=None):
         if blue_id not in BLUE_AGENTS:
             raise ValueError("Unknown Blue agent")
         self.blue_id = blue_id
         self._agent_id = BLUE_AGENTS.index(blue_id)
         self._joint = CC4MARLEnv(seed, max_hosts, steps, mask_mode,
-                                 per_agent_bounds=per_agent_bounds)
+                                 per_agent_bounds=per_agent_bounds,
+                                 seed_cycle=seed_cycle)
         self.cyborg = self._joint.cyborg
         self.env = self._joint.env
         self.max_hosts = self._joint.max_hosts_per_agent[self._agent_id]
@@ -329,6 +357,10 @@ class CC4BlueWrapper:
     def reset(self, seed=None):
         self._joint.reset(seed=seed)
         return self.get_obs(), self.get_mask()
+
+    @property
+    def reset_seeds(self):
+        return self._joint.reset_seeds
 
     @property
     def hostnames(self):
