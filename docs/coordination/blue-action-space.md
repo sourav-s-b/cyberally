@@ -1,6 +1,8 @@
 # Proposal: blue-action-space
 
-- Status: draft
+- Status: step 1 implemented on `blue` (per-agent bounds behind
+  `per_agent_bounds=False` default, global behavior preserved); steps 2–3
+  (consumer migration, global-default removal) still draft, unreviewed
 - Author role and branch: Blue, `blue/foundation`
 - Producer: Blue
 - Consumers: Environment (runtime/config), Evaluation (metric and log schema),

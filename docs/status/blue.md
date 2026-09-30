@@ -19,12 +19,25 @@ this page is its short index.
   masked-random episodes pass. Measured directly this session: 44 ms/joint step;
   true-state Red reaches 34 sessions by step 100 at seed 7629 while Blue's own
   view shows 0 the whole episode; 41 % of steps carry reward and the first ~135
-  do not; 69 % of agent-ticks are forced to Sleep by the agent-wide pending
-  lockout. See `docs/current-state.md` for the tables.
+  do not; forced Sleep is 100 % pending-action lockout (676/676 ticks, zero
+  session losses, seed-7629 breakdown) and policy-dependent — 68.7 %
+  masked-random vs 54.4 % round-robin — so it is a throughput ceiling, not an
+  unfixable blocker. See `docs/current-state.md` for the tables.
 - Blockers: none for branching — Environment, Red and Evaluation may branch from
-  `main`, which now carries the fixed wrapper and `tests_blue/`. Open items: no
-  pinned runtime (torch absent, venv is 3.12 not the 3.10 target), and the
-  action-space proposal is unaccepted. `TrueStateWrapper` is broken against this
+  `main`, which now carries the fixed wrapper and `tests_blue/`. Open items: the
+  action-space proposal is unaccepted. Torch unblocked 2026-09-30 (Blue-drafted,
+  needs Environment review): uv-built `.venv-train/` holds torch 2.14.1+cpu on
+  system Python 3.12 with sim pins identical to `.venv`;
+  see `environment/requirements-train.txt`. uv cannot supply 3.10 here (App
+  Control blocks it), so the 3.10 target needs an IT-approved install.
+  EPyMARL pinned at `cbc38c09` but not installed; wrapper already speaks the
+  runner contract (ctor kwargs, scalar common reward, `episode_limit` info,
+  lifecycle methods — see blue-session.md) and a torch train-smoke passes.
+  Real MAPPO-in-their-runner is the remaining BLUE-03 step, not torch.
+- foundation-v2 landed on `blue` (unpushed): `per_agent_bounds=True` gives
+  17/17/17/17/51 hosts, 53/155 actions, 170/510 obs, 1190 critic state, with
+  identical host indexing and trajectories; default mode unchanged and still
+  required for stock EPyMARL. Proposal step 1 of 3; consumers unmigrated. `TrueStateWrapper` is broken against this
   CAGE4 snapshot, so the privileged-label path for Evaluation must be built from
   `get_true_state(info).data`. Upstream `test_blue_actions.py` cannot collect
   because its conftest imports Ray.
@@ -40,12 +53,20 @@ this page is its short index.
   Also unresolved: how a `VERIFY` state resolves from Blue-visible evidence,
   and whole-agent primary-session loss, where native Monitor dereferences
   session 0 and needs a simulator-level decision from Environment.
-- Next: (1) get the BLUE-01 PR reviewed and merged; (2) hand Environment the
-  per-agent bounds so their configs are not written against 155/510/2550;
-  (3) BLUE-02 Sleep/random/masked-random/round-robin heuristic baselines and
-  reproduce the historical step-200 numbers on seed 7629; (4) only then wire
-  EPyMARL's real constructor, tensor-action and lifecycle interfaces, behind a
-  one-rollout-plus-one-optimizer-update smoke test.
+- Next: (1) review/merge the three stacked PRs branch-by-branch
+  (`blue/baseline-policies` = `4471c27`, then `blue/epymarl-conformance` =
+  `3b414b4` with its contract proposal, then `blue/status-handoff` docs);
+  (2) hand Environment the per-agent bounds so their configs are not written
+  against 155/510/2550; (3) install EPyMARL and run the first real MAPPO
+  rollout-plus-update in their runner, behind the already-passing
+  torch train-smoke.
+- BLUE-02 measured (seed 7629, fixed wrapper, hosts-with-Red-session @ step 200):
+  Sleep 64 total / 54 root (return -60); masked-random 33 / 25 (-102);
+  round-robin heuristic 38 / 11 (-65). Historical broken-wrapper targets
+  (Sleep 60/43, random 48/35) are superseded — recomputed here, do not compare
+  across wrapper versions. Masked-random used a single policy seed (0).
+  Extended to seeds 7629/7630/7640 via `evaluate_policies()`: round-robin
+  halves root compromise vs masked-random on every seed (25→11, 19→13, 15→9).
 - Artifacts: **no trained policy, no checkpoint, no EPyMARL registration.**
   Historical baseline numbers (Sleep 60, masked random 48 compromised hosts at
   step 200) remain unreproduced and must not be reported as fresh results.

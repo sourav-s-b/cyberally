@@ -1,9 +1,15 @@
-"""CAGE4 Blue wrappers, foundation-v1 (not yet an EPyMARL training integration).
+"""CAGE4 Blue wrappers, foundation-v2 (not yet an EPyMARL training integration).
 
 Fixed slots include all visible hosts, including routers and HQ's three subnets.
 Action order remains Sleep, Monitor, then Analyse/Remove/Restore per sorted host.
 Default masks enforce known simulator validity; evidence gating is opt-in.
 Only per-agent observations/action spaces enter policy views. No true Red state.
+
+v2 adds opt-in per-agent bounds (`per_agent_bounds=True`): slot counts derived
+from each agent's own subnet assignment instead of one global 51-host bound.
+Default mode is unchanged v1 behaviour. Stock EPyMARL shares one head across
+agents and therefore requires the homogeneous (default) mode; per-agent widths
+are reported for heuristics, logging, and future heterogeneous training.
 """
 from copy import deepcopy
 from collections.abc import Mapping
@@ -23,25 +29,56 @@ CLASSES = {"Analyse": Analyse, "Remove": Remove, "Restore": Restore}
 # Scenario's largest Blue area is HQ: three subnets, each with a router.
 DEFAULT_MAX_HOSTS = 3 * (EnterpriseScenarioGenerator.MAX_USER_HOSTS
                          + EnterpriseScenarioGenerator.MAX_SERVER_HOSTS + 1)
-WRAPPER_VERSION = "foundation-v1"
+# Per-agent subnet counts mirror
+# EnterpriseScenarioGenerator._generate_blue_agents: agents 0-3 own one zone
+# each; agent 4 (HQ) owns public_access_zone + admin_network + office_network.
+AGENT_SUBNET_COUNTS = (1, 1, 1, 1, 3)
+PER_SUBNET_MAX_HOSTS = (EnterpriseScenarioGenerator.MAX_USER_HOSTS
+                        + EnterpriseScenarioGenerator.MAX_SERVER_HOSTS + 1)  # 17
+AGENT_MAX_HOSTS = tuple(n * PER_SUBNET_MAX_HOSTS
+                        for n in AGENT_SUBNET_COUNTS)  # (17, 17, 17, 17, 51)
+WRAPPER_VERSION = "foundation-v2"
 
 
 class CC4MARLEnv:
     def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
-                 mask_mode="validity"):
+                 mask_mode="validity", common_reward=False,
+                 reward_scalarisation="sum", per_agent_bounds=False):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
             raise ValueError("steps must be >= 3 for the three mission phases")
         if mask_mode not in ("validity", "evidence"):
             raise ValueError("mask_mode must be validity or evidence")
-        self.seed = seed
-        self.max_hosts = max_hosts
+        if reward_scalarisation not in ("sum", "mean"):
+            raise ValueError("reward_scalarisation must be sum or mean")
+        if per_agent_bounds and max_hosts != DEFAULT_MAX_HOSTS:
+            raise ValueError("explicit max_hosts is incompatible with "
+                             "per_agent_bounds (bounds come from the scenario)")
+        # EPyMARL's EpisodeRunner always passes common_reward and
+        # reward_scalarisation; accept and store them. `seed` stays an
+        # attribute (applied on reset); the runner-style `seed()` setter
+        # below writes to the same value for the *next* reset.
+        self._seed = seed
+        self._seed_pending = False
+        self.common_reward = bool(common_reward)
+        self.reward_scalarisation = reward_scalarisation
+        self.per_agent_bounds = bool(per_agent_bounds)
+        if self.per_agent_bounds:
+            self.max_hosts_per_agent = list(AGENT_MAX_HOSTS)
+        else:
+            self.max_hosts_per_agent = [max_hosts] * len(BLUE_AGENTS)
+        self.n_actions_per_agent = [2 + 3 * h for h in self.max_hosts_per_agent]
+        self.obs_size_per_agent = [h * VECTOR_LEN for h in self.max_hosts_per_agent]
+        # Scalar widths are the max across agents. In default (global) mode all
+        # agents share them; in per-agent mode they are allocation upper bounds
+        # for homogeneous consumers (stock EPyMARL requires default mode).
+        self.max_hosts = max(self.max_hosts_per_agent)
         self.mask_mode = mask_mode
         self.n_agents = len(BLUE_AGENTS)
         self.episode_limit = steps
-        self.n_actions = 2 + 3 * max_hosts
-        self.obs_size = max_hosts * VECTOR_LEN
+        self.n_actions = max(self.n_actions_per_agent)
+        self.obs_size = max(self.obs_size_per_agent)
         sg = EnterpriseScenarioGenerator(blue_agent_class=SleepAgent,
             green_agent_class=EnterpriseGreenAgent, red_agent_class=DiscoveryFSRed,
             steps=steps)
@@ -58,20 +95,25 @@ class CC4MARLEnv:
         if options:
             raise ValueError("reset options are not supported")
         if seed is not None:
-            self.seed = seed
-        # First reset honors constructor seed; later seed=None advances the RNG.
-        reset_seed = self.seed if seed is not None or not self._has_reset else None
+            self._seed = seed
+            self._seed_pending = True
+        # First reset honors the constructor seed; an explicit seed()/reset(seed)
+        # applies once; otherwise seed=None advances the RNG.
+        reset_seed = (self._seed if seed is not None or not self._has_reset
+                      or self._seed_pending else None)
+        self._seed_pending = False
         self._finished = True
         self.cyborg.reset(seed=reset_seed)
         self._tick = 0
         self._awaiting = {}
-        for agent in BLUE_AGENTS:
+        for i, agent in enumerate(BLUE_AGENTS):
             base = deepcopy(self.cyborg.get_observation(agent))
             hosts = sorted(h for h, value in base.items()
                            if isinstance(value, dict) and "System info" in value)
-            if len(hosts) > self.max_hosts:
+            bound = self.max_hosts_per_agent[i]
+            if len(hosts) > bound:
                 raise ValueError(f"{agent} has {len(hosts)} hosts; max_hosts="
-                                 f"{self.max_hosts} would truncate them")
+                                 f"{bound} would truncate them")
             self.hostnames[agent] = hosts
             self.views[agent] = {h: base[h] for h in hosts}
             self.subnets[agent] = {h: extract_subnets(base[h]) for h in hosts}
@@ -82,7 +124,8 @@ class CC4MARLEnv:
         return self.get_obs(), {}
 
     def _mask_agent(self, agent):
-        mask = np.zeros(self.n_actions, dtype=np.int64)
+        mask = np.zeros(self.n_actions_per_agent[BLUE_AGENTS.index(agent)],
+                        dtype=np.int64)
         mask[0] = 1
         if agent in self._awaiting:
             return mask
@@ -110,14 +153,15 @@ class CC4MARLEnv:
             session=0, agent=agent, hostname=host), host
 
     def _obs_agent(self, agent):
-        obs = np.zeros((self.max_hosts, VECTOR_LEN), dtype=np.float32)
+        obs = np.zeros((self.max_hosts_per_agent[BLUE_AGENTS.index(agent)],
+                        VECTOR_LEN), dtype=np.float32)
         for i, host in enumerate(self.hostnames[agent]):
             obs[i] = host_to_vector(self.views[agent][host], agent,
                                    self.subnets[agent][host])
         return obs.flatten()
 
     def get_host_presence(self, agent_id):
-        mask = np.zeros(self.max_hosts, dtype=np.int64)
+        mask = np.zeros(self.max_hosts_per_agent[agent_id], dtype=np.int64)
         mask[:len(self.hostnames[BLUE_AGENTS[agent_id]])] = 1
         return mask
 
@@ -134,7 +178,7 @@ class CC4MARLEnv:
         return np.concatenate(self.get_obs()).astype(np.float32)
 
     def get_state_size(self):
-        return self.obs_size * self.n_agents
+        return sum(self.obs_size_per_agent)
 
     def get_avail_actions(self):
         return [self._mask_agent(a) for a in BLUE_AGENTS]
@@ -148,7 +192,12 @@ class CC4MARLEnv:
     def get_env_info(self):
         return {"state_shape": self.get_state_size(), "obs_shape": self.obs_size,
                 "n_actions": self.n_actions, "n_agents": self.n_agents,
-                "episode_limit": self.episode_limit}
+                "episode_limit": self.episode_limit,
+                "max_hosts_per_agent": list(self.max_hosts_per_agent),
+                "n_actions_per_agent": list(self.n_actions_per_agent),
+                "obs_size_per_agent": list(self.obs_size_per_agent),
+                "per_agent_bounds": self.per_agent_bounds,
+                "wrapper_version": WRAPPER_VERSION}
 
     def _consume(self, agent, data):
         tracker = self.trackers[agent]
@@ -204,8 +253,9 @@ class CC4MARLEnv:
         decoded = {}
         for agent in BLUE_AGENTS:
             idx = actions.get(agent, 0)
+            width = self.n_actions_per_agent[BLUE_AGENTS.index(agent)]
             if (not isinstance(idx, (int, np.integer)) or idx < 0
-                    or idx >= self.n_actions or not self._mask_agent(agent)[idx]):
+                    or idx >= width or not self._mask_agent(agent)[idx]):
                 idx = 0
             action, host = self._decode(agent, int(idx))
             decoded[agent] = action
@@ -225,7 +275,34 @@ class CC4MARLEnv:
         terminated = bool(self.env.done)
         truncated = self._tick >= self.episode_limit and not terminated
         self._finished = terminated or truncated
-        return self.get_obs(), rewards, terminated, truncated, {}
+        # EPyMARL reads info["episode_limit"] to tell horizon cut-offs (bootstrap)
+        # from true terminals. The native end always coincides with our horizon.
+        info = {"episode_limit": bool(
+            truncated or (terminated and self._tick >= self.episode_limit - 1))}
+        if self.common_reward:
+            # Native Blue reward is already one shared team signal duplicated
+            # per agent; normalize once (rewards[0]), never a 5x sum, per the
+            # contracts invariant. sum/mean coincide on identical values.
+            return self.get_obs(), float(rewards[0]), terminated, truncated, info
+        return self.get_obs(), rewards, terminated, truncated, info
+
+    def seed(self, seed=None):
+        """Runner-style seed setter; takes effect on the next reset."""
+        if seed is not None:
+            self._seed = seed
+            self._seed_pending = True
+
+    def close(self):
+        """No simulator resource to release; present for the runner lifecycle."""
+
+    def render(self):
+        """No visual rendering in this wrapper; present for the runner lifecycle."""
+
+    def save_replay(self):
+        raise NotImplementedError("CC4MARLEnv has no replay recording")
+
+    def get_stats(self):
+        return {}
 
 
 class CC4BlueWrapper:
@@ -235,17 +312,19 @@ class CC4BlueWrapper:
     reset -> (obs, mask); step -> (obs, mask, scalar team reward, done).
     """
     def __init__(self, seed=7629, blue_id="blue_agent_0",
-                 max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity"):
+                 max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity",
+                 per_agent_bounds=False):
         if blue_id not in BLUE_AGENTS:
             raise ValueError("Unknown Blue agent")
         self.blue_id = blue_id
         self._agent_id = BLUE_AGENTS.index(blue_id)
-        self._joint = CC4MARLEnv(seed, max_hosts, steps, mask_mode)
+        self._joint = CC4MARLEnv(seed, max_hosts, steps, mask_mode,
+                                 per_agent_bounds=per_agent_bounds)
         self.cyborg = self._joint.cyborg
         self.env = self._joint.env
-        self.max_hosts = max_hosts
-        self.n_actions = self._joint.n_actions
-        self.obs_size = self._joint.obs_size
+        self.max_hosts = self._joint.max_hosts_per_agent[self._agent_id]
+        self.n_actions = self._joint.n_actions_per_agent[self._agent_id]
+        self.obs_size = self._joint.obs_size_per_agent[self._agent_id]
 
     def reset(self, seed=None):
         self._joint.reset(seed=seed)
@@ -293,3 +372,9 @@ class CC4BlueWrapper:
     def step(self, idx):
         _, rewards, terminated, truncated, _ = self._joint.step({self.blue_id: idx})
         return self.get_obs(), self.get_mask(), rewards[self._agent_id], terminated or truncated
+
+    def seed(self, seed=None):
+        self._joint.seed(seed)
+
+    def close(self):
+        pass
