@@ -77,7 +77,8 @@ env_REGISTRY["cc4"] = _make_train_env
 
 
 def build_config(steps=100, t_max=800, seed=7, results="results",
-                 train_seeds=(7629, 7630, 7640), save_interval=2000):
+                 train_seeds=(7629, 7630, 7640), save_interval=2000,
+                 lr=0.0003):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -102,7 +103,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "t_max": t_max,
         "use_cuda": False,
         "gamma": 0.99,
-        "lr": 0.0003,
+        "lr": lr,
         "grad_norm_clip": 10,
         "add_value_last_step": True,
         "agent": "rnn",
@@ -210,7 +211,8 @@ if __name__ == "__main__":
     parser.add_argument("--train-seeds", type=int, nargs="+",
                         default=[7629, 7630, 7640])
     parser.add_argument("--save-interval", type=int, default=2000)
+    parser.add_argument("--lr", type=float, default=0.0003)
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
-                       save_interval=cli.save_interval))
+                       save_interval=cli.save_interval, lr=cli.lr))
