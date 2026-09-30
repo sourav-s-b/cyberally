@@ -93,6 +93,18 @@ def test_passive_event_on_other_host_during_analyse(quiet):
     assert env.observed_at[agent][other]["Processes"] == 1  # not a new event
 
 
+def test_new_passive_event_replaces_prior_delta(quiet):
+    env = quiet
+    agent = "blue_agent_0"
+    host = env.hostnames[agent][0]
+    for pid, tick in ((98765, 1), (98766, 2)):
+        env.env.state.hosts[host].events.process_creation.append(
+            {"pid": pid, "process_name": "observed-test-process"})
+        env.step([0]*5)
+        assert [p["PID"] for p in env.views[agent][host]["Processes"]] == [pid]
+        assert env.observed_at[agent][host]["Processes"] == tick
+
+
 def test_failed_action_releases_pending_without_erasing_belief(quiet):
     env = quiet
     agent = "blue_agent_0"
@@ -114,6 +126,43 @@ def test_no_timeout_based_unmasking(quiet):
     with pytest.raises(RuntimeError, match="overdue"):
         env._consume("blue_agent_0", {"success": "IN_PROGRESS"})
     assert env.get_avail_agent_actions(0).sum() == 1
+
+
+def test_overdue_action_can_be_abandoned_by_reset(quiet):
+    env = quiet
+    agent = "blue_agent_0"
+    host = env.hostnames[agent][0]
+    env.step({agent: action_index(env, agent, host, "Analyse")})
+    env._tick = 2
+    with pytest.raises(RuntimeError, match="overdue"):
+        env._consume(agent, {"success": "IN_PROGRESS"})
+    env.reset(seed=7629)
+    assert not env._awaiting and not env.trackers[agent].pending_until
+    assert env.get_avail_agent_actions(0).sum() > 1
+    env.step([0]*5)
+
+
+@pytest.mark.parametrize("action", ["Analyse", "Remove", "Restore"])
+def test_lost_target_session_reports_real_action_failure(quiet, action):
+    env = quiet
+    agent = "blue_agent_0"
+    host = next(h for h in env.hostnames[agent]
+                if h != env.env.state.sessions[agent][0].hostname)
+    env.step({agent: action_index(env, agent, host, action)})
+    assert env._awaiting[agent] == (host, action)
+    # Simulate loss of the target's Blue child session after the action starts.
+    state = env.env.state
+    child = next(s for s in state.sessions[agent].values() if s.hostname == host)
+    del state.sessions[agent][child.ident]
+    state.sessions[agent][0].children.pop(child.ident)
+    state.hosts[host].sessions[agent].remove(child.ident)
+    duration = wrapper.CLASSES[action](session=0, agent=agent, hostname=host).duration
+    for _ in range(duration - 1):
+        env.step([0]*5)
+    assert agent not in env._awaiting
+    assert env.trackers[agent].last_result[host] == (action, "FALSE")
+    assert env.trackers[agent].last_analysis[host] is None
+    assert env.trackers[agent].state[host] == "UNKNOWN"
 
 
 def test_confirmation_survives_first_empty_scan():

@@ -7,8 +7,9 @@
 **Working branch:** `blue/foundation`
 
 **Base commit:** `e605ef3` (`chore: import CAGE4 prototype and establish team workflow`)
-**Current state:** BLUE-01 is committed and pushed as `7b76fc2` on
-`origin/blue/foundation`. The Blue worktree was clean after the push.
+**Current state:** BLUE-01 foundation is committed and pushed as `7b76fc2`.
+`origin/main` at `05999fb` was merged into `blue/foundation`; this session adds
+focused tests for lost target sessions, timeout recovery, and passive-event freshness.
 
 ## Goal
 
@@ -34,6 +35,13 @@ Committed in `7b76fc2` on `blue/foundation`:
   separate, Restore remains reachable in validity mode, and successful remediation
   transitions to VERIFY rather than declaring the host clean.
 - Added `cage-challenge-4/tests_blue/test_foundation.py`.
+- Added live tests showing Analyse, Remove, and Restore return `FALSE` when their
+  target Blue child session disappears while pending. The original target stays
+  attributed, pending state clears, and no clean label is inferred. An overdue
+  action still fails explicitly; reset clears the unresolved pending state.
+- Confirmed with a live passive Monitor path that a new process event replaces the
+  prior event delta and advances the observation timestamp; a tick without an
+  event preserves the last observation and its timestamp.
 - Updated `cage-challenge-4/handoff.md` and `docs/status/blue.md` in that branch.
 
 The workspace venv `.venv` is ignored and local-only. It uses Python 3.12,
@@ -42,8 +50,8 @@ This is not yet the Environment team's pinned runtime.
 
 ## Verification already completed
 
-- From `cage-challenge-4`: `.venv\\Scripts\\python -m pytest -q tests_blue` —
-  **15 passed**.
+- From `cage-challenge-4`: `..\\.venv\\Scripts\\python.exe -m pytest -q tests_blue`
+  — **20 passed** after the new tests.
 - Three masked-random episodes (seeds 42, 7629, 7630), 75 steps each — completed;
   per-agent common rewards matched and action masks remained valid.
 - `.venv\\Scripts\\python scripts\\check_source.py` from repo root — 163
@@ -55,18 +63,14 @@ This is not yet the Environment team's pinned runtime.
 
 ## Next steps
 
-1. In the Blue workspace, inspect `git status --short --branch`, fetch origin,
-   and read `origin/main`. Preserve any new changes.
-2. Inspect/fix remaining Blue edge cases: invalid or lost Blue sessions, simulator
-   action failures, unresolved-action timeout/reset behavior, and passive event
-   semantics. Preserve tests proving real user-level Remove and root-level Restore.
-3. Coordinate with Environment on the pinned runtime and reset/scenario contract;
-   check their pushed branch/status before assuming their changes exist.
-4. Agree with Evaluation how a VERIFY state resolves using Blue-visible evidence.
+1. Check whole-agent primary-session loss with Environment: native automatic Monitor
+   dereferences session 0, so this needs a simulator-level decision. Continue
+   checking passive observations under real Red episodes.
+2. Coordinate with Environment on the pinned runtime and reset/scenario contract;
+   no Environment branch was published at this handoff.
+3. Agree with Evaluation how a VERIFY state resolves using Blue-visible evidence.
    Keep simulator truth restricted to evaluation.
-5. Update this file and `docs/status/blue.md` with actual results. Commit/push the
-   Blue code on `blue/foundation`; use a PR for normal integration into `main`.
-6. Once BLUE-01 is reviewed, build Sleep/random/round-robin heuristic evaluation;
+4. Once BLUE-01 is reviewed, build Sleep/random/round-robin heuristic evaluation;
    then implement EPyMARL's actual constructor, tensor action, reward and lifecycle
    interfaces. Do not start a long run before a complete optimizer-update smoke test.
 
