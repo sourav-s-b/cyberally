@@ -20,9 +20,9 @@ before you write code, and record which branch you based your work on.
 > `docs/implementation-plan.md`, `docs/status/blue.md`,
 > `docs/coordination/blue-action-space.md`, and the correction at the top of
 > `cage-challenge-4/handoff.md`. BLUE-01 is implemented with 20 passing tests and
-> is **not merged**. First priority is getting that PR reviewed and merged;
-> Environment, Red and Evaluation are all branching from a broken `main` until it
-> lands. Then implement BLUE-02 heuristic baselines (Sleep, built-in random,
+> **is merged into `main`** (both refs at `f8a9deb`), so branch from `main`
+> normally and treat the earlier "main is broken" warnings as obsolete. Then
+> implement BLUE-02 heuristic baselines (Sleep, built-in random,
 > masked random, round-robin Analyse/Restore) and reproduce the historical
 > step-200 seed-7629 numbers before any RL claim. Derive all shapes from
 > `get_env_info()`; never hardcode 155/510/2550 or the superseded 160/800/50.
@@ -48,8 +48,8 @@ before you write code, and record which branch you based your work on.
 
 > Work as Red owner on `red/strategy-adapter`. Read `AGENTS.md`, `red/AGENTS.md`,
 > `docs/current-state.md`, shared contracts, roadmap and role status. Your work
-> is blocked until the pinned runtime exists and `blue/foundation` merges;
-> draft the design and fixtures meanwhile. Implement RED-01 using the built-in
+> is blocked until the pinned runtime exists; the `main` merge is done, so draft
+> the design and fixtures meanwhile. Implement RED-01 using the built-in
 > scripted attacker first. Create a replayable configuration/factory and
 > deterministic smoke scenario, with **no privileged attacker state exposed to
 > Blue actor inputs** — a stored action sequence is a diagnostic trace, not a

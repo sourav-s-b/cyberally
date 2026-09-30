@@ -6,7 +6,7 @@
 - Consumers: Environment (runtime/config), Evaluation (metric and log schema),
   Red (any agent-count assumption)
 - Related issue/PR and exact dependency commits: depends on BLUE-01 wrapper
-  fixes in `7b76fc2` and `58b6cc7`; currently unmerged into `main` (`05999fb`)
+  fixes in `7b76fc2` and `58b6cc7`, merged into `main` as `f8a9deb`
 
 ## Problem and current behavior
 

@@ -12,7 +12,7 @@ simulation and evaluator.
 
 1. Human or coding assistant: read [AGENTS.md](AGENTS.md).
 2. Read [docs/current-state.md](docs/current-state.md). It is the newest document
-   here and holds the measured behaviour, the branch divergence and the traps.
+   here and holds the measured behaviour, the branch status and the traps.
 3. Set up your clone and branch: [team workflow](docs/team-workflow.md).
 4. Find your deliverables: [implementation plan](docs/implementation-plan.md).
 5. Read [integration contracts](docs/contracts.md) before changing interfaces.
@@ -23,13 +23,14 @@ To resume Sourav's active Blue task in a new assistant conversation, read
 [the current Blue session update](docs/status/blue-session.md) and paste its
 resume prompt after the standard project instructions.
 
-### Known branch divergence
+### Branch status
 
-`origin/main` and `blue/foundation` differ behaviourally, not just in content.
-The `main` copy of `cage-challenge-4/cc4_epymarl_wrapper.py` truncates host
-observations to 16 hosts, resets the shared simulator once per Blue agent, and
-leaves `Restore` unreachable. The fixes and the `tests_blue/` suite exist only on
-`blue/foundation`. Check before branching; details in
+`main` and `blue/foundation` are both at `f8a9deb` and hold identical content.
+Branch from `main` normally. Up to `05999fb`, `main` held a broken
+`cage-challenge-4/cc4_epymarl_wrapper.py` that truncated host observations to 16
+hosts, reset the shared simulator once per Blue agent and left `Restore`
+unreachable; `blue/foundation` has since been fast-forwarded into `main`, so
+those warnings are obsolete. Verify your clone with the commands in
 [docs/current-state.md](docs/current-state.md) section 0.
 
 ## Repository layout

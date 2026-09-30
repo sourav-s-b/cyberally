@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-09-30
 **Owner:** Blue (Sourav). Everyone else: read this before your kickoff prompt.
-**Branch this describes:** `blue/foundation` at `58b6cc7`. `main` at `05999fb`.
+**Branch this describes:** `main` and `blue/foundation`, both at `f8a9deb`.
 
 This file exists because the other docs are a mix of design intent, historical
 notes and superseded plans. Every number below was produced by running code in
@@ -10,30 +10,47 @@ this workspace on 2026-09-30. Anything not measured here is marked as planned.
 
 ---
 
-## 0. Read this before anything else: `main` is missing the Blue fixes
+## 0. Branch status: `main` is current — branch from it
 
-| | `origin/main` (`05999fb`) | `blue/foundation` (`58b6cc7`) |
-|---|---|---|
-| `cage-challenge-4/cc4_epymarl_wrapper.py` | **broken** — `max_hosts=16`, `vecs[:self.max_hosts]` | fixed — `max_hosts=51`, raises on overflow |
-| `cage-challenge-4/blue_action_masking.py` | **broken** — Restore unreachable, `CONFIRMED_ROOT` never set | fixed — validity/evidence masks, `VERIFY` state |
-| `cage-challenge-4/tests_blue/` | **absent** | 20 tests, all passing |
+`blue/foundation` was fast-forwarded into `main` on 2026-09-30. **Both refs are
+at `f8a9deb` and `main` contains everything Blue has built**, including
+`cage-challenge-4/tests_blue/`. Environment, Red and Evaluation should branch
+from `main` normally:
 
-If you branch from `main` you get the version that silently truncates host
-observations, resets the shared simulator five times per episode, and cannot
-reach `Restore`. **Environment, Red and Evaluation must wait for the Blue PR to
-merge, or work from `origin/blue/foundation` and record that you did.**
+```powershell
+git clone https://github.com/sourav-s-b/cyberally.git
+cd cyberally
+git switch -c environment/reproducible-runtime     # or your role's branch
+```
 
-The five specific defects in the `main` version, for reviewers:
+If you cloned before the merge, run `git pull --ff-only` on a clean tree, or
+`git switch main && git reset --hard origin/main` if you are certain you have no
+local work.
 
-1. `reset()` calls `cyborg.reset(agent=...)` once per Blue agent, so the five
-   agents observe five different worlds.
-2. `self.seed = seed` does not reseed; `cyborg.reset()` is called without it.
-3. `max_hosts=16` and `vecs[:self.max_hosts]` discard hosts. `blue_agent_4`
+**Historical note for reviewers only.** Up to `05999fb`, `main` held a broken
+wrapper and the fixes lived only on `blue/foundation`. Anyone who read the
+project docs between `e605ef3` and `f8a9deb` may have been warned away from
+`main`; that warning is obsolete. The five defects that were fixed, in case you
+need to review the change:
+
+1. `reset()` called `cyborg.reset(agent=...)` once per Blue agent, so the five
+   agents observed five different worlds.
+2. `self.seed = seed` did not reseed; `cyborg.reset()` was called without it.
+3. `max_hosts=16` and `vecs[:self.max_hosts]` discarded hosts. `blue_agent_4`
    owns three subnets and had 38 hosts at seed 7629.
-4. Host-local pending masks let a second host action overwrite `_awaiting`
-   while the controller silently discards the new action.
-5. Successful `Remove` sets ground-truth `CLEAN`, although Remove can return
+4. Host-local pending masks let a second host action overwrite `_awaiting` while
+   the controller silently discarded the new action.
+5. Successful `Remove` set ground-truth `CLEAN`, although Remove can return
    success without removing a privileged attacker.
+
+Verify the merge landed with:
+
+```powershell
+git ls-tree origin/main --name-only cage-challenge-4/tests_blue/
+Select-String -Path cage-challenge-4/cc4_epymarl_wrapper.py -Pattern 'max_hosts=16'
+```
+
+The first must list `test_foundation.py`; the second must return nothing.
 
 ---
 
@@ -168,7 +185,9 @@ actions, and dropping the concatenated critic state from 2550 to 1190.
 
 ## 4. Known traps for a coding assistant
 
-1. **`origin/main` is broken.** Section 0. Check before branching.
+1. **`main` and `blue/foundation` are both at `f8a9deb` and hold identical
+   content.** Branch from `main`. Earlier docs warned that `main` was broken;
+   that was true up to `05999fb` and is now history. Section 0.
 2. **Dimensions in the old handoff are unsafe.** `cage-challenge-4/handoff.md`
    once instructed `obs_shape=160, state_shape=800, n_actions=50`. Those are
    marked superseded. Always derive shapes from `get_env_info()`.

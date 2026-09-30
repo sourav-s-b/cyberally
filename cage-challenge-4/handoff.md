@@ -3,13 +3,15 @@
 ## Read first
 
 `../docs/current-state.md` is newer than this file and carries the measured
-behaviour, the `main`-versus-`blue/foundation` branch divergence and the trap
+behaviour, the branch status and the trap
 list. Read it before acting on anything below.
 
 Two corrections that matter most:
 
-1. **`main` still contains the broken wrapper.** The fixes described here live
-   only on `blue/foundation`. If you branch from `main` you get `max_hosts=16`
+1. **Those wrapper fixes are now merged.** `blue/foundation` was fast-forwarded
+   into `main`; both refs are at `f8a9deb` and hold the fixed wrapper plus
+   `cage-challenge-4/tests_blue/`. Branch from `main`. **History only:** when this
+   file was written, `main` still had `max_hosts=16`
    with `vecs[:self.max_hosts]` truncation, five simulator resets per episode,
    host-local pending masks and no reachable `Restore`.
 2. **The 160/800/50 dimensions below are superseded and must not be used.** See

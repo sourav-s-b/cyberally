@@ -13,6 +13,11 @@ Read [`../current-state.md`](../current-state.md) before any role file here. It
 records the measured behaviour of the simulator, which branch currently holds a
 working wrapper, and the traps that will otherwise cost an assistant an afternoon.
 
+**Branch status:** `main` and `blue/foundation` are both at `f8a9deb` and hold
+identical content, including `cage-challenge-4/tests_blue/`. Everyone may branch
+from `main`. Up to `05999fb` the fixes existed only on `blue/foundation`; any note
+saying otherwise is out of date.
+
 | Role | File | First branch |
 |---|---|---|
 | Blue | [blue.md](blue.md), detailed in [blue-session.md](blue-session.md) | `blue/foundation` |
@@ -20,6 +25,6 @@ working wrapper, and the traps that will otherwise cost an assistant an afternoo
 | Red | [red.md](red.md) | `red/strategy-adapter` |
 | Evaluation and retraining | [eval.md](eval.md) | `eval/baseline-harness` |
 
-Environment, Red and Evaluation are all recorded as **blocked** on two shared
-dependencies: the BLUE-01 wrapper fixes are not yet merged into `main`, and no
-pinned runtime exists. See `docs/current-state.md` sections 0 and 5.
+Environment, Red and Evaluation are all recorded as blocked on **one** shared
+dependency: no pinned runtime (Python 3.10 agreed, not installed). See
+`docs/current-state.md` sections 0 and 5.

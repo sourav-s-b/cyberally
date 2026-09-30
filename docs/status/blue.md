@@ -7,8 +7,8 @@ this page is its short index.
 
 - Owner: Sourav
 - First branch: `blue/foundation`
-- Status: BLUE-01 implemented and pushed on `blue/foundation`; **not merged into
-  `main`**. Action-space proposal drafted.
+- Status: BLUE-01 implemented, tested and **merged into `main`**. Both
+  `main` and `blue/foundation` are at `f8a9deb`. Action-space proposal drafted.
 - Completed: repaired joint reset/seeding, host capacity (raises instead of
   truncating), agent-wide pending actions, passive observation merging,
   validity/evidence mask separation, `VERIFY` state after remediation, episode
@@ -21,16 +21,17 @@ this page is its short index.
   view shows 0 the whole episode; 41 % of steps carry reward and the first ~135
   do not; 69 % of agent-ticks are forced to Sleep by the agent-wide pending
   lockout. See `docs/current-state.md` for the tables.
-- Blockers: `blue/foundation` must merge before Environment, Red or Evaluation
-  branch from `main`, which still contains the broken wrapper and has no
-  `tests_blue/`. No pinned runtime (torch absent, venv is 3.12 not the 3.10
-  target). `TrueStateWrapper` is broken against this CAGE4 snapshot, so the
-  privileged-label path for Evaluation must be built from
+- Blockers: none for branching — Environment, Red and Evaluation may branch from
+  `main`, which now carries the fixed wrapper and `tests_blue/`. Open items: no
+  pinned runtime (torch absent, venv is 3.12 not the 3.10 target), and the
+  action-space proposal is unaccepted. `TrueStateWrapper` is broken against this
+  CAGE4 snapshot, so the privileged-label path for Evaluation must be built from
   `get_true_state(info).data`. Upstream `test_blue_actions.py` cannot collect
   because its conftest imports Ray.
 - Dependency commits/PRs: bootstrap `e605ef3`; BLUE-01 fixes `7b76fc2` and
-  `58b6cc7`; merged main `05999fb`. No Environment, Red or Evaluation branch or
-  PR exists as of 2026-09-30.
+  `58b6cc7`; documentation and measured-state commit `f8a9deb`, fast-forwarded
+  into `main`. No Environment, Red or Evaluation branch or PR exists as of
+  2026-09-30.
 - Contract changes: **drafted, not accepted** —
   [`docs/coordination/blue-action-space.md`](../coordination/blue-action-space.md)
   proposes per-agent host bounds (17 for agents 0–3, 51 for agent 4), which

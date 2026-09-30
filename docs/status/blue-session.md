@@ -4,12 +4,14 @@
 
 **Owner:** Sourav
 
-**Working branch:** `blue/foundation` at `58b6cc7`
+**Working branch:** `blue/foundation` at `f8a9deb`
 **Base commit:** `e605ef3` (`chore: import CAGE4 prototype and establish team workflow`)
-**Merged in:** `origin/main` at `05999fb`
-**Current state:** BLUE-01 foundation is complete and pushed as `7b76fc2` plus
-`58b6cc7`. This session added the measured-behaviour tables and the action-space
-contract proposal. **`blue/foundation` is not merged into `main`.**
+**Merged in:** `origin/main` at `f8a9deb` — `blue/foundation` was fast-forwarded
+into `main`, so both refs are identical and Environment, Red and Evaluation can
+branch from `main`.
+**Current state:** BLUE-01 foundation is complete as `7b76fc2` plus `58b6cc7`,
+and this session added the measured-behaviour tables and the action-space
+contract proposal in `f8a9deb`. Next task is BLUE-02 heuristic baselines.
 
 Read `docs/current-state.md` before this file. It carries the measured facts and
 the trap list that everything below depends on.
@@ -83,19 +85,17 @@ Drafted this session, not committed to any contract yet:
 
 ## Next steps
 
-1. Open the PR for `blue/foundation` → `main`. Until it merges, Environment,
-   Red and Evaluation are branching from a broken wrapper.
-2. Install Python 3.10 and rebuild the venv with Environment (ENV-01), splitting
-   a simulator-only profile from a training profile that adds torch. torch is
-   absent today, so no training is possible.
-3. Ask Environment to confirm the per-agent host bounds of 17 and 51 before
+1. Python 3.10 and the venv rebuild with Environment (ENV-01), splitting a
+   simulator-only profile from a training profile that adds torch. torch is
+   absent today, so no training is possible. This is now the top blocker.
+2. Ask Environment to confirm the per-agent host bounds of 17 and 51 before
    they write any config, and get Evaluation's agreement on the `VERIFY`
    resolution rule using Blue-visible evidence only.
-4. Investigate whole-agent primary-session loss: native automatic Monitor
+3. Investigate whole-agent primary-session loss: native automatic Monitor
    dereferences session 0, so this needs a simulator-level decision.
-5. BLUE-02: build Sleep, built-in random, masked-random and round-robin
+4. BLUE-02: build Sleep, built-in random, masked-random and round-robin
    Analyse/Restore baselines; reproduce the step-200 seed-7629 numbers.
-6. BLUE-03 only after step 5: implement EPyMARL's actual constructor,
+5. BLUE-03 only after step 4: implement EPyMARL's actual constructor,
    tensor-action, reward and lifecycle interfaces. No long run before a complete
    rollout-plus-optimizer-update smoke test.
 
@@ -107,9 +107,10 @@ Drafted this session, not committed to any contract yet:
 > `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
 > and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
 > work: inspect `git status --short --branch` and fetch origin first. BLUE-01 is
-> `7b76fc2` plus `58b6cc7` on `blue/foundation` and is still unmerged; do not
-> reset or rewrite shared history. Next task is the merge, then Environment's
-> Python 3.10 runtime, then BLUE-02 heuristic baselines. Do not start MAPPO
+> `7b76fc2` plus `58b6cc7`, documented in `f8a9deb`, and **`blue/foundation` has
+> been fast-forwarded into `main` — both refs are at `f8a9deb` and identical**;
+> do not reset or rewrite shared history. Next task is Environment's Python 3.10
+> runtime (ENV-01), then BLUE-02 heuristic baselines. Do not start MAPPO
 > training before a complete optimizer-update smoke test, and never report an
 > unreproduced number as a result.
 
