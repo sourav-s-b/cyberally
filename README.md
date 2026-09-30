@@ -16,6 +16,10 @@ is claimed. The first milestone is a reliable simulation and evaluator.
 5. Copy the appropriate [agent kickoff prompt](docs/agent-prompts.md).
 6. Update your role's file in [team status](docs/status/README.md) with each PR.
 
+To resume Sourav's active Blue task in a new assistant conversation, read
+[the current Blue session update](docs/status/blue-session.md) and paste its
+resume prompt after the standard project instructions.
+
 ## Repository layout
 
 | Path | Purpose / primary owner |

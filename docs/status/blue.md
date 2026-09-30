@@ -1,5 +1,8 @@
 # Blue handoff
 
+**Latest detailed session state and resume prompt:** [blue-session.md](blue-session.md).
+Update that file at each meaningful Blue handoff; this page is its short index.
+
 - Owner: Sourav
 - First branch: `blue/foundation`
 - Status: design/audit complete; implementation fixes pending
