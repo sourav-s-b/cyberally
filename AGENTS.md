@@ -9,16 +9,21 @@ Do not treat the review slides' performance targets as achieved results.
 Read at session start:
 
 1. This file and any AGENTS.md in the area you will edit.
-2. `docs/team-workflow.md` and `docs/contracts.md`.
-3. `docs/implementation-plan.md` and `docs/status/<your-role>.md`.
-4. Blue work: `cage-challenge-4/blue-agent-plan.md` and the correction at the
+2. `docs/current-state.md`: measured simulator behaviour, which branch holds a
+   working wrapper, and the known traps. Newest document here; if anything else
+   disagrees with it, say so instead of assuming.
+3. `docs/team-workflow.md` and `docs/contracts.md`.
+4. `docs/implementation-plan.md` and `docs/status/<your-role>.md`.
+5. Blue work: `cage-challenge-4/blue-agent-plan.md` and the correction at the
    beginning of `cage-challenge-4/handoff.md`.
-5. Blue conversation continuity: `docs/status/blue-session.md` (latest working
+6. Blue conversation continuity: `docs/status/blue-session.md` (latest working
    state, tests, outstanding work and a resume prompt).
 
 Current instructions and accepted contracts take priority over old handoff text.
 User instructions take priority over this file. Contracts marked proposed are
 not implemented APIs; do not silently treat them as existing functionality.
+`cage-challenge-4/team-guide.md` predates this file and contradicts it on zone
+naming, topology trimming and the EPyMARL fork; do not follow it as instructions.
 
 ## Branch and workspace discipline
 

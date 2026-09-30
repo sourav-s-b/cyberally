@@ -7,6 +7,22 @@ research experiments. Static review found correctness blockers. There is no
 reproduced training run, unified evaluator, Red adapter or closed-loop pipeline.
 The review slides describe the long-term system; they are not acceptance evidence.
 
+**Read `docs/current-state.md` for measured behaviour.** Two facts change the
+order of work here:
+
+- BLUE-01 wrapper fixes are committed on `blue/foundation` but **not merged into
+  `main`**. Environment, Red and Evaluation must not branch from `main` until
+  that PR lands, or they will build against a wrapper that truncates host
+  observations, resets the simulator once per agent and cannot reach `Restore`.
+- No pinned runtime exists. The local venv is Python 3.12 with no torch;
+  Python 3.10 is the agreed target. Every live test and all training depend on
+  Environment closing this.
+
+Blue host capacity is **per agent** — 17 for agents 0-3, 51 for agent 4 — so
+no shared shape constant should be written into any config before
+`docs/coordination/blue-action-space.md` is resolved. Derive shapes from
+`get_env_info()`.
+
 Keep the full existing CAGE4 scenario for the first integration. A reduced topology
 and real Docker/eBPF actions are separately versioned Environment deliverables.
 Plan by exit criteria, not by an assumed number of weeks; training runtime is unknown.

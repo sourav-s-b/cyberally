@@ -1,5 +1,20 @@
 # Handoff: CAGE4 Blue RL + masking — everything the next AI needs
 
+## Read first
+
+`../docs/current-state.md` is newer than this file and carries the measured
+behaviour, the `main`-versus-`blue/foundation` branch divergence and the trap
+list. Read it before acting on anything below.
+
+Two corrections that matter most:
+
+1. **`main` still contains the broken wrapper.** The fixes described here live
+   only on `blue/foundation`. If you branch from `main` you get `max_hosts=16`
+   with `vecs[:self.max_hosts]` truncation, five simulator resets per episode,
+   host-local pending masks and no reachable `Restore`.
+2. **The 160/800/50 dimensions below are superseded and must not be used.** See
+   the superseded notice in the EPyMARL section.
+
 ## 2026-09-30 design-review correction
 
 Read `blue-agent-plan.md` before following the historical training instructions
@@ -43,11 +58,19 @@ over the joint-step implementation with the other agents sleeping.
 
 Regression tests: `tests_blue/test_foundation.py`, run with
 `.venv\\Scripts\\python -m pytest -q tests_blue` from `cage-challenge-4`:
-15 passed. Three 75-step masked-random episodes (seeds 42, 7629, 7630) completed;
-all action masks held and per-agent common rewards matched. The upstream Blue
-actions pytest could not collect because its wrappers import optional `ray`, absent
-from the isolated venv. Gym emits its upstream maintenance warning. The venv is
-ignored and no dependency manifest was changed.
+**20 passed** as of `58b6cc7`. Three 75-step masked-random episodes (seeds 42,
+7629, 7630) completed; all action masks held and per-agent common rewards
+matched. The upstream Blue actions pytest could not collect because its wrappers
+import optional `ray`, absent from the isolated venv. Gym emits its upstream
+maintenance warning. The venv is ignored and no dependency manifest was changed.
+
+Measured 2026-09-30 (seed 7629, masked random, `blue/foundation`): 44 ms per
+joint step; true-state Red reaches 13 user + 21 root sessions by step 100 while
+Blue's own observation view shows zero compromised hosts for the whole episode;
+162 of 399 steps carry reward and the first ~135 do not; 1374 of 1995 agent-ticks
+had exactly one legal action. Per-agent host capacity should be 17 for agents 0-3
+and 51 for agent 4, not 51 for everyone — see
+`../docs/coordination/blue-action-space.md`.
 
 Still open: install/pin runtime with Environment; test real session-loss/action
 failure cases; agree on verification after remediation; EPyMARL runner
@@ -86,17 +109,29 @@ register the env, train MAPPO, beat Random (48 total / 35 root @ step 200).
 - File-rule detector: test AUC 0.875, 0/62 clean FPs, ~25% aimed-Analyse miss rate (hence 2-strike rule).
 
 ## EPyMARL wiring (exact next steps)
+
+> **SUPERSEDED — do not follow verbatim.** Steps 2 and 3 hard-code
+> `obs_shape=160, state_shape=800, n_actions=50`. Those were derived from the
+> old `max_hosts=16` wrapper and are wrong twice over: the fixed capacity is now
+> 51 hosts, and the correct capacity is per agent. Derive every shape from
+> `get_env_info()` at runtime. Also note the repo is `uoe-agents/epymarl`, not
+> `oxwhirl/epymarl`. Steps 1 and 4 still hold.
+
 1. `pip install` EPyMARL deps (torch 2.2 already in venv; network works — shallow clone
    tested at `/tmp/epymarl`, repo `uoe-agents/epymarl`). Interface to match:
    `MultiAgentEnv`: `reset()`, `step(actions)->(obss,reward,terminated,truncated,info)`,
    `get_obs/get_state/get_avail_actions/get_total_actions/get_env_info` — all implemented.
 2. Register: in EPyMARL `src/envs/__init__.py` add
    `REGISTRY["cc4"] = lambda **kw: CC4MARLEnv(**kw)` (import from this repo).
-3. Config yaml: mappo, `n_agents=5`, `obs_shape=160`, `state_shape=800`, `n_actions=50`,
-   `episode_limit=400`. Env already returns avail masks — enable action masking in the
-   MAPPO config (that's the whole point of the tracker).
+3. Config yaml: mappo, `n_agents=5`, shapes read from `get_env_info()`, never
+   written by hand. Env already returns avail masks — enable action masking in
+   the MAPPO config (that's the whole point of the tracker).
 4. Success metric: mean episode reward trending up. Then true-state compromise counts
    at step 200 vs baselines below.
+
+Steps 2–3 also have to absorb constructor options `common_reward` and
+`reward_scalarisation`, which the runner passes and this wrapper does not yet
+accept.
 
 ## Baseline targets (true-state compromised hosts @ step 200, seed 7629)
 | Policy | total (root) | Beat this |

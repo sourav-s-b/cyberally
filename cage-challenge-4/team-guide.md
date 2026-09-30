@@ -1,5 +1,28 @@
 # Self-Evolving SOC — Team Split & Research Guide
 
+> ## ⚠️ SUPERSEDED — historical planning document. Do not follow as instructions.
+>
+> This file predates the project's `AGENTS.md` and `docs/contracts.md`. It is
+> kept for provenance and for the research pointers at the bottom, but several
+> of its concrete recommendations are **forbidden or wrong in this repository**.
+> A coding assistant reading this file without reading root `AGENTS.md` will
+> break the project's contracts.
+>
+> | This file says | The project actually requires |
+> |---|---|
+> | Trim CAGE4 to 2–3 zones (Restricted, Operational, DMZ) | Keep the **full** CAGE4 topology for first integration (`docs/implementation-plan.md`). A reduced topology is a separately versioned Environment deliverable. |
+> | Rename zones/hosts to `<zone_id>_host_<n>` | **Do not rename** CAGE zones or hosts. Keep real simulator identifiers such as `operational_zone_b_subnet_user_host_0` (`AGENTS.md`, `docs/contracts.md`). |
+> | Observation schema with `status: "compromised"` and `anomaly_score` | Blue must **never** observe ground truth. `status: "compromised"` is a privileged evaluation label, not an actor feature. |
+> | Strategy pool entry as a stored `action_sequence` | A logged action trace is a diagnostic only. Replay validity needs a replayable policy/config, seed, version and preconditions (`docs/contracts.md`). |
+> | `oxwhirl/epymarl` | `uoe-agents/epymarl`. |
+> | Docker containerisation and real JuiceShop/DVWA | Out of scope for the prototype. Those are slide targets, not deliverables. |
+>
+> **Authoritative sources:** root `AGENTS.md`, `docs/current-state.md`,
+> `docs/contracts.md`, `docs/implementation-plan.md`.
+>
+> The zone/host renaming above is the single most dangerous item — acting on it
+> would break every existing import.
+
 Detailed version: who starts on what, what to research, and exactly where to look.
 
 ---

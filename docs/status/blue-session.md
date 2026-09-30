@@ -4,94 +4,119 @@
 
 **Owner:** Sourav
 
-**Working branch:** `blue/foundation`
-
+**Working branch:** `blue/foundation` at `58b6cc7`
 **Base commit:** `e605ef3` (`chore: import CAGE4 prototype and establish team workflow`)
-**Current state:** BLUE-01 foundation is committed and pushed as `7b76fc2`.
-`origin/main` at `05999fb` was merged into `blue/foundation`; this session adds
-focused tests for lost target sessions, timeout recovery, and passive-event freshness.
+**Merged in:** `origin/main` at `05999fb`
+**Current state:** BLUE-01 foundation is complete and pushed as `7b76fc2` plus
+`58b6cc7`. This session added the measured-behaviour tables and the action-space
+contract proposal. **`blue/foundation` is not merged into `main`.**
+
+Read `docs/current-state.md` before this file. It carries the measured facts and
+the trap list that everything below depends on.
 
 ## Goal
 
-Build a reliable CAGE4 Blue defender, establish good baselines, then train/evaluate
-MARL and attacker adaptation. Read root `AGENTS.md`, `docs/implementation-plan.md`,
-`docs/contracts.md`, `cage-challenge-4/blue-agent-plan.md`, and the correction at
-the top of `cage-challenge-4/handoff.md` before changing code.
+Build a reliable CAGE4 Blue defender, establish strong baselines, then train and
+evaluate MAPPO and attacker adaptation. Read root `AGENTS.md`,
+`docs/implementation-plan.md`, `docs/contracts.md`,
+`cage-challenge-4/blue-agent-plan.md`, and the correction at the top of
+`cage-challenge-4/handoff.md` before changing code.
 
 ## Current Blue changes
 
-Committed in `7b76fc2` on `blue/foundation`:
+Committed in `7b76fc2` and `58b6cc7` on `blue/foundation`:
 
-- Reworked `cage-challenge-4/cc4_epymarl_wrapper.py` to reset the shared simulator
-  once, apply explicit seeds, advance RNG when no seed is supplied, reject host
-  overflow, track one pending action per agent, merge all visible host observations,
-  keep simulator validity masks separate from opt-in evidence masks, and distinguish
-  terminal completion from horizon truncation.
-- Increased fixed capacity to the scenario-derived 51 hosts. At seed 7629, the
-  fifth agent currently sees 38 hosts; current dimensions are 510 local observation
-  features, 155 discrete actions, and 2,550 concatenated state features.
-- Made the single-agent wrapper a facade over the same joint-step implementation.
-- Reworked `blue_action_masking.py`: positive evidence and pending actions are
-  separate, Restore remains reachable in validity mode, and successful remediation
-  transitions to VERIFY rather than declaring the host clean.
+- Reworked `cage-challenge-4/cc4_epymarl_wrapper.py`: reset the shared simulator
+  once, apply explicit seeds and advance the RNG when none is supplied, reject
+  host overflow instead of truncating, track exactly one pending action per
+  agent, merge observations for every visible host every tick, keep simulator
+  validity masks separate from opt-in evidence masks, and distinguish native
+  termination from horizon truncation.
+- Capacity raised to the scenario-derived 51 hosts. At seed 7629 agent 4 sees 38
+  hosts, so the current dimensions are 510 local observation features, 155
+  discrete actions, 2550 concatenated state.
+- `CC4BlueWrapper` is a single-agent facade over the same joint-step
+  implementation rather than a parallel copy of the bookkeeping.
+- Reworked `cage-challenge-4/blue_action_masking.py`: pending actions no longer
+  overwrite belief, `Restore` stays reachable in validity mode, and successful
+  remediation transitions to `VERIFY` instead of declaring the host clean.
 - Added `cage-challenge-4/tests_blue/test_foundation.py`.
-- Added live tests showing Analyse, Remove, and Restore return `FALSE` when their
-  target Blue child session disappears while pending. The original target stays
-  attributed, pending state clears, and no clean label is inferred. An overdue
-  action still fails explicitly; reset clears the unresolved pending state.
-- Confirmed with a live passive Monitor path that a new process event replaces the
-  prior event delta and advances the observation timestamp; a tick without an
-  event preserves the last observation and its timestamp.
-- Updated `cage-challenge-4/handoff.md` and `docs/status/blue.md` in that branch.
+- Added live tests for lost target sessions (Analyse/Remove/Restore returning
+  `FALSE` when the child session disappears mid-action, with the original target
+  still attributed and no clean label inferred), overdue-action failure, reset
+  clearing unresolved pending state, and passive Monitor event replacement with
+  timestamp advancement.
 
-The workspace venv `.venv` is ignored and local-only. It uses Python 3.12,
-NumPy 1.26.4, Gym 0.26.2, Gymnasium 0.28.1, NetworkX 3.2.1 and pytest 8.0.0.
-This is not yet the Environment team's pinned runtime.
+Drafted this session, not committed to any contract yet:
+
+- `docs/current-state.md` — measured facts, branch topology, trap list.
+- `docs/coordination/blue-action-space.md` — per-agent host bounds proposal.
 
 ## Verification already completed
 
-- From `cage-challenge-4`: `..\\.venv\\Scripts\\python.exe -m pytest -q tests_blue`
-  — **20 passed** after the new tests.
-- Three masked-random episodes (seeds 42, 7629, 7630), 75 steps each — completed;
-  per-agent common rewards matched and action masks remained valid.
-- `.venv\\Scripts\\python scripts\\check_source.py` from repo root — 163
-  tracked Python files passed syntax parsing.
-- Upstream `CybORG/Tests/test_cc4/test_blue_actions.py` did not collect because its
-  test conftest imports optional Ray. Gym 0.26 prints its upstream maintenance warning.
-- No MAPPO training, EPyMARL integration, heuristic benchmark, or historical
-  baseline reproduction has been completed.
+- From `cage-challenge-4`: `..\.venv\Scripts\python.exe -m pytest -q tests_blue`
+  — **20 passed** (12.7 s).
+- Three masked-random episodes (seeds 42, 7629, 7630), 75 steps each —
+  completed; per-agent common rewards matched and action masks held.
+- `.venv\Scripts\python.exe scripts\check_source.py` from repo root — 163
+  tracked Python files parsed.
+- Measured this session, masked-random policy, seed 7629 unless noted:
+  - 44 ms per joint step, 0.19 s reset, ~18 s per 400-step episode.
+  - True-state Red sessions via `get_true_state(info).data`, host-wide: 1 at t0,
+    13 user + 21 root at step 100, 17 + 27 at step 200, 18 + 15 at step 300.
+  - `host_ground_truth()` over `blue_agent_4`'s own observation view: 0 for every
+    host at every one of 399 steps, across seeds 7629, 7630 and 7640. Note the
+    true-state count is host-wide and the Blue-view count covers agent 4's hosts
+    only, so they are not a like-for-like ratio.
+  - 162 of 399 steps carry nonzero reward; the first ~135 do not. Mission phases
+    are `(134, 133, 133)`; phase 0 is pre-planning.
+  - 1374 of 1995 agent-ticks had exactly one legal action (Sleep) — 69 %.
+  - Live nonzero features within a single agent's observation: 22–39 %.
+  - Per-agent host counts across seeds 7629–7660: agents 0–3 hold 7–14 hosts
+    with exactly 1 router each; agent 4 holds 29–38 with 3 routers. Scenario
+    bound is 17 per subnet, 51 for agent 4.
+  - `CybORG/Agents/Wrappers/TrueStateWrapper.py:62` raises `AttributeError`
+    against this snapshot because `get_true_state(info)` returns an
+    `Observation`, not a dict; `CybORG.Agents.Wrappers` also imports Ray.
+- Not done: no MAPPO training, no EPyMARL integration, no heuristic benchmark,
+  no historical baseline reproduction, no upstream test-suite run.
 
 ## Next steps
 
-1. Check whole-agent primary-session loss with Environment: native automatic Monitor
-   dereferences session 0, so this needs a simulator-level decision. Continue
-   checking passive observations under real Red episodes.
-2. Coordinate with Environment on the pinned runtime and reset/scenario contract;
-   no Environment branch was published at this handoff.
-3. Agree with Evaluation how a VERIFY state resolves using Blue-visible evidence.
-   Keep simulator truth restricted to evaluation.
-4. Once BLUE-01 is reviewed, build Sleep/random/round-robin heuristic evaluation;
-   then implement EPyMARL's actual constructor, tensor action, reward and lifecycle
-   interfaces. Do not start a long run before a complete optimizer-update smoke test.
+1. Open the PR for `blue/foundation` → `main`. Until it merges, Environment,
+   Red and Evaluation are branching from a broken wrapper.
+2. Install Python 3.10 and rebuild the venv with Environment (ENV-01), splitting
+   a simulator-only profile from a training profile that adds torch. torch is
+   absent today, so no training is possible.
+3. Ask Environment to confirm the per-agent host bounds of 17 and 51 before
+   they write any config, and get Evaluation's agreement on the `VERIFY`
+   resolution rule using Blue-visible evidence only.
+4. Investigate whole-agent primary-session loss: native automatic Monitor
+   dereferences session 0, so this needs a simulator-level decision.
+5. BLUE-02: build Sleep, built-in random, masked-random and round-robin
+   Analyse/Restore baselines; reproduce the step-200 seed-7629 numbers.
+6. BLUE-03 only after step 5: implement EPyMARL's actual constructor,
+   tensor-action, reward and lifecycle interfaces. No long run before a complete
+   rollout-plus-optimizer-update smoke test.
 
 ## Resume prompt for a new conversation
 
-> Continue the Blue defender work in `G:\\Projects\\cyberally`. Read
-> `AGENTS.md`, `docs/status/blue-session.md`, `docs/status/blue.md`,
+> Continue the Blue defender work in `G:\Projects\cyberally`. Read `AGENTS.md`,
+> `docs/current-state.md`, `docs/status/blue-session.md`, `docs/status/blue.md`,
 > `docs/contracts.md`, `docs/implementation-plan.md`,
-> `cage-challenge-4/blue-agent-plan.md`, and the correction at the top of
-> `cage-challenge-4/handoff.md`. Preserve my work: inspect `git status --short
-> --branch` and fetch origin first. BLUE-01 is committed and pushed as `7b76fc2`
-> on `blue/foundation`; the latest session handoff was updated on main after that
-> push. Continue the listed BLUE-01 edge cases; do not reset or rewrite shared
-> history. Run the focused suite after code edits and update this session file and
-> Blue status with measured results. MAPPO/EPyMARL training is still future work.
-> MAPPO/EPyMARL training is still future work.
+> `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
+> and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
+> work: inspect `git status --short --branch` and fetch origin first. BLUE-01 is
+> `7b76fc2` plus `58b6cc7` on `blue/foundation` and is still unmerged; do not
+> reset or rewrite shared history. Next task is the merge, then Environment's
+> Python 3.10 runtime, then BLUE-02 heuristic baselines. Do not start MAPPO
+> training before a complete optimizer-update smoke test, and never report an
+> unreproduced number as a result.
 
 ## Update rule
 
-At each meaningful Blue handoff, replace this file's “Current Blue changes,”
-“Verification,” and “Next steps” with the latest state. Include branch and base
-commit, whether changes are staged/committed/pushed, exact commands/results, open
-contracts and next task. Update `docs/status/blue.md` as the short index. Never
-report a run that did not actually complete.
+At each meaningful Blue handoff, replace "Current Blue changes," "Verification"
+and "Next steps" with the latest state. Include branch and base commit, whether
+changes are staged/committed/pushed, exact commands and results, open contracts
+and the next task. Update `docs/status/blue.md` as the short index. Never report
+a run that did not actually complete.

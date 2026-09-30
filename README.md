@@ -3,32 +3,46 @@
 Shared student project for a CybORG/CAGE4 cyber-range, Red agents, Blue MARL
 defenders, and a measured adversarial retraining loop.
 
-**Status:** research prototype. Blue observation/masking/wrapper code exists but
-has known correctness blockers. No trained Blue policy or real-world deployment
-is claimed. The first milestone is a reliable simulation and evaluator.
+**Status:** research prototype. Blue observation/masking/wrapper code exists and
+20 regression tests pass, but it lives only on `blue/foundation`; no trained Blue
+policy or real-world deployment is claimed. The first milestone is a reliable
+simulation and evaluator.
 
 ## Start here
 
 1. Human or coding assistant: read [AGENTS.md](AGENTS.md).
-2. Set up your clone and branch: [team workflow](docs/team-workflow.md).
-3. Find your deliverables: [implementation plan](docs/implementation-plan.md).
-4. Read [integration contracts](docs/contracts.md) before changing interfaces.
-5. Copy the appropriate [agent kickoff prompt](docs/agent-prompts.md).
-6. Update your role's file in [team status](docs/status/README.md) with each PR.
+2. Read [docs/current-state.md](docs/current-state.md). It is the newest document
+   here and holds the measured behaviour, the branch divergence and the traps.
+3. Set up your clone and branch: [team workflow](docs/team-workflow.md).
+4. Find your deliverables: [implementation plan](docs/implementation-plan.md).
+5. Read [integration contracts](docs/contracts.md) before changing interfaces.
+6. Copy the appropriate [agent kickoff prompt](docs/agent-prompts.md).
+7. Update your role's file in [team status](docs/status/README.md) with each PR.
 
 To resume Sourav's active Blue task in a new assistant conversation, read
 [the current Blue session update](docs/status/blue-session.md) and paste its
 resume prompt after the standard project instructions.
 
+### Known branch divergence
+
+`origin/main` and `blue/foundation` differ behaviourally, not just in content.
+The `main` copy of `cage-challenge-4/cc4_epymarl_wrapper.py` truncates host
+observations to 16 hosts, resets the shared simulator once per Blue agent, and
+leaves `Restore` unreachable. The fixes and the `tests_blue/` suite exist only on
+`blue/foundation`. Check before branching; details in
+[docs/current-state.md](docs/current-state.md) section 0.
+
 ## Repository layout
 
 | Path | Purpose / primary owner |
 |---|---|
-| `cage-challenge-4/CybORG/` | Existing upstream simulator; Environment owns team modifications |
-| `cage-challenge-4/blue_*.py`, `cc4_epymarl_wrapper.py` | Existing Blue experiments and wrappers; Blue |
+| `cage-challenge-4/CybORG/` | Existing upstream simulator, unmodified; Environment owns team changes |
+| `cage-challenge-4/blue_*.py`, `cc4_epymarl_wrapper.py` | Blue experiments and wrappers; Blue |
+| `cage-challenge-4/tests_blue/` | Blue live regression suite; Blue |
 | `cage-challenge-4/blue-agent-plan.md` | Detailed Blue design, audit and experiments |
 | `cage-challenge-4/handoff.md` | Historical Blue handoff; read correction at its top |
-| `red/`, `environment/`, `loop_eval/` | New team-owned integration work; scoped instructions in each |
+| `cage-challenge-4/team-guide.md` | **Superseded** original planning doc; read the banner before using |
+| `red/`, `environment/`, `loop_eval/` | New team-owned integration work; scope files only so far |
 | `docs/` | Shared contracts, roadmap, handoffs and references |
 | `Zeroth_main.pptx` | Original review deck; aspirational claims are not measured results |
 
@@ -39,15 +53,18 @@ their task branches from the shared `main` after cloning.
 
 ## Execution environment
 
-Git/documentation work can run on Windows. Python 3.10 in a dedicated virtual
-environment is the initial compatibility target, based on the existing 2024-era
-dependency pins. It is not yet a validated installation. The historical Linux
-venv and the current global Python installation are not a reproducible setup.
+Git/documentation work can run on Windows. **Python 3.10 is the agreed
+compatibility target** and is not yet installed; the existing local venv is
+Python 3.12 with no `torch`, and `torch==2.2.0` has no cp312 wheel. The historical
+Linux venv and the current global Python installation are not a reproducible
+setup.
 
 Environment's first task is a tested minimal dependency set and lock/install
-instructions. Do not install all optional Ray, SB3, GNN and EPyMARL stacks into a
-global interpreter or upgrade pins independently on each branch. Training scripts
-and a unified run command are pending; see milestone M0 in the plan.
+instructions, split into a simulator-only profile and a separate training
+profile that adds torch. Do not install all optional Ray, SB3, GNN and EPyMARL
+stacks into a global interpreter or upgrade pins independently on each branch.
+Training scripts and a unified run command are pending; see milestone M0 in the
+plan.
 
 ## Source and licensing
 
