@@ -14,17 +14,23 @@ ACTION_OFFSET = {"Analyse": 0, "Remove": 1, "Restore": 2}
 
 
 def action_index(env, agent, host, action):
-    """Discrete index for (host, action) under the current global bound."""
+    """Discrete index for (host, action); identical under both bound modes."""
     return 2 + 3 * env.hostnames[agent].index(host) + ACTION_OFFSET[action]
 
 
 def decode_index(env, agent, idx):
-    """(action_name, host_or_None) for logging; mirrors wrapper._decode."""
+    """(action_name, host_or_None) for logging; mirrors wrapper._decode.
+
+    Indices outside the agent's own width (possible for unmasked random
+    policies under per-agent bounds) report as the Sleep the wrapper executes.
+    """
     if idx == 0:
         return ("Sleep", None)
     if idx == 1:
         return ("Monitor", None)
     hi, action_type = divmod(idx - 2, 3)
+    if hi >= len(env.hostnames[agent]) or action_type >= len(wrapper.ACTION_TEMPLATES):
+        return ("Sleep", None)
     return (wrapper.ACTION_TEMPLATES[action_type], env.hostnames[agent][hi])
 
 
@@ -160,14 +166,16 @@ def count_compromised(env):
     return total, root
 
 
-def run_episode(policy, seed=7629, steps=400, snapshot_steps=(200,), mask_mode="validity"):
+def run_episode(policy, seed=7629, steps=400, snapshot_steps=(200,), mask_mode="validity",
+                **env_kwargs):
     """Run one fixed-seed episode; return rewards, snapshots and action trace.
 
     snapshot_steps are 1-indexed env ticks (step 200 == after 200 joint steps).
     Rewards are the native common team reward (identical per agent); the
-    cumulative return is summed once, not once per agent.
+    cumulative return is summed once, not once per agent. Extra kwargs (e.g.
+    ``per_agent_bounds=True``) go to the wrapper constructor.
     """
-    env = wrapper.CC4MARLEnv(seed=seed, steps=steps, mask_mode=mask_mode)
+    env = wrapper.CC4MARLEnv(seed=seed, steps=steps, mask_mode=mask_mode, **env_kwargs)
     env.reset(seed=seed)
     policy.reset()
     snapshots = {}
@@ -199,7 +207,8 @@ def run_episode(policy, seed=7629, steps=400, snapshot_steps=(200,), mask_mode="
     }
 
 
-def evaluate_policies(factories, seeds, steps=400, snapshot_steps=(200,), mask_mode="validity"):
+def evaluate_policies(factories, seeds, steps=400, snapshot_steps=(200,), mask_mode="validity",
+                      **env_kwargs):
     """Paired multi-seed comparison: every policy runs every seed.
 
     factories maps a policy name to a zero-arg callable returning a fresh
@@ -211,7 +220,8 @@ def evaluate_policies(factories, seeds, steps=400, snapshot_steps=(200,), mask_m
     return {
         name: {
             seed: run_episode(factory(), seed=seed, steps=steps,
-                              snapshot_steps=snapshot_steps, mask_mode=mask_mode)
+                              snapshot_steps=snapshot_steps, mask_mode=mask_mode,
+                              **env_kwargs)
             for seed in seeds
         }
         for name, factory in factories.items()

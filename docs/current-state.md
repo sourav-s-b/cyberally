@@ -185,8 +185,15 @@ that can never be legal. Proposed fix is in
 per-agent bounds of 17 / 51, giving agents 0–3 an observation of 170 and 53
 actions, and dropping the concatenated critic state from 2550 to 1190.
 
-**Not implemented.** Until it is, any training config written against
-`155 / 510 / 2550` will load on paper and behave like the current wrapper.
+**Step 1 implemented on `blue`** (`CC4MARLEnv(per_agent_bounds=True)`):
+bounds 17/17/17/17/51, actions 53/53/53/53/155, obs 170×4 + 510, critic state
+1190, host indexing unchanged, masked-random trajectories identical across
+modes. Default mode is still the global bound, and stock EPyMARL (one shared
+head) still requires it — per-agent mode is for heuristics, logging, and
+future heterogeneous training. Training configs written against
+`155 / 510 / 2550` keep working; per-agent consumers must read the
+`*_per_agent` keys in `get_env_info()`. Steps 2–3 of the proposal (consumer
+migration, global-default removal) are unreviewed.
 
 ---
 

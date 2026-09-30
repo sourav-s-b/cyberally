@@ -4,8 +4,9 @@
 
 **Owner:** Sourav
 
-**Working branch:** `blue/status-handoff` (docs only; stacked on the two
-pushed branches below, branched from `d05d043`)
+**Working branch:** `blue` (singular Blue branch; task branches consolidated
+and deleted local+remote, `origin/blue` tracks it). Head carries BLUE-02,
+BLUE-03 conformance, the docs handoff, and foundation-v2 below.
 **Base commit:** `e605ef3` (`chore: import CAGE4 prototype and establish team workflow`)
 **Merged in:** `origin/main` at `f8a9deb` — `blue/foundation` was fast-forwarded
 into `main`, so both refs are identical and Environment, Red and Evaluation can
@@ -165,6 +166,20 @@ the evaluator: the privileged path on `CC4MARLEnv` is `env.env`, not
 `env.environment_controller`; `docs/current-state.md` trap 3 now says so and
 `count_compromised()` is the reference.
 
+## foundation-v2 per-agent bounds (this session, on `blue`)
+
+`CC4MARLEnv(per_agent_bounds=True)`: caps `[17, 17, 17, 17, 51]` derived from
+the scenario's own subnet counts, giving actions `[53, 53, 53, 53, 155]`,
+obs `[170, 170, 170, 170, 510]`, critic state 1190. Host order and indices
+are untouched, so masked-random trajectories are identical across modes
+(tested). Out-of-agent-range indices coerce to Sleep instead of raising;
+`get_env_info()` gains `*_per_agent` keys plus version. Default mode is
+byte-identical v1 behavior and stock EPyMARL still requires it (one shared
+head cannot span 53- and 155-wide agents). `CC4BlueWrapper` reports its own
+agent's widths; `run_episode`/`evaluate_policies` take env kwargs;
+`WRAPPER_VERSION` is now `foundation-v2`. Proposal step 1 of 3 — Environment
+and Evaluation have not reviewed; no consumer migrated yet.
+
 ## Multi-seed suite (this session, `evaluate_policies`, seeds 7629/7630/7640)
 
 Same setup as above; masked-random policy seed fixed at 0, fresh policy per
@@ -188,15 +203,13 @@ the ≥30-seed held-out suite from the Blue plan is Evaluation's build, not this
 > `docs/contracts.md`, `docs/implementation-plan.md`,
 > `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
 > and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
-> work: inspect `git status --short --branch` and fetch origin first. Pushed,
-> unmerged Blue branches off `d05d043`: `blue/baseline-policies` (`4471c27`,
-> BLUE-02), `blue/epymarl-conformance` (`3b414b4`, stacked, BLUE-03 contract +
-> proposal), `blue/status-handoff` (this docs branch, stacked); the
+> work: inspect `git status --short --branch` and fetch origin first. Blue
+> work lives on singular branch `blue` (tracks `origin/blue`); the
 > `environment/` uv drafts stay uncommitted for Environment. Do not reset or
-> rewrite shared history. Next tasks: review the three PRs branch-by-branch,
-> then EPyMARL install + first real MAPPO rollout in their runner. Do not
-> start long training before that smoke passes, and never report an
-> unreproduced number as a result.
+> rewrite shared history. Next tasks: open the PR from `blue`, get the
+> action-space proposal reviewed (steps 2–3), then EPyMARL install + first
+> real MAPPO rollout in their runner. Do not start long training before that
+> smoke passes, and never report an unreproduced number as a result.
 
 ## Update rule
 

@@ -33,7 +33,11 @@ this page is its short index.
   EPyMARL pinned at `cbc38c09` but not installed; wrapper already speaks the
   runner contract (ctor kwargs, scalar common reward, `episode_limit` info,
   lifecycle methods — see blue-session.md) and a torch train-smoke passes.
-  Real MAPPO-in-their-runner is the remaining BLUE-03 step, not torch. `TrueStateWrapper` is broken against this
+  Real MAPPO-in-their-runner is the remaining BLUE-03 step, not torch.
+- foundation-v2 landed on `blue` (unpushed): `per_agent_bounds=True` gives
+  17/17/17/17/51 hosts, 53/155 actions, 170/510 obs, 1190 critic state, with
+  identical host indexing and trajectories; default mode unchanged and still
+  required for stock EPyMARL. Proposal step 1 of 3; consumers unmigrated. `TrueStateWrapper` is broken against this
   CAGE4 snapshot, so the privileged-label path for Evaluation must be built from
   `get_true_state(info).data`. Upstream `test_blue_actions.py` cannot collect
   because its conftest imports Ray.
