@@ -196,6 +196,37 @@ seed (25→11, 19→13, 15→9) with equal-or-better return at @200 and at final
 Sleep collapses late (returns in the thousands negative). Still only 3 seeds —
 the ≥30-seed held-out suite from the Blue plan is Evaluation's build, not this.
 
+## First real MAPPO training (2026-09-30, `blue/mappo-training`, base `377ab29`)
+
+PR #1 (`blue` → `main`) is merged. EPyMARL `cbc38c09` is vendored at
+`third_party/epymarl/` (gitignored via new `third_party/` line; LICENSE +
+NOTICE + PIN.txt retained, src unmodified) and linked into `.venv-train` by
+`.venv-train/Lib/site-packages/cyberally_epymarl.pth`. `smaclite` exists only
+as from-source GitHub (not PyPI), so the SMAC-only dead import is stubbed in
+our glue with a loud error on real use. No sacred/torchvision/pettingzoo in
+the training path — driver calls EPyMARL's `run_sequential` directly with
+their EpisodeRunner/buffer/BasicMAC/PPOLearner and a plain stdlib logger.
+
+- `blue_train_mappo.py`: config mirrors their mappo.yaml (episode runner,
+  batch 1, common reward, RNN-64 actor + central-V critic, shapes from
+  `get_env_info()`), torch threads capped at 2, CLI for steps/t_max/seed,
+  per-run manifest.json + stats.json under gitignored `results/`.
+- Smoke (2×50 steps) then short run (8×100 steps, seed 7, ~76 s): finite
+  pg/critic losses, nonzero grad norms, critic loss 2.94→2.53, checkpoints
+  saved every run. Torch 2.14 emits upstream deprecation warnings (non-tuple
+  indexing in their buffer) — noise, behavior unchanged; do not patch src/.
+- `blue_eval_mappo.py` loads `agent.th` greedily through `evaluate_policies`
+  (400 steps, seeds 7629/7630/7640): the 8-episode checkpoint scores like
+  Sleep (returns -1651…-4139, roots 41–52 @200) vs round-robin (-85…-123,
+  roots 9–13) and masked-random (-190…-276). **Loop proven, not a defender.**
+  Masked-random beating Sleep 10× on return says the reward is dense enough
+  to learn from — the gap is training volume, not signal.
+- Caveats: first reset fixed (7629), later bare resets CybORG-random and
+  unrecorded — seed cycling needed before any serious run. Seed 7640 is much
+  harsher than 7629/7630 (Sleep -4138 vs ~-1600): train multi-seed. One
+  unexplained full-Windows freeze hit the very first attempt; two full runs
+  since completed cleanly — cause undetermined, reruns are cheap, watch it.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in `G:\Projects\cyberally`. Read `AGENTS.md`,
@@ -204,12 +235,12 @@ the ≥30-seed held-out suite from the Blue plan is Evaluation's build, not this
 > `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
 > and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
 > work: inspect `git status --short --branch` and fetch origin first. Blue
-> work lives on singular branch `blue` (tracks `origin/blue`); the
-> `environment/` uv drafts stay uncommitted for Environment. Do not reset or
-> rewrite shared history. Next tasks: open the PR from `blue`, get the
-> action-space proposal reviewed (steps 2–3), then EPyMARL install + first
-> real MAPPO rollout in their runner. Do not start long training before that
-> smoke passes, and never report an unreproduced number as a result.
+> work is on `blue/mappo-training` (PR #1 merged to main); the `environment/`
+> uv drafts stay uncommitted for Environment, as does root `.gitignore`. Do
+> not reset or rewrite shared history. Next tasks: seed cycling for training
+> resets, then longer multi-seed MAPPO runs until the policy beats
+> round-robin; hand Environment the vendor recipe. Never report an
+> unreproduced number as a result.
 
 ## Update rule
 

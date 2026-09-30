@@ -30,10 +30,11 @@ this page is its short index.
   system Python 3.12 with sim pins identical to `.venv`;
   see `environment/requirements-train.txt`. uv cannot supply 3.10 here (App
   Control blocks it), so the 3.10 target needs an IT-approved install.
-  EPyMARL pinned at `cbc38c09` but not installed; wrapper already speaks the
-  runner contract (ctor kwargs, scalar common reward, `episode_limit` info,
-  lifecycle methods — see blue-session.md) and a torch train-smoke passes.
-  Real MAPPO-in-their-runner is the remaining BLUE-03 step, not torch.
+   EPyMARL `cbc38c09` vendored at `third_party/epymarl/` (gitignored, .pth into
+   `.venv-train`; `smaclite` dead import stubbed, src unmodified). First real
+   MAPPO run completed 2026-09-30 in their EpisodeRunner (see blue-session.md):
+   loop proven, policy not yet a defender — 8-episode checkpoint scores like
+   Sleep. Round-robin remains the bar.
 - foundation-v2 landed on `blue` (unpushed): `per_agent_bounds=True` gives
   17/17/17/17/51 hosts, 53/155 actions, 170/510 obs, 1190 critic state, with
   identical host indexing and trajectories; default mode unchanged and still
@@ -53,13 +54,12 @@ this page is its short index.
   Also unresolved: how a `VERIFY` state resolves from Blue-visible evidence,
   and whole-agent primary-session loss, where native Monitor dereferences
   session 0 and needs a simulator-level decision from Environment.
-- Next: (1) review/merge the three stacked PRs branch-by-branch
-  (`blue/baseline-policies` = `4471c27`, then `blue/epymarl-conformance` =
-  `3b414b4` with its contract proposal, then `blue/status-handoff` docs);
-  (2) hand Environment the per-agent bounds so their configs are not written
-  against 155/510/2550; (3) install EPyMARL and run the first real MAPPO
-  rollout-plus-update in their runner, behind the already-passing
-  torch train-smoke.
+- Next: (1) longer MAPPO training (multi-seed, seed cycling per reset — bare
+  resets are currently CybORG-random and unrecorded); (2) hand Environment the
+  per-agent bounds plus the EPyMARL vendor recipe (`third_party/`, .pth,
+  smaclite stub) so the training venv is reproducible; (3) PR `blue/mappo-training`
+  once the policy beats round-robin or a longer run is worth reviewing. PR #1
+  (`blue` → `main`) is merged.
 - BLUE-02 measured (seed 7629, fixed wrapper, hosts-with-Red-session @ step 200):
   Sleep 64 total / 54 root (return -60); masked-random 33 / 25 (-102);
   round-robin heuristic 38 / 11 (-65). Historical broken-wrapper targets
@@ -67,6 +67,9 @@ this page is its short index.
   across wrapper versions. Masked-random used a single policy seed (0).
   Extended to seeds 7629/7630/7640 via `evaluate_policies()`: round-robin
   halves root compromise vs masked-random on every seed (25→11, 19→13, 15→9).
-- Artifacts: **no trained policy, no checkpoint, no EPyMARL registration.**
+- Artifacts: first MAPPO checkpoints under `cage-challenge-4/results/` (gitignored)
+  with per-run manifest.json + stats.json; `blue_train_mappo.py` (their runner,
+  our config) and `blue_eval_mappo.py` (greedy checkpoint vs heuristics on equal
+  seeds). No competitive policy yet — report the Sleep-level score honestly.
   Historical baseline numbers (Sleep 60, masked random 48 compromised hosts at
   step 200) remain unreproduced and must not be reported as fresh results.
