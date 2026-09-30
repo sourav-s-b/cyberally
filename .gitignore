@@ -1,0 +1,45 @@
+# Local environments and downloaded tools
+.venv/
+venv/
+env/
+.tools/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Credentials and machine-local settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.aws/
+.codex/
+.idea/
+.vscode/
+
+# Training artifacts: publish manifests/metrics, store weights externally
+checkpoints/
+saved_models/
+runs/
+wandb/
+results/
+frames/
+*.pt
+*.pth
+*.ckpt
+*.pkl
+*.joblib
+*.log
+
+# Local paper copies and extracted research material; citations live in docs
+/*.pdf
+/research-notes/
+/worktrees/
+.DS_Store
+Thumbs.db
