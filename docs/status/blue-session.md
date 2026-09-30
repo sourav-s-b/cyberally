@@ -7,8 +7,8 @@
 **Working branch:** `blue/foundation`
 
 **Base commit:** `e605ef3` (`chore: import CAGE4 prototype and establish team workflow`)
-**State at handoff:** BLUE-01 changes are staged in the Blue worktree but are not
-committed or pushed. The Markdown update on `main` intentionally records this.
+**Current state:** BLUE-01 is committed and pushed as `7b76fc2` on
+`origin/blue/foundation`. The Blue worktree was clean after the push.
 
 ## Goal
 
@@ -19,7 +19,7 @@ the top of `cage-challenge-4/handoff.md` before changing code.
 
 ## Current Blue changes
 
-On `blue/foundation` only:
+Committed in `7b76fc2` on `blue/foundation`:
 
 - Reworked `cage-challenge-4/cc4_epymarl_wrapper.py` to reset the shared simulator
   once, apply explicit seeds, advance RNG when no seed is supplied, reject host
@@ -55,9 +55,8 @@ This is not yet the Environment team's pinned runtime.
 
 ## Next steps
 
-1. Return to the existing `blue/foundation` workspace. Check `git status` first;
-   do not lose the staged work. Review the diff and rerun the focused tests if code
-   changed.
+1. In the Blue workspace, inspect `git status --short --branch`, fetch origin,
+   and read `origin/main`. Preserve any new changes.
 2. Inspect/fix remaining Blue edge cases: invalid or lost Blue sessions, simulator
    action failures, unresolved-action timeout/reset behavior, and passive event
    semantics. Preserve tests proving real user-level Remove and root-level Restore.
@@ -78,11 +77,11 @@ This is not yet the Environment team's pinned runtime.
 > `docs/contracts.md`, `docs/implementation-plan.md`,
 > `cage-challenge-4/blue-agent-plan.md`, and the correction at the top of
 > `cage-challenge-4/handoff.md`. Preserve my work: inspect `git status --short
-> --branch` first. The latest Blue foundation changes are staged on
-> `blue/foundation`, based on `e605ef3`; they are not committed. Continue the listed
-> BLUE-01 edge-case fixes and review without discarding or moving staged code to
-> main. Run the focused suite after code edits, update this session file and Blue
-> status with measured results, then prepare a reviewable Blue branch commit/PR.
+> --branch` and fetch origin first. BLUE-01 is committed and pushed as `7b76fc2`
+> on `blue/foundation`; the latest session handoff was updated on main after that
+> push. Continue the listed BLUE-01 edge cases; do not reset or rewrite shared
+> history. Run the focused suite after code edits and update this session file and
+> Blue status with measured results. MAPPO/EPyMARL training is still future work.
 > MAPPO/EPyMARL training is still future work.
 
 ## Update rule
