@@ -310,6 +310,46 @@ Changed, uncommitted, unpushed: `cc4_epymarl_wrapper.py`,
 (`results/` checkpoints gitignored.) Next: longer multi-seed MAPPO volume
 until the policy beats round-robin; then update `blue.md` + push.
 
+## 12k-step multi-seed run (2026-09-30, `blue/mappo-training`, `cc9a5c2`)
+
+`blue_train_mappo.py --steps 400 --t-max 12000 --seed 7` (~31 episodes,
+t_env 12369, ~15 min on Linux CPU). Manifest `reset_seeds` cycles cleanly
+through `[7629, 7630, 7640]` x10+ (train + greedy test interleaved);
+periodic checkpoints (399 ... 12369) all saved. Run dir
+`results/mappo_cc4_seed7_20260930T163901Z` (gitignored).
+
+Eval (400 steps, seeds 7629/7630/7640; baselines identical to Windows table):
+
+| Policy | 7629 ret / root@200 | 7630 ret / root@200 | 7640 ret / root@200 |
+|---|---|---|---|
+| mappo final (12369) | -407 / 38 | -2536 / 54 | -2824 / 49 |
+| mappo mid (7581) | -1821 / 54 (= Sleep) | -1857 / 53 | -3198 / 55 |
+| round-robin | -85 / 11 | -105 / 13 | -123 / 9 |
+| masked-random (seed 11) | -239 / 17 | -190 / 29 | -276 / 21 |
+| Sleep | -1821 / 54 | -1537 / 49 | -4138 / 52 |
+
+Training curve unstable: train return oscillates (-95...-2708), critic loss
+3.8 -> 61.8, final episodes collapse. Mid checkpoint is pure-Sleep-like;
+final improves 7629 only (likely seed memorization) and is worse than Sleep
+on 7630. Verdict: volume alone of this setup will not beat round-robin —
+the actor lacks the belief/age inputs the heuristic uses (see BLUE-04
+inventory below). Next: BLUE-04 explicit temporal features first, plus
+training stabilization (lower lr, real `test_interval` for validation
+curve) before the next long run. Do not launch a longer same-config run.
+
+## BLUE-04 signal inventory (read-only, 2026-09-30)
+
+Actor's 10 host features are snapshot counts only
+(`blue_obs_features.py:35`); none of the already-tracked Blue-visible
+temporal state reaches the policy: `tracker.state` (5-way),
+`last_analysis`/`last_remediation` ages, `empty_strikes`, `last_result`,
+per-field `observed_at` freshness, pending flag, normalized tick as
+mission-phase proxy (134/133/133 is a measured scenario constant).
+Proposal: ~+10 features/host, all Blue-visible belief (never privileged
+truth), feature-version bump, ablated ages -> belief -> mission context.
+Caution: existing `has_root_session` risks the plan's warned misreading
+(Blue root session != attacker root); consider ablating it in BLUE-04.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
