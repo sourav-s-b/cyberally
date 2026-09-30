@@ -152,11 +152,18 @@ both are recorded to show the direction and the size of the gap, not a ratio.
 | Live nonzero features in a 170-dim agent observation | 22–39 % | observation is mostly padding and zeros |
 | Episode end | `terminated=True` at step `steps-1` | `truncated` never fires on the native scenario |
 
-The 69 % forced-Sleep figure is the biggest open risk. It comes from the
-one-pending-action-per-agent rule being *agent-wide*: while an agent waits out a
-2-step `Analyse` it has exactly one legal action. If that rate survives under a
-trained policy, the effective decision budget is small and no policy fixes it.
-Instrument it before MAPPO; Environment may need a simulator-level answer.
+The 69 % forced-Sleep figure is a throughput ceiling, not an unfixable
+blocker. A follow-up breakdown (seed 7629, 200 steps, native Red) found forced
+Sleep is 676/676 pending-action lockout with zero session losses, and the rate
+is policy-dependent: 68.7 % under masked-random vs 54.4 % under the
+round-robin heuristic. It comes from the one-pending-action-per-agent rule
+being *agent-wide* combined with action durations (Analyse 2, Remove 3,
+Restore 5 ticks): each issued action costs its duration in forced Sleep. That
+still leaves a workable budget — e.g. agent 4's 38 hosts need 76 ticks per
+full Analyse sweep of a 400-step episode — but it caps decisions per episode,
+so remediation coverage per sweep (not raw action rate) is the metric to watch
+under MAPPO. No simulator-level answer needed; the earlier "no policy fixes
+it" framing is corrected by the measurements above.
 
 ---
 
@@ -197,14 +204,29 @@ actions, and dropping the concatenated critic state from 2550 to 1190.
    `AttributeError`. `import CybORG.Agents.Wrappers` also pulls in Ray. Working
    pattern for privileged evaluation labels:
    `env.environment_controller.get_true_state(info).data` → `{host: {...}}`.
-   Evaluation should build on that, not on the upstream helper.
+    Evaluation should build on that, not on the upstream helper. Note the
+    receiver matters: on a `CC4MARLEnv` the controller is `env.env` (the
+    `CybORG` object holds `.environment_controller`), so the working call is
+    `env.env.get_true_state(env.env.INFO_DICT['True']).data` — `blue_baselines.py`
+    `count_compromised()` is the reference implementation.
 4. **`blue_iforest_*.py` hardcode `/home/sourav/Projects/...`** and will not
    import on this machine.
-5. **No torch is installed.** `ray`, `torch`, `torch_geometric` and `sklearn`
-   are all absent. Nothing here can train yet.
-6. **The venv is Python 3.12.10 and local-only.** The documented target is
-   Python 3.10; `torch==2.2.0`, `gym==0.26.2` and `numpy==1.26.4` have cp310
-   wheels but no cp312 wheel for torch 2.2.0. Environment owns the rebuild.
+5. **torch now exists in a separate training venv (2026-09-30, Blue-drafted,
+   awaiting Environment review).** `.venv/` is still sim-only (no torch/ray/
+   sklearn). `.venv-train/` (system Python 3.12.10, built with uv 0.12.5)
+   adds `torch==2.14.1+cpu` to the identical sim pins; all 29 Blue tests pass
+   under it. Pins are drafted at `environment/requirements-{sim,train}.txt`.
+   `ray`, `torch_geometric` and `sklearn` remain absent; EPyMARL is not
+   installed yet. One transient `shm.dll` Application Control block was seen
+   on the first torch import after install and did not recur.
+6. **The venvs are Python 3.12.10 and local-only.** The documented target is
+   Python 3.10, but it is unreachable on this machine: `uv python install
+   3.10` downloads 3.10.21 yet neither it nor the `~\.local\bin` shim executes
+   (WinError 4551, Application Control). Only the system 3.12.10 runs, and
+   `torch==2.2.0` has no cp312 wheel — so 3.10 needs an IT-approved install,
+   not a uv download. uv (0.12.5, via WinGet) is however the recommended
+   installer for 3.12 venvs: it built `.venv-train` in seconds. Environment
+   owns the rebuild decision.
 7. **`cage-challenge-4/team-guide.md` contradicts current rules.** It predates
    `AGENTS.md`. It proposes renaming CAGE zones to restricted/operational/dmz,
    trimming to 2–3 zones, and points at the `oxwhirl/epymarl` fork. All three
