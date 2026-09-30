@@ -24,6 +24,37 @@ MAPPO plus measured adaptation/retention across Red strategy-pool retraining.
 Include strong heuristics in evaluation. The slides' real Docker/eBPF containment
 and wall-clock performance targets remain separate from the CybORG prototype.
 
+## 2026-09-30 BLUE-01 implementation progress
+
+`blue_action_masking.py` and `cc4_epymarl_wrapper.py` now reset once, honor
+requested/advancing seeds, reject insufficient host capacity instead of truncating,
+and expose actual variable dimensions (seed 7629: 510 per-agent observation, 155
+actions, 2550 concatenated state at the current 51-host bound). HQ had 38 hosts
+at seed 7629. `get_host_presence(agent_id)` returns padding validity separately.
+
+One pending multi-step action is tracked per Blue agent; passive observations merge
+for every visible host with per-field observation steps, and events/snapshots are
+replaced instead of appended. The `validity` mask (default) retains all native
+simulator-valid host actions, including Restore. An optional `evidence` mask is
+explicitly a policy restriction. Successful Analyse/Remove/Restore no longer
+sets ground-truth CLEAN; successful remediation enters VERIFY. Episode completion
+and wrapper truncation are separate. `CC4BlueWrapper` is a single-agent facade
+over the joint-step implementation with the other agents sleeping.
+
+Regression tests: `tests_blue/test_foundation.py`, run with
+`.venv\\Scripts\\python -m pytest -q tests_blue` from `cage-challenge-4`:
+15 passed. Three 75-step masked-random episodes (seeds 42, 7629, 7630) completed;
+all action masks held and per-agent common rewards matched. The upstream Blue
+actions pytest could not collect because its wrappers import optional `ray`, absent
+from the isolated venv. Gym emits its upstream maintenance warning. The venv is
+ignored and no dependency manifest was changed.
+
+Still open: install/pin runtime with Environment; test real session-loss/action
+failure cases; agree on verification after remediation; EPyMARL runner
+constructor/lifecycle/reward adaptation; temporal features; longer upstream test
+suite. This wrapper is foundation-v1, not a trained or registered EPyMARL env.
+Historical baseline scores remain unreproduced.
+
 ## Historical TL;DR (superseded where noted above)
 Blue-side pipeline is built and smoke-tested. Remaining: install EPyMARL,
 register the env, train MAPPO, beat Random (48 total / 35 root @ step 200).
