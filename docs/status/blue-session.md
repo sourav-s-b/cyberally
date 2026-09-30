@@ -337,6 +337,26 @@ inventory below). Next: BLUE-04 explicit temporal features first, plus
 training stabilization (lower lr, real `test_interval` for validation
 curve) before the next long run. Do not launch a longer same-config run.
 
+## Phase A verdict: training stabilized at lr=5e-5 (2026-09-30, PASS)
+
+Per the lr-only plan (strict feature freeze): probe at 5e-5 showed a flat
+critic band (3.9->5.8 over 6 episodes), so the 12k confirmation ran at
+`--lr 0.00005` (31 episodes, t_env 12369, ~15 min; run dir
+`results/mappo_cc4_seed7_20260930T172801Z`, gitignored; driver `--lr` knob
+committed as `e3e8859`).
+
+- Critic loss: 3.9 -> 1.5, bounded throughout; one mid-run wobble (31.3 at
+  t_env 8778) self-corrected back to ~2 by t_env 10374. Baseline at 3e-4
+  exploded 3.8 -> 61.8 with terminal collapse. Blowup signature gone.
+- Train return: first-3 mean -208, last-3 mean -198. No collapse — gate
+  passes (no learning either, which is Phase B's problem, not this gate's).
+- Final checkpoint eval: -1956 / -1538 / -1937 (roots 49/49/53 @200) —
+  pure Sleep-level. Plumbing fixed, policy parked at do-nothing, exactly
+  the expected Phase A outcome. Features are now the binding constraint.
+- Next: Phase B (BLUE-04 temporal/belief inputs, wider train seeds,
+  Evaluation-designated held-out suite). No same-config volume needed;
+  no sweep expansion needed unless BLUE-04 reintroduces instability.
+
 ## BLUE-04 signal inventory (read-only, 2026-09-30)
 
 Actor's 10 host features are snapshot counts only
