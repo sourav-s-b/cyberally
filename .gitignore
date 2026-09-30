@@ -1,5 +1,7 @@
 # Local environments and downloaded tools
+third_party/
 .venv/
+.venv-train/
 venv/
 env/
 .tools/

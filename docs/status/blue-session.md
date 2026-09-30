@@ -229,18 +229,26 @@ their EpisodeRunner/buffer/BasicMAC/PPOLearner and a plain stdlib logger.
 
 ## Resume prompt for a new conversation
 
-> Continue the Blue defender work in `G:\Projects\cyberally`. Read `AGENTS.md`,
-> `docs/current-state.md`, `docs/status/blue-session.md`, `docs/status/blue.md`,
-> `docs/contracts.md`, `docs/implementation-plan.md`,
+> Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
+> on Windows; now also/instead WSL — paths below are relative). Read
+> `AGENTS.md`, `docs/current-state.md`, `docs/status/blue-session.md`,
+> `docs/status/blue.md`, `docs/contracts.md`, `docs/implementation-plan.md`,
 > `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
 > and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
 > work: inspect `git status --short --branch` and fetch origin first. Blue
-> work is on `blue/mappo-training` (PR #1 merged to main); the `environment/`
-> uv drafts stay uncommitted for Environment, as does root `.gitignore`. Do
-> not reset or rewrite shared history. Next tasks: seed cycling for training
-> resets, then longer multi-seed MAPPO runs until the policy beats
-> round-robin; hand Environment the vendor recipe. Never report an
-> unreproduced number as a result.
+> work is on `blue/mappo-training`, pushed, tracking `origin/blue/mappo-training`
+> (PR #1 merged to main; stale remote `blue` deleted). The `environment/`
+> requirement/script drafts stay uncommitted for Environment; root `.gitignore`
+> (`.venv-train/`, `third_party/`) is committed. Do not reset or rewrite
+> shared history. If this is a fresh WSL clone, first rebuild: `uv venv`
+> both venvs + torch CPU + sim pins (see `environment/requirements-train.txt`
+> header), re-vendor EPyMARL `cbc38c09` to `third_party/epymarl/` + the
+> `.pth` link (see `third_party/epymarl/PIN.txt` on the old machine — NOT in
+> Git — or the recipe in this file's MAPPO section), then run both suites
+> green before anything else. Next tasks: seed cycling for training resets,
+> then longer multi-seed MAPPO runs until the policy beats round-robin; hand
+> Environment the vendor recipe. Never report an unreproduced number as a
+> result.
 
 ## Update rule
 
