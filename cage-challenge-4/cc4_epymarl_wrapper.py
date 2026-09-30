@@ -28,14 +28,24 @@ WRAPPER_VERSION = "foundation-v1"
 
 class CC4MARLEnv:
     def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
-                 mask_mode="validity"):
+                 mask_mode="validity", common_reward=False,
+                 reward_scalarisation="sum"):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
             raise ValueError("steps must be >= 3 for the three mission phases")
         if mask_mode not in ("validity", "evidence"):
             raise ValueError("mask_mode must be validity or evidence")
-        self.seed = seed
+        if reward_scalarisation not in ("sum", "mean"):
+            raise ValueError("reward_scalarisation must be sum or mean")
+        # EPyMARL's EpisodeRunner always passes common_reward and
+        # reward_scalarisation; accept and store them. `seed` stays an
+        # attribute (applied on reset); the runner-style `seed()` setter
+        # below writes to the same value for the *next* reset.
+        self._seed = seed
+        self._seed_pending = False
+        self.common_reward = bool(common_reward)
+        self.reward_scalarisation = reward_scalarisation
         self.max_hosts = max_hosts
         self.mask_mode = mask_mode
         self.n_agents = len(BLUE_AGENTS)
@@ -58,9 +68,13 @@ class CC4MARLEnv:
         if options:
             raise ValueError("reset options are not supported")
         if seed is not None:
-            self.seed = seed
-        # First reset honors constructor seed; later seed=None advances the RNG.
-        reset_seed = self.seed if seed is not None or not self._has_reset else None
+            self._seed = seed
+            self._seed_pending = True
+        # First reset honors the constructor seed; an explicit seed()/reset(seed)
+        # applies once; otherwise seed=None advances the RNG.
+        reset_seed = (self._seed if seed is not None or not self._has_reset
+                      or self._seed_pending else None)
+        self._seed_pending = False
         self._finished = True
         self.cyborg.reset(seed=reset_seed)
         self._tick = 0
@@ -225,7 +239,34 @@ class CC4MARLEnv:
         terminated = bool(self.env.done)
         truncated = self._tick >= self.episode_limit and not terminated
         self._finished = terminated or truncated
-        return self.get_obs(), rewards, terminated, truncated, {}
+        # EPyMARL reads info["episode_limit"] to tell horizon cut-offs (bootstrap)
+        # from true terminals. The native end always coincides with our horizon.
+        info = {"episode_limit": bool(
+            truncated or (terminated and self._tick >= self.episode_limit - 1))}
+        if self.common_reward:
+            # Native Blue reward is already one shared team signal duplicated
+            # per agent; normalize once (rewards[0]), never a 5x sum, per the
+            # contracts invariant. sum/mean coincide on identical values.
+            return self.get_obs(), float(rewards[0]), terminated, truncated, info
+        return self.get_obs(), rewards, terminated, truncated, info
+
+    def seed(self, seed=None):
+        """Runner-style seed setter; takes effect on the next reset."""
+        if seed is not None:
+            self._seed = seed
+            self._seed_pending = True
+
+    def close(self):
+        """No simulator resource to release; present for the runner lifecycle."""
+
+    def render(self):
+        """No visual rendering in this wrapper; present for the runner lifecycle."""
+
+    def save_replay(self):
+        raise NotImplementedError("CC4MARLEnv has no replay recording")
+
+    def get_stats(self):
+        return {}
 
 
 class CC4BlueWrapper:
@@ -293,3 +334,9 @@ class CC4BlueWrapper:
     def step(self, idx):
         _, rewards, terminated, truncated, _ = self._joint.step({self.blue_id: idx})
         return self.get_obs(), self.get_mask(), rewards[self._agent_id], terminated or truncated
+
+    def seed(self, seed=None):
+        self._joint.seed(seed)
+
+    def close(self):
+        pass
