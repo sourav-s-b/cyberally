@@ -610,8 +610,36 @@ Result A — shaping @5e-5 (from BC quad stamped 5e-5,
 (bonuses farmed) but NATIVE eval -1013/-736/-1479, worse than the BC init
 (-256/-379/-211) and worse than unshaped 1e-5 (-234/-460/-486). Verdict:
 5e-5 destroys the init regardless of reward; rising shaped return was
-bonus farming, not skill. Result B (shaping @1e-5, same lr as the
-unshaped preserve run, shaping the ONLY variable) in progress.
+bonus farming, not skill.
+
+Result B — shaping @1e-5 (`mappo_cc4_seed7_20261001T152955Z`), shaping the
+ONLY variable vs the unshaped 1e-5 run: NATIVE -723/-337/-597 (mean -552)
+vs unshaped -234/-460/-486 (mean -393). Shaping also degrades.
+
+## Combined verdict: PPO fine-tuning is net-destructive here (2026-10-01)
+
+Four independent fine-tunes, all starting from the SAME BC init, all
+scored on native returns:
+
+| Run | lr | shaped | 7629 | 7630 | 7640 | mean |
+|---|---|---|---|---|---|---|
+| BC init (no PPO) | - | - | -256 | -379 | **-211** | **-282** |
+| fine-tune | 1e-5 | no | **-234** | -460 | -486 | -393 |
+| fine-tune | 1e-5 | yes | -723 | -337 | -597 | -552 |
+| fine-tune | 5e-5 | yes | -1013 | -736 | -1479 | -1076 |
+| (earlier, lr actually 1e-3) | 1e-3 | no | -1960 | -2683 | -2522 | -2388 |
+
+Monotone in lr, and shaping hurts at BOTH lrs. Every PPO update moves the
+policy AWAY from the BC optimum; the optimum is the init itself. The
+destructive force is structural (sparse delayed credit + fresh-critic
+advantage noise), not a tuning artifact — 4/4 fine-tunes degrade.
+
+Standing deliverable: BC-distilled policy (-211..-379), 3x better than
+PPO-from-scratch and beating Sleep on all seeds. Beating the teacher
+(-85) requires the neuro-symbolic route (path 2): hard-code
+CONFIRMED-gated remediation + verify + escalation as a guaranteed floor,
+learn only host-prioritisation/timing on top. PPO must not touch the
+weights (or may only be used to generate BC data via the shaped env).
 
 ## Resume prompt for a new conversation
 
