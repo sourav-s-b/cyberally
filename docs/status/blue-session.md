@@ -723,11 +723,52 @@ policy" was the wrong diagnosis. The actual gap is capability: BC is at
 fine-tuning closes that**, because the sweep cursor round-robin uses is not
 in the observation. BC cannot learn an ordering the features do not contain.
 
-So the next step is the neuro-symbolic route, not more PPO: hard-code the
-CONFIRMED-gated remediation/verify/escalation skeleton (which is exactly
-what round-robin's advantage comes from) and learn only host prioritisation.
-Draft in `cage-challenge-4/blue_hybrid.py` (uncommitted, no risk model or
-benchmark yet).
+## CORRECTION: the sweep cursor IS in the observation (2026-10-01)
+
+The two sections above blame a *representation gap*: "round-robin's sweep
+cursor is not in the observation, so no fine-tune can recover it". **That is
+false, and it is checkable in one experiment.** I tested it.
+
+Implemented `StalestFirstBaseline`: the teacher's exact remediation core
+(CONFIRMED -> Remove, re-detected -> Restore, VERIFY -> Analyse) but with
+the cursor replaced by the observation-derived rule "Analyse the legal host
+with the largest time-since-last-analysis, never-analysed first". That
+quantity is literally the `ages` feature, `min(1, (tick - last_analysis) /
+cap)` with 1.0 for never-analysed, plus `tick` from `mission`.
+
+| policy | 7629 | 7630 | 7640 | 7701 | 7702 | 7703 | 7704 | 7705 | mean | std |
+|---|---|---|---|---|---|---|---|---|---|---|
+| round_robin (cursor) | -85 | -105 | -123 | -85 | -135 | -64 | -53 | -98 | -93.5 | 27.8 |
+| stalest_first (from obs) | -85 | -105 | -123 | -85 | -135 | -64 | -53 | -98 | -93.5 | 27.8 |
+
+Not just equal returns: **the action traces are byte-identical** (1995
+actions per episode, 0 mismatches, verified on 7629/7640/7704). The cursor
+carries no information the observation lacks. The teacher's advantage is
+fully expressible in Blue-visible features.
+
+So the blocker is not the representation. Re-reading the geometry makes the
+real obstacle concrete:
+
+- Observation is a FLAT, POSITIONAL, fixed-slot tensor: 51 host slots x 17
+  features = 867 dims (+5 one-hot agent id = 872, matching `fc1: [64, 872]`).
+- `17 = 10` base `+ 2` ages `+ 5` belief one-hots.
+- Action space is `155 = 2 + 3 x 51`: one index per (host, action) pair.
+
+Choosing a host is therefore an **argmax over 51 slots**, emitted as a single
+index into a 155-way head. The information is present, but a policy that must
+implement a cross-slot comparison by routing it through a shared MLP + GRU
+bottleneck is the wrong shape for it: the comparison is global, the encoder
+is local. BC reaches only ~12% non-sleep exact-action accuracy, which is what
+failing to express a global argmax looks like.
+
+Revised next step: change the *architecture*, not the inputs. Give the actor
+a per-host-slot scoring head whose outputs are combined across slots (masked
+softmax/argmax over the 51 slots, then expanded into the 155-way index), so
+"which host" is computed by the architecture instead of being learned inside
+a dense layer. Keep flat 867-dim obs; keep the fixed CONFIRMED/VERIFY
+skeleton as a hard floor. This is a smaller and more honest change than
+re-designing the feature set, and it is testable against the -93.5 teacher
+number on >=8 seeds.
 
 ## Resume prompt for a new conversation
 
