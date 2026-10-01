@@ -641,6 +641,94 @@ CONFIRMED-gated remediation + verify + escalation as a guaranteed floor,
 learn only host-prioritisation/timing on top. PPO must not touch the
 weights (or may only be used to generate BC data via the shaped env).
 
+## Vendored-learner patch must be reapplied on a fresh clone (2026-10-01)
+
+`third_party/` is gitignored, so the critic-only warmup change to
+`src/learners/ppo_learner.py` is NOT in git. It is recorded as
+`environment/patches/ppo-warmup.patch` (+ `.README.md`), verified to apply
+cleanly against pristine EPyMARL cbc38c09. A fresh clone that skips this
+step will accept `--warmup-steps` and silently do nothing. Add it to the
+rebuild checklist below.
+
+## CRITICAL: the 3-seed eval cannot resolve these deltas (2026-10-01)
+
+The table above is a five-row comparison whose every adjacent pair is
+smaller than the measurement noise. Re-running the SAME BC init over 8
+seeds:
+
+| seed | 7629 | 7630 | 7640 | 7701 | 7702 | 7703 | 7704 | 7705 |
+|---|---|---|---|---|---|---|---|---|
+| BC init | -256 | -379 | -211 | -323 | -134 | -324 | **-1023** | -497 |
+
+mean **-393.4**, std **276.9**. The 3-seed subset [-256,-379,-211] reads
+-282; the 8-seed mean is -393. So:
+
+- Seed 7704 alone scores -1023, worse than the lr=1e-3 runaway.
+- 95% CI on a 3-seed mean is about **+/-313** — wider than the entire
+  "BC init vs low-lr fine-tune" gap (-282 vs -393) and wider than the
+  teacher gap we have been chasing.
+- Therefore the "4/4 fine-tunes degrade" conclusion above is **not
+  established**. It is consistent with the data but the effect is inside
+  the noise band. Only the lr=1e-3 collapse is clearly outside it.
+
+Correction to the previous section: the ladder and the "structurally
+destructive" claim are overstated. What is actually measured is that no
+fine-tune has been shown to *exceed* its init beyond noise, and that
+Sleep-level and lr=1e-3 divergence are real.
+
+Consequence for method: any future A/B needs >=8 seeds and must report
+mean +/- std, not a 3-seed mean. Cheap seeds (7629/7630/7640) are fine for
+regression tests and training-seed cycling, not for ranking policies.
+
+## Warmup attempt (WSRL-style) — implemented, measured, no help (2026-10-01)
+
+The literature review (`docs/research/blue-sparse-reward-literature.md`)
+identifies value divergence at the onset of on-policy fine-tuning as the
+mechanism (WSRL, ICLR 2025). Implemented the published fix: a critic-only
+warmup that freezes the actor for the first `warmup_steps` while fitting the
+critic to on-policy data.
+
+- `blue_train_mappo.py --warmup-steps N` / `--no-warmup-critic-only`
+- learner freeze in `third_party/epymarl/src/learners/ppo_learner.py`
+  (`_warmup_active`, guarded by `getattr` so upstream configs still load)
+- `tests_blue/test_ppo_warmup.py`: 5 tests, incl. actor bit-identical during
+  warmup while the critic still moves, and the opt-out ablation arm.
+
+Run `mappo_cc4_seed7_20261001T162853Z`, lr=1e-5, warmup=4000, ages+belief:
+
+| run | 7629 | 7630 | 7640 | 3-seed mean |
+|---|---|---|---|---|
+| BC init | -256 | -379 | -211 | -282 |
+| no warmup | -234 | -460 | -486 | -393 |
+| warmup 4000 | -315 | -406 | -643 | **-455** |
+
+No improvement. Two diagnostics explain why it could not have worked here:
+
+1. **Parameter drift is nearly identical** between the arms (relative L2
+   0.0047 warmup vs 0.0048 no-warmup). Freezing the actor early did not
+   reduce total movement, so this was never the binding constraint.
+2. **Behavioural KL(pi_bc || pi_finetuned) is ~0.001 nats** measured on
+   4000 teacher-visited states. The fine-tuned policies are almost
+   *identical* to the init. Tiny KL, ~170-point return gap => the gap is
+   mostly seed noise, per the section above, not policy drift.
+
+The freeze is correct, well-tested and off by default, so keep it as a tool,
+but the experiment does not support it and it is not the fix.
+
+## Corrected picture and the real blocker
+
+With KL ~0.001 nats the policies barely differ, so "PPO destroys the BC
+policy" was the wrong diagnosis. The actual gap is capability: BC is at
+~-393 (8 seeds) and round-robin is -85/-105/-123, and **no amount of
+fine-tuning closes that**, because the sweep cursor round-robin uses is not
+in the observation. BC cannot learn an ordering the features do not contain.
+
+So the next step is the neuro-symbolic route, not more PPO: hard-code the
+CONFIRMED-gated remediation/verify/escalation skeleton (which is exactly
+what round-robin's advantage comes from) and learn only host prioritisation.
+Draft in `cage-challenge-4/blue_hybrid.py` (uncommitted, no risk model or
+benchmark yet).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

@@ -81,7 +81,8 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
                  lr=0.0003,
                  temporal_features=("ages", "belief", "freshness", "mission"),
                  include_root_session=True, mask_mode="validity",
-                 init_ckpt="", shaping=False):
+                 init_ckpt="", shaping=False,
+                 warmup_steps=0, warmup_critic_only=True):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -89,11 +90,11 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "mac": "basic_mac",
         "env": "cc4",
         "env_args": {"seed": train_seeds[0], "steps": steps,
-                     "mask_mode": mask_mode,
-                     "shaping": dict(wrapper.SHAPING_DEFAULTS) if shaping else None,
-                     "seed_cycle": list(train_seeds),
-                     "temporal_features": list(temporal_features),
-                     "include_root_session": include_root_session},
+                      "mask_mode": mask_mode,
+                      "shaping": dict(wrapper.SHAPING_DEFAULTS) if shaping else None,
+                      "seed_cycle": list(train_seeds),
+                      "temporal_features": list(temporal_features),
+                      "include_root_session": include_root_session},
         "common_reward": True,
         "reward_scalarisation": "sum",
         "batch_size_run": 1,
@@ -141,6 +142,9 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "save_replay": False,
         "local_results_path": results,
         "seed": seed,
+        # Critic-only warmup phase to prevent value divergence on BC fine-tune
+        "warmup_steps": warmup_steps,
+        "warmup_only_critic": warmup_critic_only,
     }
 
 
@@ -229,6 +233,16 @@ if __name__ == "__main__":
     parser.add_argument("--shaping", action="store_true",
                         help="enable shaped training rewards (clear/confirm "
                              "bonuses, vandalism penalty); eval stays native")
+    parser.add_argument("--warmup-steps", type=int, default=0,
+                        help="critic-only warmup: run episodes for this many "
+                             "env steps with actor frozen (WSRL-style critic "
+                             "recalibration)")
+    parser.add_argument("--warmup-critic-only", action="store_true",
+                        default=True,
+                        help="freeze actor during warmup (default)")
+    parser.add_argument("--no-warmup-critic-only", dest="warmup_critic_only",
+                        action="store_false",
+                        help="allow actor updates during warmup (not recommended)")
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
@@ -236,4 +250,6 @@ if __name__ == "__main__":
                        temporal_features=tuple(cli.temporal_groups),
                        include_root_session=not cli.drop_root_session,
                        mask_mode=cli.mask_mode, init_ckpt=cli.init_ckpt,
-                       shaping=cli.shaping))
+                       shaping=cli.shaping,
+                       warmup_steps=cli.warmup_steps,
+                       warmup_critic_only=cli.warmup_critic_only))
