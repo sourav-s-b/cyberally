@@ -19,6 +19,12 @@ def main():
     parser.add_argument("--demos", default="results/bc_demos_rr.npz")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--opt-lr", type=float, default=5e-5,
+                        help="lr stamped into the saved optimiser states. "
+                             "EPyMARL resume restores optimiser state "
+                             "wholesale INCLUDING lr, so fine-tune runs "
+                             "inherit this, not --lr. Set it to the "
+                             "intended PPO lr.")
     parser.add_argument("--batch-seqs", type=int, default=16)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
@@ -131,12 +137,18 @@ def main():
                      obs_agent_id=True)
     critic = critic_REGISTRY["cv_critic"]({"state": {"vshape": state_shape}},
                                           critic_args)
-    critic_opt = th.optim.Adam(critic.parameters(), lr=cli.lr)
+    # Fresh optimiser states at --opt-lr (NOT the BC-training opt, whose
+    # 1e-3 lr would otherwise override the fine-tune --lr on resume).
+    save_agent_opt = th.optim.Adam(agent.parameters(), lr=cli.opt_lr)
+    save_critic_opt = th.optim.Adam(critic.parameters(), lr=cli.opt_lr)
     th.save(critic.state_dict(), os.path.join(ckpt_dir, "critic.th"))
-    th.save(opt.state_dict(), os.path.join(ckpt_dir, "agent_opt.th"))
-    th.save(critic_opt.state_dict(), os.path.join(ckpt_dir, "critic_opt.th"))
+    th.save(save_agent_opt.state_dict(),
+            os.path.join(ckpt_dir, "agent_opt.th"))
+    th.save(save_critic_opt.state_dict(),
+            os.path.join(ckpt_dir, "critic_opt.th"))
     with open(os.path.join(out, "bc_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "epochs": cli.epochs, "lr": cli.lr,
+                   "opt_lr": cli.opt_lr,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "weighted": True,
                    "final_acc": tot_correct / tot_toks,

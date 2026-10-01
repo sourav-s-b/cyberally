@@ -30,3 +30,18 @@ def test_build_config_warmstart_flags():
     default = build_config()
     assert default["env_args"]["mask_mode"] == "validity"
     assert default["checkpoint_path"] == ""
+
+
+def test_resume_inherits_checkpoint_opt_lr():
+    """Regression: EPyMARL load_models restores optimiser state wholesale,
+    INCLUDING lr — so a BC quad stamped at 1e-3 silently overrides the
+    fine-tune --lr. blue_bc_pretrain --opt-lr exists to stamp the intended
+    PPO lr. This pins the mechanism on a toy optimiser."""
+    torch = pytest.importorskip("torch", reason="train venv only")
+    model = torch.nn.Linear(4, 4)
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+    saved_lr = opt.state_dict()["param_groups"][0]["lr"]
+    fresh = torch.optim.Adam(model.parameters(), lr=1e-5)
+    fresh.load_state_dict(opt.state_dict())
+    assert saved_lr == 1e-3
+    assert fresh.param_groups[0]["lr"] == 1e-3 != 1e-5

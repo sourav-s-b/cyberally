@@ -569,6 +569,27 @@ Standing result: imitation beats all RL here (-211..-379 vs PPO best
 find one. Next candidates: low-lr preserve-fine-tune (config-only),
 critic-warmup-then-joint (needs learner support), or accept BC + report.
 
+## CORRECTION + genuine low-lr fine-tune (2026-10-01)
+
+The two "fine-tune" runs above never tested their stated lrs. EPyMARL
+`load_models` (`ppo_learner.py:261`) restores optimiser state wholesale
+INCLUDING lr (`Adam.state_dict` param_groups), so both runs trained at the
+BC quad's stamped lr=1e-3 — 20-100x the intended 5e-5/1e-5. Verified:
+`agent_opt.th` param_groups lr 0.001; critic_loss curves byte-identical
+across the two "different-lr" runs. From-scratch runs unaffected (fresh
+opts). Fix: `blue_bc_pretrain.py --opt-lr` stamps fresh optimiser states
+at the intended PPO lr (default 5e-5); regression test
+`test_resume_inherits_checkpoint_opt_lr` pins the mechanism.
+
+Genuine 1e-5 fine-tune from a 1e-5-stamped quad
+(`mappo_cc4_seed7_20261001T141327Z`): training returns held -150..-190
+throughout (never collapsed); final scores -234/-460/-486 vs BC init
+-256/-379/-211. Init PRESERVED, no destruction — but also no gain over
+the teacher level in 12k steps. Revised ladder: teacher -85 >
+masked-random -134 > BC/fine-tuned -211..-486 > PPO-from-scratch -701 >
+Sleep. Next optional: warm-critic continuation (resume the 1e-5 ckpt at
+5e-5 now the value head is trained — needs another opt-lr-stamped quad).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
