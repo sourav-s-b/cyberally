@@ -443,6 +443,38 @@ run dir `results/mappo_cc4_seed7_20261001T045747Z` (gitignored):
   curriculum (phase-dense slices) and/or BC warm-start from round-robin
   before any more flat runs. Flat 12k volume is retired as a strategy.
 
+## Scan-precision split + evidence-mode scoring (2026-10-01)
+
+Privileged eval-only analysis (`/tmp/scan_precision.py`, not committed):
+fraction of each action type targeting actually-compromised hosts at
+decision time, seeds 7629/7630:
+
+| Policy | Analyse precision | Remove precision | Restore precision |
+|---|---|---|---|
+| round-robin | 21-29% (blind sweep) | 100% | 86-96% |
+| ages-only ckpt | 21-55% | 60-72% | never used |
+| ages+belief ckpt | 79-85% | 25-34% | 2-4% (wipes clean hosts) |
+
+Reading: belief features solved sensing (85% vs heuristic's 29%) while
+remediation stayed blind — round-robin wins entirely on its
+CONFIRMED-gated remediation (100%/86-96%), which no checkpoint learned.
+`blue_eval_mappo.py` gains `--mask-mode` (validity|evidence) for ablations.
+
+Evidence-gated scoring of the ages+belief ckpt: -1821/-1963/-3196
+(Sleep-level) — gating removed the vandalism but nothing useful replaced
+it; the policy's edge came from unconstrained remediation and it never
+learned correct remediation. Side finding: evidence mode also improves
+masked-random (-239->-134 on 7629): the mask helps any policy, but the
+trained net still can't beat a gated coin flip. Remediation skill is zero.
+
+Pivot decision: retire flat full-episode runs. Next, in order: (1)
+evidence-gated TRAINING (config-only 12k, gate = Remove precision >80%
++ beats masked-random); (2) park mission/drop-root ablations (sensing
+refinements for a solved problem); (3) BC warm-start from round-robin
+traces; (4) curriculum feasibility probe. Held-out seeds still await
+Evaluation; Red pool (started on `red/strategy-adapter`) is the eventual
+robustness track, not the current one.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

@@ -92,6 +92,8 @@ def main():
     parser.add_argument("--temporal-groups", nargs="*",
                         default=["ages", "belief", "freshness", "mission"])
     parser.add_argument("--drop-root-session", action="store_true")
+    parser.add_argument("--mask-mode", default="validity",
+                        choices=["validity", "evidence"])
     cli = parser.parse_args()
     env_kwargs = {"temporal_features": tuple(cli.temporal_groups),
                   "include_root_session": not cli.drop_root_session}
@@ -106,7 +108,7 @@ def main():
     }
     results = baselines.evaluate_policies(
         factories, cli.seeds, steps=cli.steps, snapshot_steps=(200, cli.steps),
-        **env_kwargs)
+        mask_mode=cli.mask_mode, **env_kwargs)
     for name, per_seed in results.items():
         for seed, run in per_seed.items():
             snaps = run["snapshots"]
