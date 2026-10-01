@@ -143,6 +143,75 @@ class RoundRobinBaseline:
         return 0
 
 
+class SuspicionSweepBaseline:
+    """Teacher v2: round-robin remediation core, suspicion-ordered coverage.
+
+    Same CONFIRMED->Remove / VERIFY->Analyse / Restore-escalation as
+    RoundRobinBaseline, but the sweep front-loads coverage (never-analysed
+    first, then stalest) and skips hosts it analysed in the last few of its
+    own analyses (cooldown) so ticks go to unseen/stale hosts first.
+    Never issues Monitor; never touches privileged state.
+    """
+
+    COOLDOWN = 3
+
+    def __init__(self):
+        self._recent = {}
+
+    def reset(self):
+        self._recent.clear()
+
+    def _legal(self, mask, env, agent, host, action):
+        idx = action_index(env, agent, host, action)
+        return bool(mask[idx])
+
+    def select(self, env, agent):
+        idx = wrapper.BLUE_AGENTS.index(agent)
+        mask = env.get_avail_agent_actions(idx)
+        if int(mask.sum()) <= 1:
+            return 0  # busy (agent-wide pending) or no session: only Sleep legal
+        tracker = env.trackers[agent]
+        hosts = env.hostnames[agent]
+
+        confirmed = [h for h in hosts if tracker.state.get(h) == "CONFIRMED"]
+        for host in confirmed:
+            last_an = tracker.last_analysis.get(host)
+            last_re = tracker.last_remediation.get(host)
+            re_detected = (
+                last_an is not None
+                and last_re is not None
+                and last_an > last_re
+            )
+            if re_detected and self._legal(mask, env, agent, host, "Restore"):
+                return action_index(env, agent, host, "Restore")
+            if self._legal(mask, env, agent, host, "Remove"):
+                return action_index(env, agent, host, "Remove")
+            if self._legal(mask, env, agent, host, "Restore"):
+                return action_index(env, agent, host, "Restore")
+
+        verify = [
+            h
+            for h in hosts
+            if tracker.state.get(h) == "VERIFY"
+            and self._legal(mask, env, agent, h, "Analyse")
+        ]
+        if verify:
+            host = min(verify, key=lambda h: tracker.last_remediation.get(h) or 0)
+            return action_index(env, agent, host, "Analyse")
+
+        recent = self._recent.setdefault(agent, [])
+        cands = [h for h in hosts
+                 if self._legal(mask, env, agent, h, "Analyse")]
+        fresh = [h for h in cands if h not in recent]
+        pool = fresh or cands
+        pool.sort(key=lambda h: (tracker.last_analysis.get(h) is not None,
+                                 tracker.last_analysis.get(h) or 0))
+        host = pool[0]
+        recent.append(host)
+        del recent[:-self.COOLDOWN]
+        return action_index(env, agent, host, "Analyse")
+
+
 # --- Privileged evaluation helpers (eval-only, never policy inputs) ---
 
 

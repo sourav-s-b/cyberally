@@ -48,19 +48,54 @@ AGENT_MAX_HOSTS = tuple(n * PER_SUBNET_MAX_HOSTS
                         for n in AGENT_SUBNET_COUNTS)  # (17, 17, 17, 17, 51)
 WRAPPER_VERSION = "foundation-v3"
 
+# Reward-shaping magnitudes (v1). Applied ONLY when shaping is enabled
+# (training); evaluation always scores native rewards. Privileged true
+# state may inform REWARDS (coach may know the score); only Blue-visible
+# observations may inform POLICIES. Shaping is scaffolding: final grading
+# is native return on held-out seeds, with shaping ablated on/off.
+SHAPING_DEFAULTS = {"clear": 3.0, "confirm": 1.0, "vandalism": -3.0}
+
+
+def shaping_event_bonus(action_name, was_compromised, now_compromised,
+                        confirmed, scales=SHAPING_DEFAULTS):
+    """Pure shaping rule for one completed Blue action (reward-channel only).
+
+    - Remove/Restore on a host compromised at issue that is clean now:
+      +clear (actually evicted the attacker).
+    - Remove/Restore on a host clean at issue: +vandalism (negative:
+      wasted remediation the native disruption penalty under-prices).
+    - Remove/Restore that did not clear: 0 — failed clears of privileged
+      attackers are correct behavior (escalation handles them), not error.
+    - Analyse landing on CONFIRMED: +confirm (information value).
+    """
+    if action_name in ("Remove", "Restore"):
+        if not was_compromised:
+            return float(scales["vandalism"])
+        if not now_compromised:
+            return float(scales["clear"])
+        return 0.0
+    if action_name == "Analyse" and confirmed:
+        return float(scales["confirm"])
+    return 0.0
+
 
 class CC4MARLEnv:
     def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
                  mask_mode="validity", common_reward=False,
                  reward_scalarisation="sum", per_agent_bounds=False,
                  seed_cycle=None, temporal_features=(),
-                 include_root_session=True):
+                 include_root_session=True, shaping=None):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
             raise ValueError("steps must be >= 3 for the three mission phases")
         if mask_mode not in ("validity", "evidence"):
             raise ValueError("mask_mode must be validity or evidence")
+        if shaping is not None:
+            shaping = dict(shaping) if shaping is not True else dict(SHAPING_DEFAULTS)
+            unknown = set(shaping) - set(SHAPING_DEFAULTS)
+            if unknown:
+                raise ValueError(f"unknown shaping keys: {sorted(unknown)}")
         if reward_scalarisation not in ("sum", "mean"):
             raise ValueError("reward_scalarisation must be sum or mean")
         if per_agent_bounds and max_hosts != DEFAULT_MAX_HOSTS:
@@ -100,6 +135,7 @@ class CC4MARLEnv:
                          else VECTOR_LEN - 1)
         self.host_vector_len = self.base_len + self.temporal_len
         self.common_reward = bool(common_reward)
+        self.shaping = shaping
         self.reward_scalarisation = reward_scalarisation
         self.per_agent_bounds = bool(per_agent_bounds)
         if self.per_agent_bounds:
@@ -270,6 +306,7 @@ class CC4MARLEnv:
                 "temporal_features": list(self.temporal_features),
                 "host_vector_len": self.host_vector_len,
                 "include_root_session": self.include_root_session,
+                "shaping": dict(self.shaping) if self.shaping else None,
                 "wrapper_version": WRAPPER_VERSION}
 
     def _consume(self, agent, data):
@@ -311,6 +348,21 @@ class CC4MARLEnv:
         elif self._tick >= tracker.pending_until[host]:
             raise RuntimeError(f"{agent}: {name} on {host} overdue without result")
 
+    def _compromised_set(self):
+        """Privileged compromised-host set. REWARD-CHANNEL ONLY (shaping);
+        never exposed to policies. Mirrors the eval-only label logic."""
+        controller = self.env
+        true_state = controller.get_true_state(controller.INFO_DICT["True"]).data
+        out = set()
+        for hostname, host_obs in true_state.items():
+            if not isinstance(host_obs, dict):
+                continue
+            red = [s for s in (host_obs.get("Sessions", []) or [])
+                   if "red" in str(s.get("agent", ""))]
+            if red:
+                out.add(hostname)
+        return out
+
     def step(self, actions):
         if self._finished:
             raise RuntimeError("Call reset before stepping a new episode")
@@ -337,12 +389,36 @@ class CC4MARLEnv:
                 self.trackers[agent].note_action_issued(
                     host, name, action.duration, self._tick)
                 self._awaiting[agent] = (host, name)
+        prev_comp = self._compromised_set() if self.shaping else None
         self.env.step(decoded)
         self._tick += 1
         rewards = []
         for agent in BLUE_AGENTS:
             self._consume(agent, self.env.get_last_observation(agent).data)
             rewards.append(float(sum(self.env.get_reward(agent).values())))
+        if self.shaping:
+            now_comp = self._compromised_set()
+            bonus = 0.0
+            for agent in BLUE_AGENTS:
+                tracker = self.trackers[agent]
+                for host in self.hostnames[agent]:
+                    last_re = tracker.last_remediation.get(host)
+                    if last_re == self._tick:
+                        name, _ = tracker.last_result.get(host, (None, None))
+                        if name in ("Remove", "Restore"):
+                            bonus += shaping_event_bonus(
+                                name, host in prev_comp, host in now_comp,
+                                False, self.shaping)
+                            continue
+                    last_an = tracker.last_analysis.get(host)
+                    if last_an == self._tick:
+                        name, _ = tracker.last_result.get(host, (None, None))
+                        if name == "Analyse":
+                            bonus += shaping_event_bonus(
+                                name, False, False,
+                                tracker.state.get(host) == "CONFIRMED",
+                                self.shaping)
+            rewards = [r + bonus for r in rewards]
         # Preserve the native finite scenario terminal (upstream ends at steps-1).
         # A wrapper-only cut-off is a truncation, not a fabricated natural terminal.
         terminated = bool(self.env.done)
@@ -387,7 +463,7 @@ class CC4BlueWrapper:
     def __init__(self, seed=7629, blue_id="blue_agent_0",
                  max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity",
                  per_agent_bounds=False, seed_cycle=None, temporal_features=(),
-                 include_root_session=True):
+                 include_root_session=True, shaping=None):
         if blue_id not in BLUE_AGENTS:
             raise ValueError("Unknown Blue agent")
         self.blue_id = blue_id
@@ -396,7 +472,8 @@ class CC4BlueWrapper:
                                  per_agent_bounds=per_agent_bounds,
                                  seed_cycle=seed_cycle,
                                  temporal_features=temporal_features,
-                                 include_root_session=include_root_session)
+                                 include_root_session=include_root_session,
+                                 shaping=shaping)
         self.cyborg = self._joint.cyborg
         self.env = self._joint.env
         self.max_hosts = self._joint.max_hosts_per_agent[self._agent_id]

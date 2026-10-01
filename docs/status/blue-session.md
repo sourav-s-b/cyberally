@@ -590,6 +590,29 @@ masked-random -134 > BC/fine-tuned -211..-486 > PPO-from-scratch -701 >
 Sleep. Next optional: warm-critic continuation (resume the 1e-5 ckpt at
 5e-5 now the value head is trained — needs another opt-lr-stamped quad).
 
+## Combined 1+2+3 build: teacher v2 + shaped rewards (2026-10-01)
+
+Teacher v2 `SuspicionSweepBaseline` (same remediation core, suspicion-
+ordered coverage + cooldown): ties round-robin exactly (-85/-105/-123) on
+all three seeds — no gain, so v1 remains the teacher; v2 kept as a future
+diversity option, not a claim.
+
+Shaping (path 1) in wrapper: `SHAPING_DEFAULTS` {clear +3, confirm +1,
+vandalism -3} + pure rule `shaping_event_bonus()`; `shaping=` kwarg on
+CC4MARLEnv/CC4BlueWrapper, `train --shaping`, recorded in get_env_info +
+manifest. Reward-channel privileged scan (true state) is legal per
+contracts (only OBSERVATIONS are Blue-restricted); failed clears
+score 0 by design (correct escalation, not error). Eval stays native.
+Tests: `tests_blue/test_shaping.py` (4, incl. zero-failed-clear rule).
+
+Result A — shaping @5e-5 (from BC quad stamped 5e-5,
+`mappo_cc4_seed7_20261001T145833Z`): shaped training return -435 -> -68
+(bonuses farmed) but NATIVE eval -1013/-736/-1479, worse than the BC init
+(-256/-379/-211) and worse than unshaped 1e-5 (-234/-460/-486). Verdict:
+5e-5 destroys the init regardless of reward; rising shaped return was
+bonus farming, not skill. Result B (shaping @1e-5, same lr as the
+unshaped preserve run, shaping the ONLY variable) in progress.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

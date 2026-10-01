@@ -81,7 +81,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
                  lr=0.0003,
                  temporal_features=("ages", "belief", "freshness", "mission"),
                  include_root_session=True, mask_mode="validity",
-                 init_ckpt=""):
+                 init_ckpt="", shaping=False):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -90,6 +90,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "env": "cc4",
         "env_args": {"seed": train_seeds[0], "steps": steps,
                      "mask_mode": mask_mode,
+                     "shaping": dict(wrapper.SHAPING_DEFAULTS) if shaping else None,
                      "seed_cycle": list(train_seeds),
                      "temporal_features": list(temporal_features),
                      "include_root_session": include_root_session},
@@ -225,10 +226,14 @@ if __name__ == "__main__":
     parser.add_argument("--init-ckpt", default="",
                         help="EPyMARL checkpoint dir to resume actor from "
                              "(BC warm-start); t_env continues from its step")
+    parser.add_argument("--shaping", action="store_true",
+                        help="enable shaped training rewards (clear/confirm "
+                             "bonuses, vandalism penalty); eval stays native")
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
                        save_interval=cli.save_interval, lr=cli.lr,
                        temporal_features=tuple(cli.temporal_groups),
                        include_root_session=not cli.drop_root_session,
-                       mask_mode=cli.mask_mode, init_ckpt=cli.init_ckpt))
+                       mask_mode=cli.mask_mode, init_ckpt=cli.init_ckpt,
+                       shaping=cli.shaping))
