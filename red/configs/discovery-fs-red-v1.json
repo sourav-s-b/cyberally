@@ -1,0 +1,6 @@
+{
+  "schema_version": "red-strategy-v1-draft",
+  "strategy_id": "native-discovery-fs-red",
+  "strategy_version": "1",
+  "policy": "DiscoveryFSRed"
+}

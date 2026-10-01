@@ -1,5 +1,19 @@
 # Current state: what exists, what is measured, what is only planned
 
+## RED-01 scripted baseline on a separate branch, 2026-10-01
+
+This worktree uses `red/strategy-adapter`, based on published main/telemetry
+`ad9e5c0423f42fc8970e4ffe1051c1cb47a9530c`. Red implementation is confined to
+that branch: versioned native DiscoveryFSRed config, policy-class adapter, fresh
+standalone scenario factory, source/config manifests and Red diagnostic CLI.
+Blue and simulator sources are unchanged. Combined tests: 75 passed (15 Red,
+60 Blue) in 46.56 s. Native-versus-adapter parity, fresh episodes and resets
+were checked at development seeds 7629/7630. CLI smoke: 39 ticks each at native
+horizon 40, zero invalid executed Red actions; no attack-effectiveness claim.
+Environment/Blue/Evaluation seam review remains pending; training/pool consumers
+are not integrated. Older no-Red-code/runtime statements below are historical.
+See `docs/status/red.md` and `docs/coordination/red-strategy-factory.md`.
+
 ## Local Blue telemetry producer, 2026-10-01
 
 Checkout is now `blue/telemetry-schema`, based on main
