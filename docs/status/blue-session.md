@@ -520,6 +520,28 @@ traces; (4) curriculum feasibility probe. Held-out seeds still await
 Evaluation; Red pool (started on `red/strategy-adapter`) is the eventual
 robustness track, not the current one.
 
+## Evidence-gated TRAINING verdict (2026-10-01, Step 1)
+
+`blue_train_mappo.py` gains `--mask-mode` (was hardcoded `validity`);
+probe reuses `env_args` so the flag flows automatically. Ran 12k
+(`results/mappo_cc4_seed7_20261001T115017Z`, ages+belief, lr 5e-5,
+evidence masks in training): critic 5.9->1.4, healthiest curve yet.
+
+Paired eval, validity mode: ckpt -701/-1084/-3163 vs ungated
+-2551/-2786/-2412 and Sleep -1821/-1537/-4138 — beats Sleep everywhere,
+3.6x/2.6x better on 7629/7630. Evidence-mode scoring: -2094/-1969/-2532,
+no better than the ungated ckpt under the same mask.
+
+Precision autopsy (validity scoring): Analyse 65-74% (was 79-85%),
+Remove 36-51% (was 25-34%), Restore ~0-8% (vandalism cured, Sleep 55-58%).
+
+Gate FAILS both criteria: Remove precision 36-51% (< 80%), returns far
+from masked-random (-134/-155/-138). Reading: the constraint taught
+restraint and some targeting, but not skill — the failure is now confirmed
+deeper than exploration. Next: BC warm-start from round-robin traces
+(`run_episode` already logs action traces; need BC loss glue + PPO
+fine-tune), per plan Step 3.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
