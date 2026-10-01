@@ -171,6 +171,16 @@ class CC4MARLEnv:
     def get_obs_agent(self, agent_id):
         return self._obs_agent(BLUE_AGENTS[agent_id])
 
+    def get_telemetry(self, agent_id):
+        """Optional draft JSONL block from this agent's local retained Blue view.
+
+        Does not change actor features, masks, simulator behavior or action state.
+        """
+        from blue_telemetry import telemetry_block
+        agent = BLUE_AGENTS[agent_id]
+        return telemetry_block(self.views[agent], self.observed_at[agent],
+                               tick=self._tick, subnets_by_host=self.subnets[agent])
+
     def get_obs_size(self):
         return self.obs_size
 
