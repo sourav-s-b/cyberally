@@ -1,5 +1,19 @@
 # Blue handoff
 
+## Telemetry producer, 2026-10-01
+
+- Branch `blue/telemetry-schema`; exact main dependency
+  `2f0cfb67ae1d3b2da6a1b1ccff28eff9e1a5c915`. Local, uncommitted work.
+- Added simulated Proc/Conn/File/Auth mapping, strict JSON boundary, source-field
+  ticks, optional per-agent wrapper export and schema-based collection/manifest.
+- Validation: 18 telemetry tests; 60 tests passed in the isolated main-based publication
+  checkout. Earlier 67-test result includes local uncommitted MAPPO tests.
+  All ten existing features preserved; passive/Analyse/reset coverage is live.
+- Existing local training work and staging preserved. No real telemetry,
+  detector fitting, truth labels or acceptance of the shared schema claimed.
+- Next: Environment/Evaluation review of documented refinements before merge,
+  then separately scoped anomaly data/experiment work. Full handoff below.
+
 **Latest detailed session state and resume prompt:** [blue-session.md](blue-session.md).
 Read [docs/current-state.md](../current-state.md) first — it holds the measured
 facts and the list of traps. Update this file at each meaningful Blue handoff;

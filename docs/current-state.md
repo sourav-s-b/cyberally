@@ -1,5 +1,18 @@
 # Current state: what exists, what is measured, what is only planned
 
+## Local Blue telemetry producer, 2026-10-01
+
+Checkout is now `blue/telemetry-schema`, based on main
+`2f0cfb67ae1d3b2da6a1b1ccff28eff9e1a5c915`; older branch statements below
+are historical. Existing uncommitted training work is preserved. Local additive
+telemetry mapping and per-agent export are implemented and tested; optional
+JSONL collection includes source-field simulator ticks, simulated origin,
+schema-derived features and an artifact manifest. No real sensors or new
+detector results exist. Schema remains draft pending Environment/Evaluation
+review. Clean main-based publication suite: 60 passed; telemetry tests: 18 passed.
+The earlier 67-test result includes local, uncommitted MAPPO tests.
+See `docs/coordination/blue-telemetry-schema.md` and `docs/status/blue-session.md`.
+
 **Last updated:** 2026-09-30
 **Owner:** Blue (Sourav). Everyone else: read this before your kickoff prompt.
 **Branch this describes:** `main` and `blue/foundation`, both at `f8a9deb`.

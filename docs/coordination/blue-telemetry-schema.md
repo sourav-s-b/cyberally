@@ -1,6 +1,6 @@
 # Proposal: blue-telemetry-schema (Path 2 translation layer)
 
-- Status: draft, unreviewed
+- Status: draft, unreviewed; implemented locally on `blue/telemetry-schema`
 - Author role and branch: Blue, `blue/mappo-training`
 - Producer and affected consumers: Producer Blue (draft; long-term producer
   is Environment once real sensors exist); consumers Blue (featurizer,
@@ -11,6 +11,65 @@
   definitions in `cage-challenge-4/blue_obs_features.py`. No dependency on
   container, eBPF, or LLM-Red work — this proposal explicitly does not
   require any of it.
+
+## Local implementation and refinements (2026-10-01)
+
+Local additive producer: `blue_telemetry.py`, optional wrapper method
+`get_telemetry(agent_id)`, and `blue_collect_telemetry.py`. Tested dependency:
+main `2f0cfb67ae1d3b2da6a1b1ccff28eff9e1a5c915`, with the pre-existing local
+Blue training changes preserved. This is not an accepted shared contract.
+
+The code refines the sketch below; affected-role review is still required:
+
+- JSON records include a `type` discriminator and immutable `origin: simulated`.
+  Strict decoding rejects missing/falsified origin, unknown fields/types,
+  wall-clock timestamps, negative ticks, invalid IDs/ports and nonfinite density.
+- Unobserved PID, PPID, process name, destination, port, path and session fields
+  remain null. `comm` maps observed `process_name`. `FileEvent.name` retains
+  `File Name` separately from directory `Path`. `AuthEvent.agent` preserves
+  Blue-visible session ownership needed by the existing feature extractor.
+  No privileged Red-session labels or attacker-name inference are added.
+- `ConnEvent.external_known` marks whether subnet/address information supports
+  the classification. Carried reset subnets preserve existing boundaries.
+  Unknown external status gives false for legacy feature parity plus this flag.
+- File `known` uses the existing UNKNOWN-marker test; missing classification
+  gives true and missing/null density gives 0.0 for legacy parity. These defaults
+  do not prove benignness. This adapter does not introduce a new missingness model.
+- Blocks declare `telemetry_version: blue-telemetry-v1-draft`,
+  `telemetry_time_unit: sim_tick`, and `telemetry_semantics: latest_observed_rows`.
+  Each row retains its source-field observation tick, never export time.
+  `field_observed_at` retains empty-field freshness; missing is not observed-empty.
+  Repeated snapshots must not be accumulated as new event counts. Process and
+  session rows do not establish that an exec or login event occurred.
+- `records_to_vector` reproduces all ten legacy features from one host's schema
+  records. The collection command is the first optional consumer. Existing actor
+  features, masks, rewards, policy manifests and historical anomaly scripts are
+  unchanged. The latter still need a separate corrected detector experiment.
+
+Example, from the root (artifacts under ignored `runs/`):
+
+```powershell
+.venv-train/Scripts/python.exe cage-challenge-4/blue_collect_telemetry.py --output runs/telemetry-demo --seeds 8123 8124 --steps 30 --policy round-robin
+```
+
+The output directory must be new. JSONL contains five local agent snapshots per
+tick, including reset/final observations, with field freshness and schema-derived
+features. The manifest records actual seeds, policy, schema/feature/action versions,
+source commit/hashes, runtime versions and dataset hash. Native Red is active:
+this data is unlabeled, not a verified benign training dataset. No detector is fit.
+Consumers group records by episode, agent and host. No truth-label file is emitted.
+
+Validation: 18 focused telemetry tests and 60 tests in the isolated main-based
+publication checkout passed (32.59 s). The earlier 67-test result includes
+uncommitted local MAPPO tests and eight existing upstream warnings. Tests cover JSON round-trip and all-feature parity, sparse/stale
+data, all five live agents, passive observations, Analyse completion, reset,
+unchanged features/masks, manifest hashing and refusal to overwrite artifacts.
+
+PR checklist / rollout: review additive producer first; migrate future anomaly and
+SIEM consumers in separate changes. Environment reviews sensor field realism;
+these are sensor-inspired shapes, not validated real-sensor interchangeable APIs.
+Evaluation owns JSONL/SIEM adapters and rejection of sim ticks in wall-clock metrics.
+No accepted contract or teammate notification is implied by this local work.
 
 ## Problem and current behavior
 
@@ -100,10 +159,9 @@ manifest alongside `feature_version`/`action_version`.
 
 ## Validation and decision
 
-- Not yet implemented; estimated 3–5 days (schema day, mapping day,
-  JSONL + round-trip day, buffer for review).
-- Untested: mapping coverage of edge-case sim fields; Environment's
-  field-shape review.
+- Local implementation and tests exist as described above; review and merge
+  remain pending. The original 3–5 day estimate is not measured completion time.
+- Untested: integration with any real sensor; Environment's field-shape review.
 - Affected-role review: pending (Environment for schema realism,
   Evaluation for JSONL/SIEM fit). Do not mark accepted just because this
   file exists.

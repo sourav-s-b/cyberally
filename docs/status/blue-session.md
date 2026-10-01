@@ -1,5 +1,50 @@
 # Blue session update
 
+## Telemetry producer implementation (2026-10-01)
+
+Branch `blue/telemetry-schema`, base/main dependency
+`2f0cfb67ae1d3b2da6a1b1ccff28eff9e1a5c915`. Created this task branch from
+main after its schema-only fast-forward. Existing staged/unstaged training work
+and unrelated untracked files are preserved in the original checkout.
+Publication uses a separate worktree to exclude that work. User explicitly
+requested committing and pushing telemetry directly to main; role review
+remains pending, so this does not mark the schema accepted.
+Older sections' claimed current branch is historical, not this checkout's branch.
+
+Delivered `blue_telemetry.py`: frozen Proc/Conn/File/Auth records, strict JSON
+serialization/validation, source-field simulator ticks, simulated provenance,
+and schema-only parity with all ten existing features. Optional wrapper
+`get_telemetry(agent_id)` exports only that agent's local Blue view. Actor inputs,
+masks and native simulator behavior stay unchanged. `blue_collect_telemetry.py`
+writes JSONL plus reproducibility manifest, using schema records for features.
+Native Red is active; data is unlabeled and not a verified benign training set.
+The proposed contract now documents nullable fields, owner/name retention,
+external availability and retained-row semantics. Repeated rows are not new events.
+
+Validation: 18 focused telemetry tests passed; isolated main-based publication
+suite 60 passed in 32.59 s. Earlier local full Blue suite: 67 passed, with
+8 existing upstream warnings in 54.76 s (includes uncommitted MAPPO tests). Real tests cover all agents, live passive
+events, Analyse, reset, feature/mask parity, artifact hashes and no-overwrite.
+No long training, real-sensor experiment, SIEM integration or detector fitting.
+Environment/Evaluation review remains pending; shared contract not accepted.
+
+After timestamp validation/runtime-manifest refinements, focused tests again
+passed (18). CLI smoke: seeds 8123/8124, 30 native steps, round-robin policy,
+300 agent snapshots including reset/final views. Artifacts are ignored under
+`runs/telemetry-smoke-20261001/` (`telemetry.jsonl`, `manifest.json`).
+Final `git diff --check` passed. Existing Git staging was preserved.
+
+PR checklist: producer additive, old consumers unchanged, schema versions recorded,
+no privileged labels in collector, no upstream edits or tracked runtime artifacts.
+Future consumers migrate after affected-role review; old checkpoints remain
+compatible because existing policy features/actions did not change. No teammate
+messages or review requests sent. Existing training files/index remain untouched.
+
+Resume: inspect telemetry diff and test results; obtain Environment field-shape
+and Evaluation JSONL/time-unit review before merge. Then implement a separate
+anomaly experiment with train/validation episode splits and clearly separated
+evaluation labels. Example collection command lives in the schema proposal.
+
 **Last updated:** 2026-09-30
 
 **Owner:** Sourav
