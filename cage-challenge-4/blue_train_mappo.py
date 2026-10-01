@@ -78,9 +78,10 @@ env_REGISTRY["cc4"] = _make_train_env
 
 def build_config(steps=100, t_max=800, seed=7, results="results",
                  train_seeds=(7629, 7630, 7640), save_interval=2000,
-                  lr=0.0003,
-                  temporal_features=("ages", "belief", "freshness", "mission"),
-                  include_root_session=True, mask_mode="validity"):
+                 lr=0.0003,
+                 temporal_features=("ages", "belief", "freshness", "mission"),
+                 include_root_session=True, mask_mode="validity",
+                 init_ckpt=""):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -132,7 +133,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "use_wandb": False,
         "save_model": True,
         "save_model_interval": save_interval,  # periodic + first checkpoints
-        "checkpoint_path": "",
+        "checkpoint_path": init_ckpt,
         "evaluate": False,
         "render": False,
         "load_step": 0,
@@ -221,10 +222,13 @@ if __name__ == "__main__":
     parser.add_argument("--drop-root-session", action="store_true")
     parser.add_argument("--mask-mode", choices=("validity", "evidence"),
                         default="validity")
+    parser.add_argument("--init-ckpt", default="",
+                        help="EPyMARL checkpoint dir to resume actor from "
+                             "(BC warm-start); t_env continues from its step")
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
                        save_interval=cli.save_interval, lr=cli.lr,
                        temporal_features=tuple(cli.temporal_groups),
                        include_root_session=not cli.drop_root_session,
-                       mask_mode=cli.mask_mode))
+                       mask_mode=cli.mask_mode, init_ckpt=cli.init_ckpt))

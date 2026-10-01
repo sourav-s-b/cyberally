@@ -542,6 +542,33 @@ deeper than exploration. Next: BC warm-start from round-robin traces
 (`run_episode` already logs action traces; need BC loss glue + PPO
 fine-tune), per plan Step 3.
 
+## BC warm-start arc (2026-10-01, Step 3)
+
+New: `blue_collect_bc.py` (10 round-robin teacher eps, ages+belief,
+~20k samples, teacher 55% Sleep), `blue_bc_pretrain.py` (GRU full-episode
+CE -> `results/models/bc_rr_<stamp>/0/` resume quad incl. fresh critic +
+Adam states), `blue_train_mappo.py --init-ckpt` (EPyMARL checkpoint_path
+resume; needs full quad — critic.th + both opts, first attempt crashed
+without them), `tests_blue/test_bc_warmstart.py`.
+
+1. Unweighted BC -> Sleep-mode collapse (acc 54.65% = majority). Cause:
+   hidden RR cursor unobservable + Sleep noise. Fix: inverse-sqrt class
+   weights + zero loss on busy ticks (mask sum<=1).
+2. Weighted BC: nonsleep-acc 0.3%->12% (exact-id ceiling is the hidden
+   cursor). Zero-shot semantics transfer: Analyse 565-781, Restore
+   86-174 at 36-37% compromised-precision (vs any PPO ckpt ~2-3%).
+3. BC zero-shot scores -256/-379/-211 — best learned policy of the
+   project, beats Sleep everywhere and masked-random on 7640.
+4. PPO fine-tune 12k from BC (`mappo_cc4_seed7_20261001T131137Z`):
+   catastrophic unlearning — 9975 scores -1960/-2683/-2522, final 12369
+   -1762/-2060/-2522. Fresh critic + noisy early advantages wipe the init
+   before the value head learns; never recovers.
+
+Standing result: imitation beats all RL here (-211..-379 vs PPO best
+-701); PPO as currently configured cannot preserve a good init, let alone
+find one. Next candidates: low-lr preserve-fine-tune (config-only),
+critic-warmup-then-joint (needs learner support), or accept BC + report.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
