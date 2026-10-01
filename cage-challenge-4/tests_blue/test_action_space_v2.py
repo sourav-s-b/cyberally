@@ -32,7 +32,7 @@ def test_per_agent_widths_and_env_info(v2):
     info = v2.get_env_info()
     assert info["per_agent_bounds"] is True
     assert info["n_actions_per_agent"] == [53, 53, 53, 53, 155]
-    assert info["wrapper_version"] == "foundation-v2"
+    assert info["wrapper_version"] == "foundation-v3"
 
 
 def test_no_dead_slots_inside_live_range(v2):

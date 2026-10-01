@@ -370,6 +370,34 @@ truth), feature-version bump, ablated ages -> belief -> mission context.
 Caution: existing `has_root_session` risks the plan's warned misreading
 (Blue root session != attacker root); consider ablating it in BLUE-04.
 
+## BLUE-04 implementation (2026-10-01, `blue/mappo-training`, committed)
+
+Merged `origin/main` first (spec-safe). Implemented the flagged bundle per
+the agreed decisions (bundle behind flags, ages capped at horizon,
+`has_root_session` ablation):
+
+- `blue_obs_features.py`: `host_to_temporal()` pure builder (ages 2,
+  belief one-hot 5, freshness 2 incl. pending-busy, mission tick 1;
+  sentinel 1.0 = never-observed, distinct from fresh 0.0) + `temporal_len`
+  + `ROOT_SESSION_INDEX`. `host_to_vector` untouched (10-wide).
+- `cc4_epymarl_wrapper.py`: `temporal_features=()` default (v2-identical
+  observations) + `include_root_session=True`; dims from flags;
+  `WRAPPER_VERSION` -> `foundation-v3`; env_info gains temporal keys;
+  facade passthrough. Full bundle: host 20-wide, obs 1020, critic 5100.
+- Driver defaults to the full bundle (`--temporal-groups`,
+  `--drop-root-session` CLI); eval derives geometry from env_info
+  (`policy_dims` helper) with matching rollout-env flags, and EPyMARL/torch
+  imports are now lazy so the module imports in the sim venv.
+- `tests_blue/test_temporal_features.py`: 11 tests (v2-identity default,
+  bundle/per-agent/drop dims, sentinel layout, live Analyse age decay,
+  belief wiring, root-index-only removal, masked-random trace invariance
+  on/off, geometry helper). Suites: 58+1 (sim), 59 (train).
+- Smoke (train venv, 2x50, lr=5e-5, full bundle): run completes, manifest
+  records flags + cycled seeds, obs/state 1020/5100 flow automatically.
+- Next: ablation runs at frozen lr=5e-5 — ages-only vs +belief vs +mission
+  vs drop-root, bar = beat masked-random everywhere, then approach
+  round-robin. Old (510-dim) checkpoints fail loudly on load, as designed.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

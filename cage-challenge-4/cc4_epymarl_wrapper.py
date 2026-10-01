@@ -1,4 +1,4 @@
-"""CAGE4 Blue wrappers, foundation-v2 (not yet an EPyMARL training integration).
+"""CAGE4 Blue wrappers, foundation-v3 (not yet an EPyMARL training integration).
 
 Fixed slots include all visible hosts, including routers and HQ's three subnets.
 Action order remains Sleep, Monitor, then Analyse/Remove/Restore per sorted host.
@@ -10,6 +10,13 @@ from each agent's own subnet assignment instead of one global 51-host bound.
 Default mode is unchanged v1 behaviour. Stock EPyMARL shares one head across
 agents and therefore requires the homogeneous (default) mode; per-agent widths
 are reported for heuristics, logging, and future heterogeneous training.
+
+v3 adds opt-in temporal/belief features (`temporal_features=(...)`, BLUE-04):
+per-host evidence ages, belief one-hot, freshness/pending state and mission
+progress, all Blue-visible, appended after the base snapshot vector.
+Default (no groups) is byte-identical v2 behaviour. `include_root_session`
+drops the base has_root_session feature (BLUE-04 ablation: a Blue-visible
+root session is not proof of attacker root).
 """
 from copy import deepcopy
 from collections.abc import Mapping
@@ -20,7 +27,9 @@ from CybORG.Simulator.Scenarios import EnterpriseScenarioGenerator
 from CybORG.Agents import SleepAgent, EnterpriseGreenAgent, DiscoveryFSRed
 from CybORG.Simulator.Actions import Sleep
 from CybORG.Simulator.Actions.AbstractActions import Monitor, Analyse, Remove, Restore
-from blue_obs_features import host_to_vector, extract_subnets, VECTOR_LEN
+from blue_obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
+                               host_to_temporal, temporal_len, TEMPORAL_GROUPS,
+                               ROOT_SESSION_INDEX)
 from blue_action_masking import BlueZoneTracker
 
 BLUE_AGENTS = [f"blue_agent_{i}" for i in range(5)]
@@ -37,14 +46,15 @@ PER_SUBNET_MAX_HOSTS = (EnterpriseScenarioGenerator.MAX_USER_HOSTS
                         + EnterpriseScenarioGenerator.MAX_SERVER_HOSTS + 1)  # 17
 AGENT_MAX_HOSTS = tuple(n * PER_SUBNET_MAX_HOSTS
                         for n in AGENT_SUBNET_COUNTS)  # (17, 17, 17, 17, 51)
-WRAPPER_VERSION = "foundation-v2"
+WRAPPER_VERSION = "foundation-v3"
 
 
 class CC4MARLEnv:
     def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
                  mask_mode="validity", common_reward=False,
                  reward_scalarisation="sum", per_agent_bounds=False,
-                 seed_cycle=None):
+                 seed_cycle=None, temporal_features=(),
+                 include_root_session=True):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
@@ -77,6 +87,18 @@ class CC4MARLEnv:
         self.seed_cycle = seed_cycle
         self._cycle_pos = 0
         self.reset_seeds = []
+        # BLUE-04 temporal/belief features (v3). Default () preserves v2
+        # byte-identical observations; any enabled group widens the host
+        # vector and is recorded in get_env_info() and run manifests, so
+        # checkpoints are only loadable under identical flags.
+        # include_root_session=False drops the base has_root_session
+        # feature (ablation: Blue-visible root != attacker root).
+        self.temporal_features = tuple(temporal_features or ())
+        self.temporal_len = temporal_len(self.temporal_features)
+        self.include_root_session = bool(include_root_session)
+        self.base_len = (VECTOR_LEN if self.include_root_session
+                         else VECTOR_LEN - 1)
+        self.host_vector_len = self.base_len + self.temporal_len
         self.common_reward = bool(common_reward)
         self.reward_scalarisation = reward_scalarisation
         self.per_agent_bounds = bool(per_agent_bounds)
@@ -85,7 +107,8 @@ class CC4MARLEnv:
         else:
             self.max_hosts_per_agent = [max_hosts] * len(BLUE_AGENTS)
         self.n_actions_per_agent = [2 + 3 * h for h in self.max_hosts_per_agent]
-        self.obs_size_per_agent = [h * VECTOR_LEN for h in self.max_hosts_per_agent]
+        self.obs_size_per_agent = [h * self.host_vector_len
+                                   for h in self.max_hosts_per_agent]
         # Scalar widths are the max across agents. In default (global) mode all
         # agents share them; in per-agent mode they are allocation upper bounds
         # for homogeneous consumers (stock EPyMARL requires default mode).
@@ -180,11 +203,21 @@ class CC4MARLEnv:
             session=0, agent=agent, hostname=host), host
 
     def _obs_agent(self, agent):
-        obs = np.zeros((self.max_hosts_per_agent[BLUE_AGENTS.index(agent)],
-                        VECTOR_LEN), dtype=np.float32)
+        ai = BLUE_AGENTS.index(agent)
+        obs = np.zeros((self.max_hosts_per_agent[ai], self.host_vector_len),
+                       dtype=np.float32)
+        busy = agent in self._awaiting
+        tracker = self.trackers[agent]
         for i, host in enumerate(self.hostnames[agent]):
-            obs[i] = host_to_vector(self.views[agent][host], agent,
-                                   self.subnets[agent][host])
+            row = host_to_vector(self.views[agent][host], agent,
+                                 self.subnets[agent][host])
+            if not self.include_root_session:
+                del row[ROOT_SESSION_INDEX]
+            row += host_to_temporal(tracker, host,
+                                    self.observed_at[agent][host],
+                                    self._tick, self.episode_limit, busy,
+                                    self.temporal_features)
+            obs[i] = row
         return obs.flatten()
 
     def get_host_presence(self, agent_id):
@@ -224,6 +257,9 @@ class CC4MARLEnv:
                 "n_actions_per_agent": list(self.n_actions_per_agent),
                 "obs_size_per_agent": list(self.obs_size_per_agent),
                 "per_agent_bounds": self.per_agent_bounds,
+                "temporal_features": list(self.temporal_features),
+                "host_vector_len": self.host_vector_len,
+                "include_root_session": self.include_root_session,
                 "wrapper_version": WRAPPER_VERSION}
 
     def _consume(self, agent, data):
@@ -340,14 +376,17 @@ class CC4BlueWrapper:
     """
     def __init__(self, seed=7629, blue_id="blue_agent_0",
                  max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity",
-                 per_agent_bounds=False, seed_cycle=None):
+                 per_agent_bounds=False, seed_cycle=None, temporal_features=(),
+                 include_root_session=True):
         if blue_id not in BLUE_AGENTS:
             raise ValueError("Unknown Blue agent")
         self.blue_id = blue_id
         self._agent_id = BLUE_AGENTS.index(blue_id)
         self._joint = CC4MARLEnv(seed, max_hosts, steps, mask_mode,
                                  per_agent_bounds=per_agent_bounds,
-                                 seed_cycle=seed_cycle)
+                                 seed_cycle=seed_cycle,
+                                 temporal_features=temporal_features,
+                                 include_root_session=include_root_session)
         self.cyborg = self._joint.cyborg
         self.env = self._joint.env
         self.max_hosts = self._joint.max_hosts_per_agent[self._agent_id]

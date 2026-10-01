@@ -48,6 +48,70 @@ FEATURE_NAMES = [
 
 VECTOR_LEN = len(FEATURE_NAMES)
 
+# Index of has_root_session in the base vector. The wrapper can drop it
+# (BLUE-04 ablation): a Blue-visible root session is not proof of an
+# attacker root session, so its value as an actor input is tested, not
+# assumed.
+ROOT_SESSION_INDEX = 5
+
+# Blue-visible belief states tracked by BlueZoneTracker (blue_action_masking).
+# Ordered for a fixed one-hot layout; append-only if states are ever added.
+BELIEF_STATES = ("UNKNOWN", "CLEAN", "SUSPICIOUS", "CONFIRMED", "VERIFY")
+
+# Temporal/belief feature groups (BLUE-04). Fixed order; dims vary by subset.
+# Ages and freshness are normalized by the episode horizon and capped at 1.0;
+# "never observed" maps to 1.0 (maximally stale), which is distinct from
+# 0.0 (just observed) — missingness is signal, never silent zero-fill.
+TEMPORAL_GROUPS = ("ages", "belief", "freshness", "mission")
+TEMPORAL_GROUP_LENS = {"ages": 2, "belief": len(BELIEF_STATES),
+                       "freshness": 2, "mission": 1}
+
+
+def temporal_len(groups=TEMPORAL_GROUPS):
+    """Total temporal width for a subset of TEMPORAL_GROUPS."""
+    groups = tuple(groups or ())
+    unknown = [g for g in groups if g not in TEMPORAL_GROUP_LENS]
+    if unknown:
+        raise ValueError(f"unknown temporal groups: {unknown}")
+    return sum(TEMPORAL_GROUP_LENS[g] for g in groups)
+
+
+def host_to_temporal(tracker, host, observed_at, tick, horizon,
+                     pending_busy=False, groups=TEMPORAL_GROUPS):
+    """Blue-visible temporal/belief features for one host (BLUE-04).
+
+    All inputs are the agent's own belief/observation bookkeeping — never
+    privileged truth. ``tracker`` needs ``.state``/``.last_analysis``/
+    ``.last_remediation``/``.empty_strikes`` dicts (BlueZoneTracker
+    satisfies this; no import to avoid a dependency cycle).
+    ``observed_at`` maps field name -> last-observed tick. ``horizon`` is
+    the episode step bound used to cap and normalize ages.
+    """
+    groups = tuple(groups or ())
+    unknown = [g for g in groups if g not in TEMPORAL_GROUP_LENS]
+    if unknown:
+        raise ValueError(f"unknown temporal groups: {unknown}")
+    if not isinstance(horizon, int) or horizon < 1:
+        raise ValueError("horizon must be a positive integer")
+    cap = horizon
+    out = []
+    if "ages" in groups:
+        last_an = tracker.last_analysis.get(host)
+        last_re = tracker.last_remediation.get(host)
+        out += [min(1.0, (tick - last_an) / cap) if last_an is not None else 1.0,
+                min(1.0, (tick - last_re) / cap) if last_re is not None else 1.0]
+    if "belief" in groups:
+        state = tracker.state.get(host, "UNKNOWN")
+        out += [1.0 if state == s else 0.0 for s in BELIEF_STATES]
+    if "freshness" in groups:
+        stamps = [t for t in (observed_at or {}).values()
+                  if isinstance(t, (int, float))]
+        newest = min(1.0, (tick - max(stamps)) / cap) if stamps else 1.0
+        out += [newest, 1.0 if pending_busy else 0.0]
+    if "mission" in groups:
+        out += [min(1.0, tick / cap)]
+    return out
+
 
 def _sessions(host):
     return host.get("Sessions", []) or []

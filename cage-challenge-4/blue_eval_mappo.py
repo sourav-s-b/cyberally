@@ -15,21 +15,44 @@ import os
 from types import SimpleNamespace as SN
 
 import numpy as np
-import torch as th
-
-from modules.agents import REGISTRY as agent_REGISTRY
 
 import blue_baselines as baselines
 import cc4_epymarl_wrapper as wrapper
 
 
-class GreedyCheckpointPolicy:
-    """Greedy masked-argmax policy from a saved MAPPO actor."""
+def policy_dims(env_info):
+    """(n_agents, obs_dim, n_actions) from a get_env_info() dict.
 
-    def __init__(self, ckpt_dir, hidden_dim=64):
-        self.n_agents = len(wrapper.BLUE_AGENTS)
-        self.obs_dim = wrapper.DEFAULT_MAX_HOSTS * wrapper.VECTOR_LEN
-        self.n_actions = 2 + 3 * wrapper.DEFAULT_MAX_HOSTS
+    Pure helper so geometry is unit-testable without torch or checkpoints:
+    obs gains the one-hot agent id (as in BasicMAC._build_inputs with
+    obs_agent_id=True, obs_last_action=False).
+    """
+    n_agents = env_info["n_agents"]
+    return n_agents, env_info["obs_shape"] + n_agents, env_info["n_actions"]
+
+
+class GreedyCheckpointPolicy:
+    """Greedy masked-argmax policy from a saved MAPPO actor.
+
+    Geometry derives from ``env_info`` (a ``get_env_info()`` dict), so
+    temporal/bound variants size correctly; a checkpoint trained under
+    different flags fails loudly on load_state_dict instead of
+    silently mis-scoring. Pass the same temporal flags used in training
+    both here and to the rollout env (see main()).
+    """
+
+    def __init__(self, ckpt_dir, hidden_dim=64, env_info=None):
+        try:
+            import torch as th
+            from modules.agents import REGISTRY as agent_REGISTRY
+        except ImportError as e:
+            raise ImportError(
+                "blue_eval_mappo needs the train venv (torch + EPyMARL .pth link): "
+                f"{e}")
+        if env_info is None:
+            probe = wrapper.CC4MARLEnv(steps=400)
+            env_info = probe.get_env_info()
+        self.n_agents, self.obs_dim, self.n_actions = policy_dims(env_info)
         input_shape = self.obs_dim + self.n_agents  # + one-hot id, no last-act
         args = SN(hidden_dim=hidden_dim, n_actions=self.n_actions, use_rnn=True)
         self.agent = agent_REGISTRY["rnn"](input_shape, args)
@@ -62,15 +85,24 @@ def main():
     parser.add_argument("--ckpt", required=True)
     parser.add_argument("--seeds", type=int, nargs="+", default=[7629, 7630, 7640])
     parser.add_argument("--steps", type=int, default=400)
+    parser.add_argument("--temporal-groups", nargs="*",
+                        default=["ages", "belief", "freshness", "mission"])
+    parser.add_argument("--drop-root-session", action="store_true")
     cli = parser.parse_args()
+    env_kwargs = {"temporal_features": tuple(cli.temporal_groups),
+                  "include_root_session": not cli.drop_root_session}
+    probe = wrapper.CC4MARLEnv(steps=cli.steps, **env_kwargs)
+    env_info = probe.get_env_info()
     factories = {
-        "mappo_ckpt": lambda: GreedyCheckpointPolicy(cli.ckpt),
+        "mappo_ckpt": lambda: GreedyCheckpointPolicy(cli.ckpt,
+                                                     env_info=env_info),
         "round_robin": baselines.RoundRobinBaseline,
         "masked_random": lambda: baselines.MaskedRandomBaseline(seed=11),
         "sleep": baselines.SleepBaseline,
     }
     results = baselines.evaluate_policies(
-        factories, cli.seeds, steps=cli.steps, snapshot_steps=(200, cli.steps))
+        factories, cli.seeds, steps=cli.steps, snapshot_steps=(200, cli.steps),
+        **env_kwargs)
     for name, per_seed in results.items():
         for seed, run in per_seed.items():
             snaps = run["snapshots"]
