@@ -418,7 +418,30 @@ run dir `results/mappo_cc4_seed7_20261001T043619Z` (gitignored):
   one-hot at net construction, and the lazy-torch refactor left
   `reset()`/`select()` without the module ref. Regression test added
   (`test_greedy_policy_loads_matching_checkpoint_and_selects`,
-  train-venv-only). Suites now 58+2 (sim) / 60 (train).
+   train-venv-only). Suites now 58+2 (sim) / 60 (train).
+
+## BLUE-04 ablation 2/4 verdict: +belief worse than Sleep (2026-10-01)
+
+12k run, `--temporal-groups ages belief` (host 17-wide), lr=5e-5 frozen,
+run dir `results/mappo_cc4_seed7_20261001T045747Z` (gitignored):
+
+- Stability: critic 5.1 -> 14.0 (max 18.2) — bounded, calmer than
+  ages-only's 26-plateau. Returns flat (-242 -> -276). No collapse.
+- Final eval: -2551 / -2786 / -2412 (roots 42-50 @200) — worse than Sleep
+  on 7629/7630, better only on 7640. Belief inputs made behavior actively
+  harmful, not merely useless.
+- Autopsy (action histograms, native Red, seeds 7629/7630) overturns the
+  Sleep-collapse hypothesis for both temporal checkpoints: ages-only acts
+  41-43% of ticks (Analyse 23-29%, Remove 14-18%), +belief 35-44%
+  (Analyse 21-36%, Remove 5-11%, Restore 2-3%). Exploration is healthy;
+  actions are misdirected — remediation without skill, likely mistimed
+  Restore disruption and unverified Removes.
+- Revised diagnosis: not collapse (entropy fine) but unshaped behavior —
+  the scan->confirm->remediate->verify chain never forms. Next diagnostics:
+  scan precision (fraction of Analyses targeting compromised hosts,
+  privileged eval-only) to split sensing vs remediation failure; then
+  curriculum (phase-dense slices) and/or BC warm-start from round-robin
+  before any more flat runs. Flat 12k volume is retired as a strategy.
 
 ## Resume prompt for a new conversation
 
