@@ -133,3 +133,28 @@ def test_policy_dims_derive_from_env_info():
                         "n_actions": 155}) == (5, 515, 155)
     assert policy_dims({"n_agents": 5, "obs_shape": 1020,
                         "n_actions": 155}) == (5, 1025, 155)
+
+
+def test_greedy_policy_loads_matching_checkpoint_and_selects(calm, tmp_path):
+    """Train-venv-only regression test: policy construction must use
+    policy_dims output directly as the net input (no double-added agent
+    id) and select() must work without module-global torch."""
+    torch = pytest.importorskip("torch")
+    agents_mod = pytest.importorskip("modules.agents")
+    from types import SimpleNamespace as SN
+
+    from blue_eval_mappo import GreedyCheckpointPolicy
+    env = wrapper.CC4MARLEnv(steps=30, temporal_features=("ages",))
+    env.reset(seed=7629)
+    info = env.get_env_info()
+    n_agents, obs_dim, n_actions = policy_dims(info)
+    net = agents_mod.REGISTRY["rnn"](obs_dim,
+                                     SN(hidden_dim=64, n_actions=n_actions,
+                                        use_rnn=True))
+    torch.save(net.state_dict(), tmp_path / "agent.th")
+    policy = GreedyCheckpointPolicy(str(tmp_path), env_info=info)
+    for agent in wrapper.BLUE_AGENTS:
+        action = policy.select(env, agent)
+        assert 0 <= action < n_actions
+        assert env.get_avail_agent_actions(
+            wrapper.BLUE_AGENTS.index(agent))[action] == 1

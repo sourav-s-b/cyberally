@@ -398,6 +398,28 @@ the agreed decisions (bundle behind flags, ages capped at horizon,
   vs drop-root, bar = beat masked-random everywhere, then approach
   round-robin. Old (510-dim) checkpoints fail loudly on load, as designed.
 
+## BLUE-04 ablation 1/4 verdict: ages-only insufficient (2026-10-01)
+
+12k run, `--temporal-groups ages` (host 12-wide, obs 612), lr=5e-5 frozen,
+run dir `results/mappo_cc4_seed7_20261001T043619Z` (gitignored):
+
+- Stability: critic 5.1 -> 22.7 (max 26.1) — bounded, no blowup, but
+  plateaus an order above the no-temporal run's 1.5. Watch item: wider obs
+  with hidden_dim still 64 may be straining the critic.
+- Returns flat (first-3 -226, last-3 -280): no collapse, no learning.
+- Final eval: -1369 / -2309 / -2055 (roots 38/55/50 @200) vs
+  masked-random -239/-190/-276 and round-robin -85/-105/-123.
+  Better than Sleep on two seeds, nowhere near either bar.
+- Verdict: staleness awareness alone is not the gap. Proceed to ablation
+  2/4 (+belief) per plan — the belief one-hot is the round-robin
+  notebook's core, untested until now.
+- Eval tooling bugs found and fixed while scoring (both failed loudly,
+  neither corrupted results): `policy_dims` double-added the agent-id
+  one-hot at net construction, and the lazy-torch refactor left
+  `reset()`/`select()` without the module ref. Regression test added
+  (`test_greedy_policy_loads_matching_checkpoint_and_selects`,
+  train-venv-only). Suites now 58+2 (sim) / 60 (train).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

@@ -49,11 +49,13 @@ class GreedyCheckpointPolicy:
             raise ImportError(
                 "blue_eval_mappo needs the train venv (torch + EPyMARL .pth link): "
                 f"{e}")
+        self._th = th
         if env_info is None:
             probe = wrapper.CC4MARLEnv(steps=400)
             env_info = probe.get_env_info()
         self.n_agents, self.obs_dim, self.n_actions = policy_dims(env_info)
-        input_shape = self.obs_dim + self.n_agents  # + one-hot id, no last-act
+        # obs_dim already includes the one-hot id (see policy_dims); no last-act
+        input_shape = self.obs_dim
         args = SN(hidden_dim=hidden_dim, n_actions=self.n_actions, use_rnn=True)
         self.agent = agent_REGISTRY["rnn"](input_shape, args)
         state = th.load(os.path.join(ckpt_dir, "agent.th"),
@@ -65,15 +67,17 @@ class GreedyCheckpointPolicy:
 
     def reset(self):
         self.hidden = {
-            a: th.zeros(1, self.agent.args.hidden_dim) for a in wrapper.BLUE_AGENTS
+            a: self._th.zeros(1, self.agent.args.hidden_dim)
+            for a in wrapper.BLUE_AGENTS
         }
 
     def select(self, env, agent):
         i = wrapper.BLUE_AGENTS.index(agent)
         obs = np.concatenate(
             [env.get_obs_agent(i), np.eye(self.n_agents)[i]]).astype(np.float32)
-        with th.no_grad():
-            logits, h = self.agent(th.from_numpy(obs).unsqueeze(0), self.hidden[agent])
+        with self._th.no_grad():
+            logits, h = self.agent(self._th.from_numpy(obs).unsqueeze(0),
+                                   self.hidden[agent])
         self.hidden[agent] = h
         masked = logits.squeeze(0).numpy()
         masked[env.get_avail_agent_actions(i) == 0] = -np.inf
