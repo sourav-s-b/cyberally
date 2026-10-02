@@ -879,6 +879,19 @@ train subset 13 passed. Full record in proposal 02. Next: stabilized
 fine-tuning (KL-to-teacher, schedules, behavior constraints) — not more
 architecture.
 
+## KL-to-teacher slows collapse only; line closed (2026-10-02)
+
+Frozen-demonstrator KL in the vendored learner (`teacher_kl` + teacher MAC,
+`--kl-teacher-ckpt/--kl-teacher-coef`, recorded as
+`environment/patches/ppo-kl-teacher.patch` + README, diff-generated and
+byte-verified; applies after ppo-warmup.patch). Math unit-tested (3 tests;
+caught a flipped expectation). KL run (coef 0.1, same config): KL stat
+0.0003 -> 0.07, 8-seed means ckpt-5187 -940 (was -1072), final -1265 (was
+-1770). Slower collapse, same destination; KL 0.07 nats with returns at
+-1000s = razor-thin landscape, and the anchor caps at distilled -205
+anyway. Closed absent a better distill. Sim 102/7-skip (torch tests skip);
+train 16 passed. Full record in proposal 02.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

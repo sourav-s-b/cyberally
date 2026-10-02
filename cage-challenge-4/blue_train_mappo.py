@@ -87,7 +87,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
                  include_root_session=True, mask_mode="validity",
                   init_ckpt="", shaping=False,
                   warmup_steps=0, warmup_critic_only=True,
-                  agent="rnn"):
+                  agent="rnn", kl_teacher_ckpt="", kl_teacher_coef=0.1):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -150,6 +150,9 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         # Critic-only warmup phase to prevent value divergence on BC fine-tune
         "warmup_steps": warmup_steps,
         "warmup_only_critic": warmup_critic_only,
+        # KL-to-teacher anchoring (inactive unless a ckpt dir is given)
+        "kl_teacher_ckpt": kl_teacher_ckpt,
+        "kl_teacher_coef": kl_teacher_coef,
     }
 
 
@@ -252,6 +255,10 @@ if __name__ == "__main__":
                         choices=("rnn", "rnn_factorized"),
                         help="actor head: flat 155-way or factorized "
                              "host-then-command (proposal 02)")
+    parser.add_argument("--kl-teacher-ckpt", default="",
+                        help="distilled actor ckpt dir anchoring PPO via "
+                             "KL(teacher || current); empty disables")
+    parser.add_argument("--kl-teacher-coef", type=float, default=0.1)
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
@@ -262,4 +269,6 @@ if __name__ == "__main__":
                        shaping=cli.shaping,
                        warmup_steps=cli.warmup_steps,
                        warmup_critic_only=cli.warmup_critic_only,
-                       agent=cli.agent))
+                       agent=cli.agent,
+                       kl_teacher_ckpt=cli.kl_teacher_ckpt,
+                       kl_teacher_coef=cli.kl_teacher_coef))

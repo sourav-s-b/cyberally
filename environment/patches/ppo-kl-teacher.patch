@@ -1,0 +1,101 @@
+--- a/src/learners/ppo_learner.py
++++ b/src/learners/ppo_learner.py
+@@ -1,5 +1,6 @@
+ # code heavily adapted from https://github.com/AnujMahajanOxf/MAVEN
+ import copy
++import os
+ 
+ import torch as th
+ from torch.optim import Adam
+@@ -9,6 +10,17 @@
+ from modules.critics import REGISTRY as critic_resigtry
+ 
+ 
++def teacher_kl(pi, teacher_pi, mask):
++    """Mean KL(teacher || current) over valid (batch, time, agent) triples.
++
++    Both distributions are post-softmax masked probs with shape
++    (..., n_actions); mask has shape (..., ) with 1 on valid triples.
++    Unit-testable in isolation (see tests_blue/test_kl_teacher.py).
++    """
++    kl_triple = (teacher_pi * (th.log(teacher_pi + 1e-10)
++                               - th.log(pi + 1e-10))).sum(-1)
++    return (kl_triple * mask).sum() / mask.sum().clamp(min=1.0)
++
+ 
+ class PPOLearner:
+     def __init__(self, mac, scheme, logger, args):
+@@ -50,6 +62,25 @@
+         self.warmup_steps = getattr(args, "warmup_steps", 0)
+         self.warmup_frozen_steps = 0
+ 
++        # KL-to-teacher anchoring (CAGE4 addition, NOT upstream EPyMARL).
++        # A frozen copy of the demonstrator actor (e.g. the BC-distilled
++        # checkpoint) regularises PPO updates via KL(teacher || current) on
++        # the masked action distributions, so sparse noisy rewards cannot
++        # silently unlearn the distilled ordering. Inactive unless both a
++        # checkpoint dir and a positive coefficient are configured.
++        self.kl_teacher_coef = float(getattr(args, "kl_teacher_coef", 0.0))
++        kl_ckpt = getattr(args, "kl_teacher_ckpt", "")
++        self.teacher_mac = None
++        if kl_ckpt and self.kl_teacher_coef > 0:
++            self.teacher_mac = copy.deepcopy(mac)
++            state = th.load(os.path.join(kl_ckpt, "agent.th"),
++                            map_location="cpu", weights_only=True)
++            missing = self.teacher_mac.agent.load_state_dict(state,
++                                                             strict=True)
++            assert not missing.missing_keys and not missing.unexpected_keys, (
++                f"teacher ckpt mismatch: {missing}")
++            for p in self.teacher_mac.agent.parameters():
++                p.requires_grad_(False)
+ 
+     def _warmup_active(self, t_env: int) -> bool:
+         return bool(self.warmup_only_critic) and t_env < self.warmup_steps
+@@ -91,6 +122,18 @@
+         old_pi_taken = th.gather(old_pi, dim=3, index=actions).squeeze(3)
+         old_log_pi_taken = th.log(old_pi_taken + 1e-10)
+ 
++        # Frozen teacher distribution (computed once per batch, not per
++        # epoch: the teacher never changes). Masked post-softmax probs from
++        # mac.forward, same construction as pi below.
++        teacher_out = None
++        if self.teacher_mac is not None:
++            with th.no_grad():
++                tout = []
++                self.teacher_mac.init_hidden(batch.batch_size)
++                for t in range(batch.max_seq_length - 1):
++                    tout.append(self.teacher_mac.forward(batch, t=t))
++                teacher_out = th.stack(tout, dim=1)
++
+         for k in range(self.args.epochs):
+             mac_out = []
+             self.mac.init_hidden(batch.batch_size)
+@@ -125,6 +168,10 @@
+                 ).sum()
+                 / mask.sum()
+             )
++            kl_teacher = th.tensor(0.0)
++            if teacher_out is not None:
++                kl_teacher = teacher_kl(pi, teacher_out, mask)
++                pg_loss = pg_loss + self.kl_teacher_coef * kl_teacher
+ 
+             # Optimise agents (skipped during critic-only warmup)
+             grad_norm = th.tensor(0.0)
+@@ -172,6 +219,8 @@
+             )
+             self.logger.log_stat("pg_loss", pg_loss.item(), t_env)
+             self.logger.log_stat("agent_grad_norm", grad_norm.item(), t_env)
++            if self.teacher_mac is not None:
++                self.logger.log_stat("kl_teacher", kl_teacher.item(), t_env)
+             self.logger.log_stat(
+                 "pi_max",
+                 (pi.max(dim=-1)[0] * mask).sum().item() / mask.sum().item(),
+@@ -269,6 +318,8 @@
+     def cuda(self):
+         self.old_mac.cuda()
+         self.mac.cuda()
++        if self.teacher_mac is not None:
++            self.teacher_mac.cuda()
+         self.critic.cuda()
+         self.target_critic.cuda()
+ 

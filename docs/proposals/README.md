@@ -19,7 +19,7 @@ later) · `parked` (valid but not now) · `rejected` (evidence against).
 | # | Proposal | Status | Verdict |
 |---|---|---|---|
 | 01 | Hybrid rules + learned priority | drafted | BUILD FIRST |
-| 02 | Host-then-command factorized actor | built+tested | head validated (distill 21.8%); MAPPO diverges — blocked on fine-tune |
+| 02 | Host-then-command factorized actor | built+tested | head validated (distill 21.8%); vanilla MAPPO diverges; KL 0.1 slows only — fine-tune line closed |
 | 03 | Entity-attention encoder | proposed | BUILD WITH 02 |
 | 04 | TERLA-style semantic action collapse | deferred | take action-waiting audit only |
 | 05 | Full GNN policy | parked | revisit only on generalization suite |
