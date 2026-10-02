@@ -19,6 +19,11 @@ REGISTRY = {
     "hybrid_none": ("blue_hybrid", "HybridBluePolicy", {"priority_fn": None}),
     "hybrid_lancer": ("blue_hybrid", "HybridBluePolicy",
                       {"priority_fn": "lancer"}),
+    # v2: suspicion bonus decays with fruitless re-analyses (0.5 each).
+    # v1 ("hybrid_lancer", fruitless_decay=1.0) stays frozen for comparison.
+    "hybrid_lancer_v2": ("blue_hybrid", "HybridBluePolicy",
+                         {"priority_fn": "lancer",
+                          "priority_kwargs": {"fruitless_decay": 0.5}}),
 }
 
 TORCH_POLICIES = {"mappo_ckpt"}

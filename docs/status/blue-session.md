@@ -823,6 +823,18 @@ bonus with fruitless re-analyses (empty_strikes). Sim suite: 92 passed,
 5 skipped. Numbers in `docs/proposals/01-hybrid-priority.md`, manifest
 `docs/proposals/manifests/lancer-v1-20261002.json`.
 
+## v2 + held-out: fixed constants exhausted (2026-10-02)
+
+v2 (`fruitless_decay` 0.5 on the suspicion bonus; unit-tested incl. a
+caught-and-fixed logic bug) regresses to -75.2 on the same 8 seeds —
+still beats teacher (-93.5) but worse than v1 (-63.2). Held-out, 8 fresh
+seeds 7801-7808: v1 collapses to -110.1 ± 130.4 (seed 7802: -414)
+vs teacher -85.1 ± 46.1; v2 tracks teacher at -91.2 ± 48.5. v1's +30.2
+was selection bias; v2 regularizes to parity. Verdict in proposal 01:
+no improvement claim stands; next is the adaptive risk scorer, not more
+constant-tuning. Manifests `lancer-v2-20261002.json`,
+`lancer-heldout-20261002.json`. Sim suite: 94 passed, 5 skipped.
+
 ## Parallel eval harness (2026-10-02)
 
 Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable

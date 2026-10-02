@@ -1,7 +1,7 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: drafted — parity proven; lancer v1 TESTED at -63.2 ± 26.0
-  (+30.2 vs teacher, 6/8 seeds; needs held-out replication)
+- Status: drafted — v1 fails held-out replication; v2 == teacher parity.
+  Fixed constants exhausted; next is the adaptive risk scorer.
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
@@ -90,6 +90,48 @@ Per-step rate -0.158 vs winner-band -0.226 (usual build caveats).
   compromised). v2 direction: decay the suspicion bonus with fruitless
   re-analyses (tie to `empty_strikes`), or suppress it for recently
   analysed hosts.
+
+## Experiment 3: v2 + held-out replication (2026-10-02, TESTED, humbling)
+
+- v2: suspicion bonus x `fruitless_decay**n_fruitless` (`fruitless_decay`
+  0.5; v1 frozen as `fruitless_decay=1.0`). Fruitless = completed Analyse
+  with no new CONFIRMED transition; remediation resets. Registry
+  `hybrid_lancer_v2` via new `priority_kwargs` plumbing. First version of
+  the logic (reset on any CONFIRMED state) was caught by the new unit test
+  and fixed: re-analysing an already-known host must count fruitless.
+- Regression, same 8 seeds (`lancer-v2-20261002`):
+
+| policy | mean | std | per-seed |
+|---|---|---|---|
+| hybrid_lancer (v1) | -63.2 | 26.0 | -50 -41 -63 -48 -75 -44 -64 -121 |
+| hybrid_lancer_v2 | -75.2 | 33.6 | -52 -54 -63 -54 -90 -57 -81 -151 |
+| round_robin | -93.5 | 27.8 | -85 -105 -123 -85 -135 -64 -53 -98 |
+
+v2 still beats the teacher (+18.2) but is uniformly worse than v1 —
+the decay hurts most on the failure seeds (7705: -151 vs -121).
+- Held-out, 8 FRESH seeds 7801-7808 chosen before running
+  (`lancer-heldout-20261002`):
+
+| policy | mean | std | per-seed |
+|---|---|---|---|
+| hybrid_lancer (v1) | -110.1 | 130.4 | -138 -414 -42 -134 -32 -35 -41 -45 |
+| hybrid_lancer_v2 | -91.2 | 48.5 | -108 -94 -59 -167 -47 -155 -51 -49 |
+| round_robin | -85.1 | 46.1 | -88 -90 -52 -144 -51 -163 -53 -40 |
+
+Paired diffs vs teacher: v1 -25.0, v2 -6.1, both inside noise — NO
+improvement claim stands.
+- Interpretation: v1's +30.2 was selection bias on the regression seeds.
+  v1 is seed-fragile (held-out std 130 vs 26): sticky suspicion locks onto
+  the right hosts early on some seeds (7806: -35 vs -163) and catastrophically
+  neglects coverage on others (7802: -414). v2's decay regularizes toward
+  teacher behavior (std 48.5 ~= teacher 46.1) — kills catastrophes AND big
+  wins, net teacher parity. The teacher itself is stable across seed sets
+  (-93.5 -> -85.1); the learners are not.
+- Lesson recorded: fixed constants cannot win the ordering game across
+  seeds — they trade catastrophe for mediocrity. Next is the adaptive risk
+  scorer (learned per-host priority from Blue-visible features), which can
+  condition on *why* a host looks suspicious instead of applying one bonus
+  schedule everywhere.
 
 Remaining, not yet run: (1) lancer-style priority + punch-style
 file-density>0.9 flag + UC-style persistent malicious-event flags, same

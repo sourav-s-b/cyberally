@@ -38,11 +38,14 @@ class HybridBluePolicy:
     isolation.
     """
 
-    def __init__(self, priority_fn=None):
+    def __init__(self, priority_fn=None, priority_kwargs=None):
         # String specs ("lancer") resolve to scorer builders so registry
         # entries stay picklable for the process pool (proposal 01).
         if isinstance(priority_fn, str):
-            priority_fn = make_priority(priority_fn)
+            priority_fn = make_priority(priority_fn,
+                                        **(priority_kwargs or {}))
+        elif priority_kwargs:
+            raise ValueError("priority_kwargs need a string priority_fn spec")
         self.priority_fn = priority_fn
         self._n = {}
         self._cursor = {}
@@ -145,20 +148,26 @@ class LancerPriority:
     (UC-style persistent flag, punch-style density tripwire): a host that
     *currently* shows unknown files, density > 0.9, external connections,
     or a CONFIRMED/VERIFY belief scores higher until remediated and
-    re-observed. Rules 1-2 still grab CONFIRMED/VERIFY hosts first; the
-    bonus matters when remediation is illegal and they fall to the sweep.
+    re-observed. The bonus decays geometrically with consecutive fruitless
+    re-analyses (``fruitless_decay`` per completed Analyse that yields no
+    detection), which stops the v1 failure mode of re-analysing
+    already-known hosts forever. Rules 1-2 still grab CONFIRMED/VERIFY
+    hosts first; the bonus matters when remediation is illegal and they
+    fall to the sweep.
 
     State is plain floats/dicts (picklable) keyed per agent; ``reset()``
     clears it (called by HybridBluePolicy.reset).
     """
 
     def __init__(self, init=1.0, touch_decay=0.5, detect_boost=2.0,
-                 novelty_boost=1.0, suspicious_bonus=2.0):
+                 novelty_boost=1.0, suspicious_bonus=2.0,
+                 fruitless_decay=1.0):
         self.init = init
         self.touch_decay = touch_decay
         self.detect_boost = detect_boost
         self.novelty_boost = novelty_boost
         self.suspicious_bonus = suspicious_bonus
+        self.fruitless_decay = fruitless_decay
         self.reset()
 
     def reset(self):
@@ -167,6 +176,7 @@ class LancerPriority:
         self._acct_re = {}
         self._state = {}
         self._sig = {}
+        self._fruitless = {}
 
     def _signals(self, env, agent, host):
         """(unknown_files, max_density, n_external) from the merged view."""
@@ -182,13 +192,25 @@ class LancerPriority:
             last_an = tracker.last_analysis.get(host)
             last_re = tracker.last_remediation.get(host)
             if last_an != self._acct_an.get(key):
-                # A new Analyse completed on this host: decay once.
+                # A new Analyse completed on this host: decay once, and count
+                # it fruitless unless it newly detected (state transitioned
+                # to CONFIRMED on this sync). Re-analysing an already-known
+                # host counts fruitless too -- that is the v1 loop being
+                # fixed. Remediation resets the count (see below).
                 self._acct_an[key] = last_an
                 self._v[key] = self._v.get(key, self.init) * self.touch_decay
+                now = tracker.state.get(host)
+                if (self._state.get(key) != "CONFIRMED"
+                        and now == "CONFIRMED"):
+                    self._fruitless[key] = 0
+                else:
+                    self._fruitless[key] = self._fruitless.get(key, 0) + 1
             if last_re != self._acct_re.get(key):
-                # A new Remove/Restore completed: decay once.
+                # A new Remove/Restore completed: decay once, and a
+                # remediation attempt resets fruitless re-analysis count.
                 self._acct_re[key] = last_re
                 self._v[key] = self._v.get(key, self.init) * self.touch_decay
+                self._fruitless[key] = 0
             state = tracker.state.get(host)
             if state == "CONFIRMED" and self._state.get(key) != "CONFIRMED":
                 self._v[key] = self._v.get(key, self.init) + self.detect_boost
@@ -210,7 +232,9 @@ class LancerPriority:
         self._sync(env, agent)
         value = self._v.get((agent, host), self.init)
         if self._suspicious_now(env, agent, host):
-            value += self.suspicious_bonus
+            value += (self.suspicious_bonus
+                      * (self.fruitless_decay
+                         ** self._fruitless.get((agent, host), 0)))
         return value
 
 

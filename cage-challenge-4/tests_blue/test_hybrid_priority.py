@@ -79,6 +79,33 @@ def test_scorer_picklable():
     assert isinstance(pickle.loads(blob), LancerPriority)
 
 
+def test_fruitless_reanalysis_decays_suspicion_bonus(quiet):
+    scorer = LancerPriority(init=1.0, touch_decay=1.0, novelty_boost=0.0,
+                            suspicious_bonus=2.0, fruitless_decay=0.5)
+    agent = "blue_agent_0"
+    host = quiet.hostnames[agent][0]
+    quiet.trackers[agent].state[host] = "CONFIRMED"  # bonus applies
+    first = scorer(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 5  # fruitless re-analyse
+    second = scorer(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 9  # another fruitless one
+    third = scorer(quiet, agent, host)
+    assert first > second > third  # 2.0 -> 1.0 -> 0.5 bonus
+    assert third == pytest.approx(first - 1.5)
+
+
+def test_v1_default_disables_fruitless_decay(quiet):
+    v1 = LancerPriority(touch_decay=1.0, novelty_boost=0.0)  # isolate bonus
+    agent = "blue_agent_0"
+    host = quiet.hostnames[agent][0]
+    quiet.trackers[agent].state[host] = "CONFIRMED"
+    a = v1(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 5
+    b = v1(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 9
+    assert v1(quiet, agent, host) == pytest.approx(a) == pytest.approx(b)
+
+
 def test_hybrid_lancer_selects_legal(quiet):
     policy = HybridBluePolicy(priority_fn="lancer")
     for _ in range(8):
