@@ -1013,6 +1013,17 @@ PARTIAL — update vindicated, transfer is the gap; route to 16 (IQL ckpt
 replaces attention as best init) + 17. Sim 112/9. Manifests
 iql/a05/a03/a07/full/strong/heldout-20261002. Ckpts local-only.
 
+## Phase A: Q-instability kills the scaling story (2026-10-02)
+
+60-ep 50k-iter retrain DIVERGED (loss_q 4→421, adv_max 1159): more budget
+without stabilization fails; 20k was early-stopped luck. Train seeds 1–2
+on 24-ep: loss_q 8.4/6.4 (vs 1.6 seed 0) → regression -105.6±90.4
+(7640 -319 tail) / -108.1±31.6. loss_q predicts return; seed-0 -82 was a
+lucky ticket — soften single-seed conclusions incl. data gaps. Gate: no
+champion → Phase B held-out look CANCELLED, one-look budget preserved.
+Lesson: rung-2 IQL is a lottery ticket; rung 3 needs value stabilization
+first (17-adjacent). Manifests iql-s1/s2-20261002 added.
+
 ## Repo layout cleanup (2026-10-02)
 
 cage-challenge-4/ is now the pristine simulator only (CybORG/ untouched

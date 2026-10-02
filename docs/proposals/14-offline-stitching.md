@@ -116,3 +116,22 @@ is data (14-diagnostic, second clause) and 16/17 become mandatory.
   the best init) and 17 (critic audit may explain the uniform held-out
   degradation). Second held-out look budget: SPENT cautiously (one fair
   run); further tuning stays regression-side; pristine 8201+ untouched.
+
+## Phase A follow-up: Q-instability, not undertraining (2026-10-02)
+
+- Scaled-iters retrain (60-ep, 20k→50k, seed 0): DIVERGED — loss_q 4.08 →
+  420.9, adv_max 1159, 6.9% clipped. More budget without stabilization
+  fails (deadly triad on a fixed log). Undertraining hypothesis DEAD;
+  the 20k run was early-stopped luck.
+- Train-seed check (24-ep, seeds 1–2): loss_q 8.44 / 6.36 (vs 1.60 seed
+  0), adv_max 176 / 27. Regression: s1 -105.6±90.4 (7640: -319 tail),
+  s2 -108.1±31.6. loss_q predicts performance; seed 0's -82 was a lucky
+  ticket. Single-seed training conclusions SOFTENED across rung 2 —
+  including the 24-vs-60/strong data gaps (confounded with train seed).
+- Gate: nothing beat -82 → Phase B second held-out look CANCELLED,
+  one-look budget PRESERVED.
+- Lesson: rung-2 IQL works only as an optimization lottery ticket here.
+  A rung 3 needs value stabilization FIRST (reward /100 to RTG scale,
+  LayerNorm, lower lr / harder targets) before bigger logs — that work is
+  17-adjacent. Manifests `iql-s1/s2-20261002.json` (no pool for the
+  diverged 50k ckpt — diagnostics condemned it).
