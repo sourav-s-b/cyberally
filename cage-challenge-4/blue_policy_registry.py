@@ -47,9 +47,10 @@ REGISTRY = {
                         "priority_kwargs": {"mode": "gate"}}),
 }
 
-TORCH_POLICIES = {"mappo_ckpt", "mappo_ckpt_factorized"}
+TORCH_POLICIES = {"mappo_ckpt", "mappo_ckpt_factorized", "rvs_ckpt"}
 _CKPT_AGENT = {"mappo_ckpt": "rnn",
-               "mappo_ckpt_factorized": "rnn_factorized"}
+               "mappo_ckpt_factorized": "rnn_factorized",
+               "rvs_ckpt": "rnn_factorized"}
 
 
 def needs_torch(name):
@@ -61,13 +62,22 @@ def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, attn_layers=0,
                 **env_kwargs):
     """Greedy MAPPO-checkpoint policy; probe env sizes geometry from flags."""
     import cc4_epymarl_wrapper as wrapper
+    if name == "rvs_ckpt":
+        from blue_eval_rvs import RvSCheckpointPolicy
+        target = env_kwargs.pop("target_return", -50.0)
+        probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
+        env_info = probe.get_env_info()
+        return RvSCheckpointPolicy(ckpt_dir, target_return=target,
+                                   hidden_dim=hidden_dim, env_info=env_info,
+                                   agent_type=_CKPT_AGENT[name],
+                                   attn_layers=attn_layers)
     from blue_eval_mappo import GreedyCheckpointPolicy
     probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
     env_info = probe.get_env_info()
     return GreedyCheckpointPolicy(ckpt_dir, hidden_dim=hidden_dim,
-                                  env_info=env_info,
-                                  agent_type=_CKPT_AGENT[name],
-                                  attn_layers=attn_layers)
+                                   env_info=env_info,
+                                   agent_type=_CKPT_AGENT[name],
+                                   attn_layers=attn_layers)
 
 
 def build(name, **overrides):

@@ -25,22 +25,30 @@ warning (C27) that return-conditioning alone cannot stitch.
 
 ## Experiment
 
-1. Log dataset spec: 872-dim obs + validity mask + action + native reward
-   from lancer_v2/round-robin traces (8101+ demos plus regression-8
-   traces). Masks are REQUIRED — AWR extraction must range over valid
-   actions only, else it re-learns masked-action mass.
-2. Rung 1 (days): RvS return-conditioned MLP on the factorized head.
-   Tests whether return-conditioning alone unlocks anything.
-3. Rung 2 (1–2 weeks): IQL-discrete — expectile V (tau ~0.7–0.9 sweep),
-   SARSA-style backup, AWR policy extraction (temperature sweep). Start on
-   the factorized head (21.8% extraction surface beats flat 12.2%).
-4. Gate (binding): beat round-robin on HELD-OUT 7801–7808 (mean and paired
-   diff), same bar that killed 01/13/riskx. Report vs attention-distill
-   parity line (-93.9 ± 45.8) as the secondary comparator.
-5. Diagnostic read: RvS ties + IQL beats → stitching was the missing
-   piece. Both tie → logs lack improvable diversity → the ceiling is data,
-   not algorithm; proceed to online exploration (16/17), do not tune
-   expectiles further.
+RUNG 1 DONE (2026-10-02). RvS return-conditioned factorized GRU.
+
+- Data: extended `blue_collect_bc.py` (--teacher/--mix, team rewards
+  saved); 24 eps on 8101–8124, 8 each lancer_v2/RR/masked-random:
+  returns -44…-304, bimodal (good -44…-123, weak -187…-304) — the
+  conditioning signal exists. `results/offline_logs_14.npz` (gitignored).
+- Model: `blue_rvs_pretrain.py` — factorized head + trailing RTG scalar
+  (`rtg_dim=1` split in `FactorizedRNNAgent`; default path bit-identical).
+  30 epochs: acc 35.9%, nonsleep 22.6% (in-sample, on par with BC).
+- Eval: `RvSCheckpointPolicy` (`blue_eval_rvs.py`, registry `rvs_ckpt`,
+  minimal `observe_step` hook in `run_episode` — no-op for heuristics).
+  Pool `--target-return`, `--temporal-groups ages belief` to match logs.
+- Target sensitivity (regression-8): target -50 → -112.6 ± 87.0 (tail
+  -313 on 7705: demanding near-max returns destabilizes); target -80 →
+  -87.1 ± 28.1 vs RR -93.5 ± 27.8 (parity, no tail). The policy LISTENS
+  to conditioning — machinery works.
+- Held-out 7801–7808 (target -80): rvs -94.0 ± 45.3 vs RR -85.1 ± 46.1,
+  paired -8.9 (-60 +5 -4 +7 -8 +7 -7 -11); cf lancer_v2 -91.2 ± 48.5
+  paired -6.1. Teacher parity with one tail episode — no exceed.
+- Manifests: `rvs-20261002.json`, `rvs-t80-20261002.json`,
+  `rvs-heldout-20261002.json`. Ckpt `results/models/rvs_14/` (local only).
+- RUNG-1 VERDICT per the diagnostic: RvS TIES. Return-conditioning
+  reproduces the teacher but cannot exceed it — the Brandfonbrener
+  prediction holds. Stitching is confirmed as the missing piece.
 
 ## Pros
 
@@ -68,3 +76,8 @@ warning (C27) that return-conditioning alone cannot stitch.
 PROPOSED, P1, do first. Outcome routes the program: IQL wins → fine-tune
 the IQL policy (16) instead of the attention ckpt; both tie → the ceiling
 is data and online methods (16/17) are mandatory, not optional.
+
+RUNG 2 ROUTING (2026-10-02): RvS tied — proceed to IQL-discrete
+(expectile V tau 0.7–0.9, SARSA backup, AWR extraction over VALID actions
+only, factorized head). Same held-out gate. If IQL also ties, the ceiling
+is data (14-diagnostic, second clause) and 16/17 become mandatory.

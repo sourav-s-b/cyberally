@@ -37,10 +37,15 @@ class FactorizedRNNAgent(nn.Module):
         super().__init__()
         self.args = args
         self.n_agents = args.n_agents
-        assert (input_shape - self.n_agents) % N_SLOTS == 0, (
-            f"input {input_shape} with {self.n_agents} id dims is not "
-            f"{N_SLOTS} slots wide")
-        self.slot_feats = (input_shape - self.n_agents) // N_SLOTS
+        # Optional return-to-go conditioning (proposal 14, RvS): trailing
+        # rtg_dim dims are consumed by fc1/GRU only, never by the slot/id
+        # split. Default 0 reproduces the exact original layout.
+        self.rtg_dim = int(getattr(args, "rtg_dim", 0) or 0)
+        slot_width = input_shape - self.n_agents - self.rtg_dim
+        assert slot_width % N_SLOTS == 0, (
+            f"input {input_shape} with {self.n_agents} id dims and "
+            f"{self.rtg_dim} RTG dims is not {N_SLOTS} slots wide")
+        self.slot_feats = slot_width // N_SLOTS
         hidden = args.hidden_dim
         ctx = hidden + self.n_agents
 
@@ -79,7 +84,9 @@ class FactorizedRNNAgent(nn.Module):
         b = inputs.shape[0]
         flat_slots = N_SLOTS * self.slot_feats
         slots = inputs[:, :flat_slots].reshape(b, N_SLOTS, self.slot_feats)
-        ids = inputs[:, flat_slots:]
+        # Id block sits between slots and the optional trailing RTG dims;
+        # heads see exactly the n_agents id dims as before.
+        ids = inputs[:, flat_slots:flat_slots + self.n_agents]
         emb = F.relu(self.slot_enc(slots))
         ctx = torch.cat([h.unsqueeze(1).expand(-1, N_SLOTS, -1),
                          ids.unsqueeze(1).expand(-1, N_SLOTS, -1)], dim=-1)

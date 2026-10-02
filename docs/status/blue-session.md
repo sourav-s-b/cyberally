@@ -985,6 +985,20 @@ no-training planning baseline and an explicit deferred list (diffusion,
 GAIL, DreamerV3-full, program synthesis, Mamba) with trigger conditions.
 README index updated. No code; awaiting build order.
 
+## Proposal 14 rung 1: RvS ties teacher (2026-10-02)
+
+Collector extended (--teacher/--mix + team rewards); 24 mixed eps
+8101–8124 (lancer_v2/RR/random, returns -44…-304 bimodal).
+`blue_rvs_pretrain.py` factorized+RTG (`rtg_dim` split, default path
+unchanged): 22.6% nonsleep-acc. Eval via `rvs_ckpt` + `observe_step`
+hook (no-op for heuristics). Target -50 → -112.6±87 (tail -313);
+target -80 → regression -87.1±28.1 (parity), held-out -94.0±45.3 vs
+RR -85.1±46.1 (paired -8.9, one -60 tail; cf lancer_v2 -6.1). RvS
+TIES: conditioning works, stitching missing — Brandfonbrener holds.
+Routing: rung 2 IQL-discrete. Sim 112/8; torch rvs/factorized/baseline
+tests pass. Manifests rvs/rvs-t80/rvs-heldout-20261002. Ckpt local-only
+(results/models/rvs_14/).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

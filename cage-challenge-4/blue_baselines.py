@@ -308,6 +308,10 @@ def run_episode(policy, seed=7629, steps=400, snapshot_steps=(200,), mask_mode="
     env = wrapper.CC4MARLEnv(seed=seed, steps=steps, mask_mode=mask_mode, **env_kwargs)
     env.reset(seed=seed)
     policy.reset()
+    # Optional post-step hook (proposal 14): policies that track episode
+    # state from rewards (e.g. RvS returns-to-go) implement
+    # observe_step(actions, rewards). Heuristics lack it: no-op for them.
+    notify = getattr(policy, "observe_step", None)
     snapshots = {}
     trace = []
     cumulative = 0.0
@@ -315,6 +319,8 @@ def run_episode(policy, seed=7629, steps=400, snapshot_steps=(200,), mask_mode="
         actions = {agent: int(policy.select(env, agent)) for agent in wrapper.BLUE_AGENTS}
         _, rewards, terminated, truncated, _ = env.step(actions)
         cumulative += float(rewards[0])
+        if notify is not None:
+            notify(actions, [float(r) for r in rewards])
         for agent in wrapper.BLUE_AGENTS:
             name, host = decode_index(env, agent, actions[agent])
             trace.append(

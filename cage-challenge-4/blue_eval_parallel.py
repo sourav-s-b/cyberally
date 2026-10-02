@@ -131,6 +131,8 @@ def main():
                     help=f"registry names {names()}")
     ap.add_argument("--mappo-ckpt", default=None,
                     help="ckpt dir for the mappo_ckpt policy")
+    ap.add_argument("--target-return", type=float, default=-50.0,
+                    help="RvS conditioning target (rvs_ckpt only, proposal 14)")
     ap.add_argument("--attn-layers", type=int, default=0,
                     help="cross-slot attention layers of the ckpt's head")
     ap.add_argument("--seeds", type=int, nargs="+",
@@ -160,6 +162,8 @@ def main():
         for p in ckpt_policies:
             policy_kwargs[p] = {"ckpt_dir": cli.mappo_ckpt,
                                 "attn_layers": cli.attn_layers}
+            if p == "rvs_ckpt":
+                policy_kwargs[p]["target_return"] = cli.target_return
     use_torch = any(needs_torch(p) for p in cli.policies)
     if use_torch:
         try:
