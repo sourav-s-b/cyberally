@@ -92,6 +92,39 @@ def test_slot_width_derivation_and_init_hidden():
     assert full.init_hidden().shape == (1, 64)
 
 
+def test_decompose_matches_forward():
+    agent = FactorizedRNNAgent(872, _args())
+    x = th.randn(4, 872)
+    h = th.zeros(4, 64)
+    flat, h1, host, cmd, glob = agent.decompose(x, h)
+    q, h2 = agent(x, h)
+    assert th.equal(flat, q) and th.equal(h1, h2)
+    assert host.shape == (4, 51) and cmd.shape == (4, 51, 3)
+    assert glob.shape == (4, 2)
+    # flat[2+3s+c] == host[s] + cmd[s, c]
+    recon = (host.unsqueeze(-1) + cmd).reshape(4, -1)
+    assert th.equal(q[:, 2:], recon)
+    assert th.equal(q[:, :2], glob)
+
+
+def _args_attn(n_layers=1):
+    a = _args()
+    a.attn_layers = n_layers
+    return a
+
+
+def test_attention_path_shapes_and_grads():
+    agent = FactorizedRNNAgent(872, _args_attn(1))
+    x = th.randn(3, 872)
+    q, h = agent(x, th.zeros(3, 64))
+    assert q.shape == (3, 155) and h.shape == (3, 64)
+    q.sum().backward()
+    assert all(p.grad is not None for p in agent.slot_attn.parameters())
+    # attn=0 models have no attention module (behavior identical to before)
+    plain = FactorizedRNNAgent(872, _args())
+    assert not hasattr(plain, "slot_attn")
+
+
 def test_greedy_ckpt_resume_factorized(tmp_path):
     # Minimal ckpt-resume path: random-weights agent.th in ckpt layout,
     # GreedyCheckpointPolicy loads it and emits legal actions for a few

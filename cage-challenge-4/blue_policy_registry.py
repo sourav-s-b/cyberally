@@ -46,7 +46,8 @@ def needs_torch(name):
     return name in TORCH_POLICIES
 
 
-def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, **env_kwargs):
+def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, attn_layers=0,
+                **env_kwargs):
     """Greedy MAPPO-checkpoint policy; probe env sizes geometry from flags."""
     import cc4_epymarl_wrapper as wrapper
     from blue_eval_mappo import GreedyCheckpointPolicy
@@ -54,7 +55,8 @@ def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, **env_kwargs):
     env_info = probe.get_env_info()
     return GreedyCheckpointPolicy(ckpt_dir, hidden_dim=hidden_dim,
                                   env_info=env_info,
-                                  agent_type=_CKPT_AGENT[name])
+                                  agent_type=_CKPT_AGENT[name],
+                                  attn_layers=attn_layers)
 
 
 def build(name, **overrides):

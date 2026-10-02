@@ -1,7 +1,10 @@
 # Proposal 03: Entity-attention encoder (1–2 layers)
 
-- Status: proposed (design only, no code)
-- Date: 2026-10-02
+- Status: tested (supervised) — 1-layer TransformerEncoder over slot
+  embeddings inside the factorized head; teacher parity on held-out
+  (proposal 02, Experiment 3). Standalone masked-softmax variant never
+  built (unnecessary — the factorized integration won first try).
+- Date: 2026-10-02 (built; originally proposed same day)
 
 ## Description
 

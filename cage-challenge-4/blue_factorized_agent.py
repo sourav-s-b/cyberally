@@ -53,11 +53,23 @@ class FactorizedRNNAgent(nn.Module):
         self.host_head = nn.Linear(SLOT_EMB + ctx, 1)
         self.cmd_head = nn.Linear(SLOT_EMB + ctx, N_CMD)
         self.global_head = nn.Linear(ctx, 2)
+        # Optional cross-slot self-attention (proposal 03, supervised use):
+        # lets slots compare staleness/suspicion pairwise instead of routing
+        # through the dense bottleneck. 0 = off (behavior identical).
+        # Attention runs on slot embeddings only (ctx is slot-constant).
+        self.attn_layers = int(getattr(args, "attn_layers", 0) or 0)
+        if self.attn_layers > 0:
+            layer = nn.TransformerEncoderLayer(
+                d_model=SLOT_EMB, nhead=4, dim_feedforward=128,
+                batch_first=True)
+            self.slot_attn = nn.TransformerEncoder(
+                layer, num_layers=self.attn_layers)
 
     def init_hidden(self):
         return self.fc1.weight.new(1, self.args.hidden_dim).zero_()
 
-    def forward(self, inputs, hidden_state):
+    def decompose(self, inputs, hidden_state):
+        """(flat_logits, next_hidden, host, cmd, glob) for aux losses."""
         x = F.relu(self.fc1(inputs))
         h_in = hidden_state.reshape(-1, self.args.hidden_dim)
         if self.args.use_rnn:
@@ -71,6 +83,8 @@ class FactorizedRNNAgent(nn.Module):
         emb = F.relu(self.slot_enc(slots))
         ctx = torch.cat([h.unsqueeze(1).expand(-1, N_SLOTS, -1),
                          ids.unsqueeze(1).expand(-1, N_SLOTS, -1)], dim=-1)
+        if self.attn_layers > 0:
+            emb = self.slot_attn(emb)
         he = torch.cat([emb, ctx], dim=-1)
         host = self.host_head(he).squeeze(-1)          # (b, 51)
         cmd = self.cmd_head(he)                        # (b, 51, 3)
@@ -79,4 +93,8 @@ class FactorizedRNNAgent(nn.Module):
                            dtype=inputs.dtype)
         flat[:, :2] = glob
         flat[:, 2:] = (host.unsqueeze(-1) + cmd).reshape(b, -1)
+        return flat, h, host, cmd, glob
+
+    def forward(self, inputs, hidden_state):
+        flat, h, _, _, _ = self.decompose(inputs, hidden_state)
         return flat, h

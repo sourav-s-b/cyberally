@@ -21,8 +21,8 @@ later) · `parked` (valid but not now) · `rejected` (evidence against) ·
 | # | Proposal | Status | Verdict |
 |---|---|---|---|
 | 01 | Hybrid rules + learned priority | tested | lancer_v2 at teacher parity; snapshot risk killed; fixed constants exhausted |
-| 02 | Host-then-command factorized actor | built+tested | head validated (distill 21.8%); vanilla MAPPO diverges; KL 0.1 slows only — fine-tune line closed |
-| 03 | Entity-attention encoder | proposed | BUILD WITH 02 |
+| 02 | Host-then-command factorized actor | built+tested | attention distill at teacher parity (held-out); KL-PPO unlocked with stop-rules |
+| 03 | Entity-attention encoder | tested | 1-layer attention in factorized head; parity driver (see 02 Exp3) |
 | 04 | TERLA-style semantic action collapse | deferred | take action-waiting audit only |
 | 05 | Full GNN policy | parked | revisit only on generalization suite |
 | 06 | Learned hierarchy master / bandit gate | rejected/queued | reject PPO master; bandit gate queued |

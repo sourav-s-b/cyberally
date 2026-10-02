@@ -87,7 +87,8 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
                  include_root_session=True, mask_mode="validity",
                   init_ckpt="", shaping=False,
                   warmup_steps=0, warmup_critic_only=True,
-                  agent="rnn", kl_teacher_ckpt="", kl_teacher_coef=0.1):
+                  agent="rnn", kl_teacher_ckpt="", kl_teacher_coef=0.1,
+                  attn_layers=0):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -153,6 +154,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         # KL-to-teacher anchoring (inactive unless a ckpt dir is given)
         "kl_teacher_ckpt": kl_teacher_ckpt,
         "kl_teacher_coef": kl_teacher_coef,
+        "attn_layers": attn_layers,
     }
 
 

@@ -1,8 +1,7 @@
 # Proposal 02: Host-then-command factorized actor
 
-- Status: built — expressiveness VALIDATED (distill 21.8% vs 12.2%),
-  MAPPO fine-tune DIVERGES (same disease, faster). Blocked on fine-tuning,
-  not on the head.
+- Status: built+tested — attention distill at teacher parity (held-out).
+  Ladder gate passed; KL-anchored PPO unlocked with stop-rules.
 - Date: 2026-10-02
 
 ## Description
@@ -100,6 +99,39 @@ existing EPyMARL MAPPO loop (joint log-prob bookkeeping for PPO).
   (review step 3), where base-scenario points are saturated and real
   differentiation lives.
 
+## Experiment 3: attention distill reaches teacher parity (2026-10-02)
+
+- Confusion analysis first (teacher-driven states, no divergence):
+  distilled errors are 26-32% wrong-host-Analyse, ~1% wrong-command,
+  0% omission/commission. Commands perfect, host selection broken —
+  exactly the cross-slot comparison deficit. More demos: no gain
+  (21.71% vs 21.84%). Aux host-CE (weight 1.0): HURTS (-503 vs -307 on
+  same demos — fights joint calibration).
+- Implementation: 1-layer TransformerEncoder (4 heads) over the 32-dim
+  slot embeddings (ctx is slot-constant, excluded; 101 is prime — heads
+  math documented), `--attn-layers` plumbed through BC/train/eval/pool
+  (default 0 = behavior identical). 5 unit tests incl. decompose
+  consistency.
+- Distill (v2 demos, aux 0): nonsleep-acc **25.7%** (vs 21.7%). Pool,
+  native, 400 steps:
+
+| policy | regr-8 | heldout-8 (7801-08) |
+|---|---|---|
+| attn-1 distill | **-85.5 ± 31.1** | **-93.9 ± 45.8** |
+| round_robin | -93.5 ± 27.8 | -85.1 ± 46.1 |
+
+  Per-seed regr: -52 -104 -42 -73 -111 -65 -118 -119; heldout: -137
+  -147 -48 -122 -61 -138 -53 -45. Worst heldout seed -147 — compare
+  lancer v1's -414 and no-attn distill's -1959 on the same set.
+  Cross-run determinism confirmed (identical trace hashes across pool
+  invocations). Cost: ~500 s / 8 cells (attention forward ~4x slower).
+- Verdict: FIRST learned policy at teacher parity on unseen seeds, with
+  no RL at all. Phase-2 gate PASSED (held-out, within noise; pristine
+  8201+ reserve still untouched for the final claim). This unlocks
+  KL-preserve → PPO-improve — but note the lesson of Experiment 2: only
+  attempt PPO from this checkpoint with the KL anchor, and stop at the
+  first sign of divergence.
+
 ## Pros
 
 - Keeps PPO/MAPPO and all existing infra; change is localized to the actor
@@ -122,9 +154,7 @@ existing EPyMARL MAPPO loop (joint log-prob bookkeeping for PPO).
 BUILD SECOND, after 01 sets the bar. If the hybrid already approaches the
 lancer band, this proposal must clear a higher bar to justify its complexity.
 
-Update 2026-10-02: built and tested (see Experiment 1). The complexity was
-lower than feared (combined-logit trick, no plumbing risk materialized)
-and expressiveness doubled — but vanilla MAPPO fine-tuning diverges on it.
-Status is now BLOCKED ON FINE-TUNING, not on the head: next work here is
-stabilized updates (KL-to-teacher, lr/entropy schedule, behavior
-constraints), not more architecture.
+Update 2026-10-02 (Experiment 3): attention distill reaches teacher parity
+on held-out seeds with no RL (-85.5/-93.9 vs -93.5/-85.1). The ladder gate
+is PASSED. Next permitted step: KL-anchored PPO from the attention
+checkpoint with divergence stop-rules — anything else repeats Experiment 1.

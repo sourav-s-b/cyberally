@@ -53,8 +53,10 @@ def run_cell(cell):
         # flags as the rollout env; _build_ckpt forwards them to the probe.
         # mask_mode included so validity checks run under the same config.
         for key in ("temporal_features", "include_root_session",
-                    "mask_mode", "red_agent"):
-            kwargs.setdefault(key, cell.get("env_kwargs", {}).get(key))
+                    "mask_mode"):
+            val = cell.get("env_kwargs", {}).get(key)
+            if val is not None:
+                kwargs.setdefault(key, val)
         kwargs.setdefault("steps", cell["steps"])
     policy = build(cell["policy"], **kwargs)
     res = run_episode(policy, seed=cell["seed"], steps=cell["steps"],
@@ -129,6 +131,8 @@ def main():
                     help=f"registry names {names()}")
     ap.add_argument("--mappo-ckpt", default=None,
                     help="ckpt dir for the mappo_ckpt policy")
+    ap.add_argument("--attn-layers", type=int, default=0,
+                    help="cross-slot attention layers of the ckpt's head")
     ap.add_argument("--seeds", type=int, nargs="+",
                     default=[7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705])
     ap.add_argument("--steps", type=int, default=400)
@@ -154,7 +158,8 @@ def main():
         if not cli.mappo_ckpt:
             raise SystemExit(f"{ckpt_policies} need --mappo-ckpt DIR")
         for p in ckpt_policies:
-            policy_kwargs[p] = {"ckpt_dir": cli.mappo_ckpt}
+            policy_kwargs[p] = {"ckpt_dir": cli.mappo_ckpt,
+                                "attn_layers": cli.attn_layers}
     use_torch = any(needs_torch(p) for p in cli.policies)
     if use_torch:
         try:

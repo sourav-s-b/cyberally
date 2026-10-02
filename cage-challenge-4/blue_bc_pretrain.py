@@ -28,9 +28,17 @@ def main():
     parser.add_argument("--batch-seqs", type=int, default=16)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--attn-layers", type=int, default=0,
+                        help="cross-slot self-attention layers in the "
+                             "factorized head (proposal 03); 0 = off")
     parser.add_argument("--agent", default="rnn",
                         choices=("rnn", "rnn_factorized"),
                         help="actor head to distill into (proposal 02)")
+    parser.add_argument("--aux-host-weight", type=float, default=0.0,
+                        help="auxiliary CE on the factorized host selector "
+                             "(host index of non-global teacher actions; "
+                             "needs --agent rnn_factorized; proposal 02 "
+                             "phase 2: distill WHAT host, not just WHAT id)")
     parser.add_argument("--out", default=None)
     cli = parser.parse_args()
 
@@ -63,7 +71,7 @@ def main():
     n_seqs = seq_obs.shape[0]
 
     args = SN(hidden_dim=cli.hidden_dim, n_actions=n_actions, use_rnn=True,
-              n_agents=n_agents)
+              n_agents=n_agents, attn_layers=cli.attn_layers)
     agent = agent_REGISTRY[cli.agent](obs_dim, args)
     opt = th.optim.Adam(agent.parameters(), lr=cli.lr)
     # Inverse-sqrt class weights: the teacher is ~55% Sleep and exact
@@ -78,6 +86,11 @@ def main():
 
     order = np.arange(n_seqs)
     tot_nonsleep_correct = tot_nonsleep = 0
+    host_correct = host_toks = 0
+    use_aux = cli.aux_host_weight > 0
+    if use_aux and cli.agent != "rnn_factorized":
+        raise SystemExit("--aux-host-weight needs --agent rnn_factorized")
+    aux_fn = th.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
     for epoch in range(1, cli.epochs + 1):
         np.random.shuffle(order)
         tot_loss, tot_correct, tot_toks = 0.0, 0, 0
@@ -89,9 +102,14 @@ def main():
             b, t, _ = b_obs.shape
             h = th.zeros(b, cli.hidden_dim)
             logits = []
+            hosts = [] if use_aux else None
             hh = h
             for step in range(t):
-                q, hh = agent(b_obs[:, step], hh)
+                if use_aux:
+                    q, hh, hs, _, _ = agent.decompose(b_obs[:, step], hh)
+                    hosts.append(hs)
+                else:
+                    q, hh = agent(b_obs[:, step], hh)
                 logits.append(q)
             logits = th.stack(logits, dim=1)  # (b, t, n_actions)
             # Zero the loss on busy ticks (mask sum<=1: teacher always Sleeps
@@ -104,6 +122,23 @@ def main():
             denom = mask.sum().clamp(min=1)
             loss = (loss_fn(logits.reshape(-1, n_actions),
                             b_act.reshape(-1)).reshape(b, t) * mask).sum() / denom
+            host_acc_term = ""
+            if use_aux:
+                host_logits = th.stack(hosts, dim=1)  # (b, t, 51)
+                host_tgt = ((b_act - 2) // 3).clone()
+                host_tgt[(b_act < 2)] = -100  # Sleep/Monitor: no host
+                aux = (aux_fn(host_logits.reshape(-1, host_logits.shape[-1]),
+                              host_tgt.reshape(-1)).reshape(b, t)
+                       * mask).sum() / denom
+                loss = loss + cli.aux_host_weight * aux
+                with th.no_grad():
+                    hpred = host_logits.argmax(-1)
+                    hmask = (host_tgt != -100) & mask.bool()
+                    host_correct += int(((hpred == host_tgt) * hmask).sum())
+                    host_toks += int(hmask.sum())
+                    host_acc_term = (f" host-acc "
+                                     f"{host_correct / max(host_toks, 1):.4f}")
+            opt.zero_grad()
             opt.zero_grad()
             loss.backward()
             th.nn.utils.clip_grad_norm_(agent.parameters(), 10.0)
@@ -117,10 +152,11 @@ def main():
                 tot_nonsleep += int(non_sleep.sum())
                 tot_toks += int(mask.sum())
                 tot_loss += float(loss) * int(mask.sum())
-        print(f"epoch {epoch:3d} loss {tot_loss/tot_toks:.4f} "
-              f"acc {tot_correct/tot_toks:.4f} "
-              f"nonsleep-acc {tot_nonsleep_correct/max(tot_nonsleep,1):.4f}",
-              flush=True)
+            print(f"epoch {epoch:3d} loss {tot_loss/tot_toks:.4f} "
+                  f"acc {tot_correct/tot_toks:.4f} "
+                  f"nonsleep-acc {tot_nonsleep_correct/max(tot_nonsleep,1):.4f}"
+                  f"{host_acc_term if use_aux else ''}",
+                  flush=True)
 
     stamp = th.__version__  # noqa: keep linters quiet about unused import shape
     del stamp
@@ -158,6 +194,8 @@ def main():
     with open(os.path.join(out, "bc_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "epochs": cli.epochs, "lr": cli.lr,
                    "opt_lr": cli.opt_lr, "agent": cli.agent,
+                   "aux_host_weight": cli.aux_host_weight,
+                   "attn_layers": cli.attn_layers,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "weighted": True,
                    "final_acc": tot_correct / tot_toks,

@@ -930,6 +930,21 @@ simulator hooks: coordination proposal `docs/coordination/blue-red-
 variants.md` (draft, needs Environment review; Blue will not modify core
 sim).
 
+## Distill ladder: attention reaches teacher parity (2026-10-02)
+
+Phase 2. Clean confusion (teacher-driven states): distilled errors are
+26-32% wrong-host-Analyse, ~1% wrong-command, 0% omission/commission —
+commands perfect, host selection broken. More demos: no gain (21.7% vs
+21.8%). Aux host-CE (1.0): HURTS (-503 vs -307 same demos). 1-layer
+TransformerEncoder over slot embeddings (`--attn-layers`, default 0 =
+identical behavior; 101-indivisible-by-4 fixed by attending on 32-dim
+emb only): distill 25.7%, pool -85.5 ± 31.1 regr / -93.9 ± 45.8 heldout
+vs teacher -93.5/-85.1 — FIRST learned teacher parity, no RL, worst
+heldout seed -147 (vs lancer -414, no-attn -1959). Cross-run trace hashes
+identical. Cost ~500 s/8 cells. Full record proposal 02 Exp3, proposal 03
+tested. Ladder gate PASSED; KL-PPO unlocked with stop-rules. Sim 108/7;
+train 22 passed.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

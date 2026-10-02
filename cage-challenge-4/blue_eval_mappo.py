@@ -42,7 +42,7 @@ class GreedyCheckpointPolicy:
     """
 
     def __init__(self, ckpt_dir, hidden_dim=64, env_info=None,
-                 agent_type="rnn"):
+                 agent_type="rnn", attn_layers=0):
         try:
             import torch as th
             from modules.agents import REGISTRY as agent_REGISTRY
@@ -58,7 +58,8 @@ class GreedyCheckpointPolicy:
         # obs_dim already includes the one-hot id (see policy_dims); no last-act
         input_shape = self.obs_dim
         args = SN(hidden_dim=hidden_dim, n_actions=self.n_actions,
-                  n_agents=self.n_agents, use_rnn=True)
+                  n_agents=self.n_agents, use_rnn=True,
+                  attn_layers=attn_layers)
         if agent_type == "rnn_factorized":
             import blue_factorized_agent as factorized
             agent_REGISTRY["rnn_factorized"] = (
