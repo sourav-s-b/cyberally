@@ -17,6 +17,8 @@ REGISTRY = {
     "round_robin": ("blue_baselines", "RoundRobinBaseline", {}),
     "suspicion_sweep": ("blue_baselines", "SuspicionSweepBaseline", {}),
     "hybrid_none": ("blue_hybrid", "HybridBluePolicy", {"priority_fn": None}),
+    "hybrid_lancer": ("blue_hybrid", "HybridBluePolicy",
+                      {"priority_fn": "lancer"}),
 }
 
 TORCH_POLICIES = {"mappo_ckpt"}

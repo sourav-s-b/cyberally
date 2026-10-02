@@ -810,6 +810,19 @@ numbers in `docs/proposals/01-hybrid-priority.md`). Sim suite: 82 passed,
 5 skipped. Next: lancer-style priority + density/persistent flags, same
 seeds, then risk scorer.
 
+## Lancer v1 beats teacher (2026-10-02, needs replication)
+
+`LancerPriority` in `blue_hybrid.py` + `hybrid_lancer` registry entry;
+`tests_blue/test_hybrid_priority.py` (6 tests) passes. Pool
+`lancer-v1-20261002`: hybrid_lancer -63.2 ± 26.0 vs round_robin
+-93.5 ± 27.8, paired diff +30.2 (6/8 seeds; t ~= 2.6, p ~= 0.04
+uncorrected, first variant — encouraging, not victory). Wins by
+remediating less (fewer Restore disruptions); fails on 7704/7705 via
+sticky-suspicion re-analysis loops + Restore storms. v2: decay suspicion
+bonus with fruitless re-analyses (empty_strikes). Sim suite: 92 passed,
+5 skipped. Numbers in `docs/proposals/01-hybrid-priority.md`, manifest
+`docs/proposals/manifests/lancer-v1-20261002.json`.
+
 ## Parallel eval harness (2026-10-02)
 
 Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable

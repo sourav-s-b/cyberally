@@ -39,6 +39,10 @@ class HybridBluePolicy:
     """
 
     def __init__(self, priority_fn=None):
+        # String specs ("lancer") resolve to scorer builders so registry
+        # entries stay picklable for the process pool (proposal 01).
+        if isinstance(priority_fn, str):
+            priority_fn = make_priority(priority_fn)
         self.priority_fn = priority_fn
         self._n = {}
         self._cursor = {}
@@ -46,6 +50,8 @@ class HybridBluePolicy:
     def reset(self):
         self._n.clear()
         self._cursor.clear()
+        if hasattr(self.priority_fn, "reset"):
+            self.priority_fn.reset()
 
     def select(self, env, agent):
         idx = wrapper.BLUE_AGENTS.index(agent)
@@ -107,5 +113,118 @@ def host_risk_features(env, agent, host):
     model and the actor share one feature contract.
     """
     from blue_obs_features import host_to_vector
-    return host_to_vector(env.trackers[agent], env.views[agent][host], host,
-                          env.subnets[agent], agent)
+    subnets = env.subnets[agent]
+    own = subnets.get(host, []) if isinstance(subnets, dict) else subnets
+    return host_to_vector(env.views[agent].get(host, {}), agent, own)
+
+
+# Indices into the host_to_vector 10-feature layout (blue_obs_features).
+_I_UNKNOWN_FILES = 6
+_I_MAX_DENSITY = 7
+_I_N_EXT_CONN = 9
+
+# Punch-style file-density tripwire (their wrapper flagged density > 0.9).
+DENSITY_THRESHOLD = 0.9
+
+
+class LancerPriority:
+    """Lancer-style per-host scan priority (CAGE-4 Team lancer, no ML).
+
+    Per-host float value: initialised to ``init``, multiplicatively decayed
+    each time an Analyse/Remove/Restore *completes* on that host (detected
+    via tracker stamps, counted once), boosted on new detections
+    (state -> CONFIRMED) and on novel suspicious signals in the passively
+    merged view (more unknown files / higher density / more external
+    connections). The novelty boost is our mapping of lancer's
+    "increased in response to Monitor observations": we never issue
+    Monitor (equivalent to Sleep here), but the wrapper merges unsolicited
+    Monitor observations every tick, so view deltas are the same event
+    stream.
+
+    On top of the carried value, scoring adds a sticky suspicion bonus
+    (UC-style persistent flag, punch-style density tripwire): a host that
+    *currently* shows unknown files, density > 0.9, external connections,
+    or a CONFIRMED/VERIFY belief scores higher until remediated and
+    re-observed. Rules 1-2 still grab CONFIRMED/VERIFY hosts first; the
+    bonus matters when remediation is illegal and they fall to the sweep.
+
+    State is plain floats/dicts (picklable) keyed per agent; ``reset()``
+    clears it (called by HybridBluePolicy.reset).
+    """
+
+    def __init__(self, init=1.0, touch_decay=0.5, detect_boost=2.0,
+                 novelty_boost=1.0, suspicious_bonus=2.0):
+        self.init = init
+        self.touch_decay = touch_decay
+        self.detect_boost = detect_boost
+        self.novelty_boost = novelty_boost
+        self.suspicious_bonus = suspicious_bonus
+        self.reset()
+
+    def reset(self):
+        self._v = {}
+        self._acct_an = {}
+        self._acct_re = {}
+        self._state = {}
+        self._sig = {}
+
+    def _signals(self, env, agent, host):
+        """(unknown_files, max_density, n_external) from the merged view."""
+        vec = host_risk_features(env, agent, host)
+        return (vec[_I_UNKNOWN_FILES], vec[_I_MAX_DENSITY],
+                vec[_I_N_EXT_CONN])
+
+    def _sync(self, env, agent):
+        """Fold tracker/view deltas into carried values (idempotent)."""
+        tracker = env.trackers[agent]
+        for host in env.hostnames[agent]:
+            key = (agent, host)
+            last_an = tracker.last_analysis.get(host)
+            last_re = tracker.last_remediation.get(host)
+            if last_an != self._acct_an.get(key):
+                # A new Analyse completed on this host: decay once.
+                self._acct_an[key] = last_an
+                self._v[key] = self._v.get(key, self.init) * self.touch_decay
+            if last_re != self._acct_re.get(key):
+                # A new Remove/Restore completed: decay once.
+                self._acct_re[key] = last_re
+                self._v[key] = self._v.get(key, self.init) * self.touch_decay
+            state = tracker.state.get(host)
+            if state == "CONFIRMED" and self._state.get(key) != "CONFIRMED":
+                self._v[key] = self._v.get(key, self.init) + self.detect_boost
+            self._state[key] = state
+            sig = self._signals(env, agent, host)
+            old = self._sig.get(key)
+            if old is not None and any(s > o for s, o in zip(sig, old)):
+                self._v[key] = self._v.get(key, self.init) + self.novelty_boost
+            self._sig[key] = sig
+
+    def _suspicious_now(self, env, agent, host):
+        unknown_files, density, n_ext = self._sig.get(
+            (agent, host), (0, 0.0, 0))
+        state = env.trackers[agent].state.get(host)
+        return (unknown_files > 0 or density > DENSITY_THRESHOLD
+                or n_ext > 0 or state in ("CONFIRMED", "VERIFY"))
+
+    def __call__(self, env, agent, host):
+        self._sync(env, agent)
+        value = self._v.get((agent, host), self.init)
+        if self._suspicious_now(env, agent, host):
+            value += self.suspicious_bonus
+        return value
+
+
+PRIORITY_BUILDERS = {
+    "lancer": LancerPriority,
+}
+
+
+def make_priority(spec, **kwargs):
+    """Build a priority scorer from a string spec (or pass through)."""
+    if spec is None or callable(spec):
+        return spec
+    try:
+        return PRIORITY_BUILDERS[spec](**kwargs)
+    except KeyError:
+        raise ValueError(f"unknown priority {spec!r}; known: "
+                         f"{sorted(PRIORITY_BUILDERS)}")

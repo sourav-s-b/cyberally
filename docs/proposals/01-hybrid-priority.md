@@ -1,6 +1,7 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: drafted — parity proven, priority scorer not yet built
+- Status: drafted — parity proven; lancer v1 TESTED at -63.2 ± 26.0
+  (+30.2 vs teacher, 6/8 seeds; needs held-out replication)
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
@@ -55,6 +56,40 @@ Pool rerun 2026-10-02 (`blue_eval_parallel.py --policies round_robin
 hybrid_none`, 6 workers, fork, 66 s for 16 cells): identical returns and
 trace hashes; manifest `docs/proposals/manifests/parity-pool-20261002.json`;
 `blue_compare.py --baseline round_robin` reports mean +0.0, trace MATCH.
+
+## Experiment 2: lancer scorer v1 (2026-10-02, TESTED, beats teacher)
+
+- Implementation: `LancerPriority` in `blue_hybrid.py` (per-host float,
+  init 1.0, x0.5 decay per completed Analyse/Remove/Restore counted once,
+  +2.0 on CONFIRMED transition, +1.0 on novel view signals, +2.0 sticky
+  suspicion bonus while unknown-files/density>0.9/ext-conns/CONFIRMED-VERIFY
+  persist). String spec `"lancer"` so registry entries stay picklable;
+  `HybridBluePolicy.reset` propagates. Also fixed `host_risk_features`
+  (passed 5 args to the 3-arg `host_to_vector`; was dead code, now used).
+  Registry: `hybrid_lancer`. Unit tests
+  `tests_blue/test_hybrid_priority.py` (6 tests: resolution, reset,
+  once-only decay, CONFIRMED boost, pickling, legal actions).
+- Bug found by the pool: `env.subnets[agent]` is a host->subnets dict, not
+  a list; fixed to per-host entries (matches wrapper obs construction).
+- Pool run `lancer-v1-20261002` (8 seeds x 400, native; manifest committed):
+
+| policy | n | mean | std | per-seed returns |
+|---|---|---|---|---|
+| hybrid_lancer | 8 | -63.2 | 26.0 | -50 -41 -63 -48 -75 -44 -64 -121 |
+| round_robin | 8 | -93.5 | 27.8 | -85 -105 -123 -85 -135 -64 -53 -98 |
+
+Paired diff mean +30.2 (+35 +64 +60 +37 +60 +20 -11 -23), 6/8 seeds
+better. Paired t ~= 2.6, p ~= 0.04 UNCORRECTED, first variant tried:
+encouraging, not a victory claim — needs held-out-seed replication.
+Per-step rate -0.158 vs winner-band -0.226 (usual build caveats).
+- Mechanism (trace mix, seeds 7704/7705/7630): lancer wins by remediating
+  LESS (fewer Restore disruptions; cf. TERLA's 6-7% action rate) while
+  keeping coverage. Failure mode on 7704/7705: sticky suspicion bonus
+  re-analyses already-known hosts (starves coverage) and re-detection
+  chains cause Restore storms (7705: 56 Restores vs 38, final 26 vs 19
+  compromised). v2 direction: decay the suspicion bonus with fruitless
+  re-analyses (tie to `empty_strikes`), or suppress it for recently
+  analysed hosts.
 
 Remaining, not yet run: (1) lancer-style priority + punch-style
 file-density>0.9 flag + UC-style persistent malicious-event flags, same
