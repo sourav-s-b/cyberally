@@ -51,6 +51,11 @@ would have stuck on one host, so it was fixed before measuring).
 
 Mean -93.5 both. Sim suite after change: 82 passed, 5 skipped (was 81/5).
 
+Pool rerun 2026-10-02 (`blue_eval_parallel.py --policies round_robin
+hybrid_none`, 6 workers, fork, 66 s for 16 cells): identical returns and
+trace hashes; manifest `docs/proposals/manifests/parity-pool-20261002.json`;
+`blue_compare.py --baseline round_robin` reports mean +0.0, trace MATCH.
+
 Remaining, not yet run: (1) lancer-style priority + punch-style
 file-density>0.9 flag + UC-style persistent malicious-event flags, same
 seeds; (2) tiny risk scorer on Blue-visible 17-feat vectors. Target: beat

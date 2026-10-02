@@ -810,6 +810,22 @@ numbers in `docs/proposals/01-hybrid-priority.md`). Sim suite: 82 passed,
 5 skipped. Next: lancer-style priority + density/persistent flags, same
 seeds, then risk scorer.
 
+## Parallel eval harness (2026-10-02)
+
+Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable
+name -> constructor specs, incl. `mappo_ckpt` torch entry),
+`blue_eval_parallel.py` (process pool over policy x seed cells; fork for
+heuristics, spawn + train-venv requirement for torch),
+`cage-challenge-4/blue_compare.py` (table, paired diffs, trace parity,
+proposal-ready markdown). Manifests committed under
+`docs/proposals/manifests/`. Correctness: `tests_blue/test_eval_parallel.py`
+(pool == serial, cross-worker determinism, torch-spec fails loudly) passes.
+Live proof: 8-seed parity re-run through the pool reproduces the serial
+record exactly (16 cells, 66 s on 6 workers; manifest
+`parity-pool-20261002.json`; compare reports +0.0, MATCH). Sim suite: 86
+passed, 5 skipped. Subagent layer: one Task subagent per proposal owns its
+eval end-to-end (run shard, analyze, update proposal file).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
