@@ -1,6 +1,6 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: drafted (code exists, untracked, unbenchmarked)
+- Status: drafted — parity proven, priority scorer not yet built
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
@@ -28,10 +28,32 @@ learnable part is measurable in isolation against round-robin (-93.5 ± 27.8).
 
 ## Experiment
 
-Not yet run. Planned: (1) parity proof `HybridBluePolicy(None)` ==
-round-robin on >= 8 seeds; (2) lancer-style priority + punch-style
+PARITY PROVEN 2026-10-02 (this change: `priority_fn=None` now runs a cursor
+round-robin identical to `RoundRobinBaseline`; the first-draft `cands[0]`
+would have stuck on one host, so it was fixed before measuring).
+
+- Regression: `cage-challenge-4/tests_blue/test_hybrid_parity.py` — 2 seeds,
+  asserts equal native returns AND identical per-tick traces. Passes (69 s).
+- Full manifest, 8 seeds x 400 steps, native reward (scratch
+  `/tmp/opencode/parity_8seed.py`, results/ is gitignored so numbers live
+  here):
+
+| seed | round_robin | hybrid_none | traces identical |
+|---|---|---|---|
+| 7629 | -85 | -85 | yes (1995/1995) |
+| 7630 | -105 | -105 | yes |
+| 7640 | -123 | -123 | yes |
+| 7701 | -85 | -85 | yes |
+| 7702 | -135 | -135 | yes |
+| 7703 | -64 | -64 | yes |
+| 7704 | -53 | -53 | yes |
+| 7705 | -98 | -98 | yes |
+
+Mean -93.5 both. Sim suite after change: 82 passed, 5 skipped (was 81/5).
+
+Remaining, not yet run: (1) lancer-style priority + punch-style
 file-density>0.9 flag + UC-style persistent malicious-event flags, same
-seeds; (3) tiny risk scorer on Blue-visible 17-feat vectors. Target: beat
+seeds; (2) tiny risk scorer on Blue-visible 17-feat vectors. Target: beat
 -93.5, approach lancer's constant-size -71 band on equal footing.
 
 ## Pros

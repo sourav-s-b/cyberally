@@ -798,6 +798,18 @@ Deep literature review complete; decision doc:
   factored-additive Q. Next concrete task: lancer-style priority + density
   flag + `HybridBluePolicy(None)` == round-robin parity proof, >=8 seeds.
 
+## Hybrid parity proven (2026-10-02)
+
+Proposal 01 step 1 done. `cage-challenge-4/blue_hybrid.py` (now tracked)
+fixed so `priority_fn=None` runs a cursor round-robin identical to
+`RoundRobinBaseline` (first draft's `cands[0]` would have stuck on one
+host). New regression `tests_blue/test_hybrid_parity.py` passes. 8-seed
+manifest (400 steps, native): identical returns AND byte-identical
+1995-entry traces on all of 7629/7630/7640/7701-7705 (mean -93.5 both;
+numbers in `docs/proposals/01-hybrid-priority.md`). Sim suite: 82 passed,
+5 skipped. Next: lancer-style priority + density/persistent flags, same
+seeds, then risk scorer.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
