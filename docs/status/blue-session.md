@@ -770,6 +770,34 @@ skeleton as a hard floor. This is a smaller and more honest change than
 re-designing the feature set, and it is testable against the -93.5 teacher
 number on >=8 seeds.
 
+## Architecture review (2026-10-02)
+
+Deep literature review complete; decision doc:
+`docs/research/blue-architecture-review.md` (new, committed).
+
+- Official CAGE-4 analysis (Kiely et al., AAAI 2025, PDF extracted locally):
+  top-3 teams all sweep-and-remediate heuristics (UC -113 ± 35, lancer
+  -118 ± 40, punch -142 ± 44); best MARL was cybermonic's GNN at -193 ± 84.
+  Eval is 100 x 500-step episodes; our -93.5 is over 400 steps, so compare
+  per-step rates only (-0.234 vs -0.226/step), never raw totals.
+- Winning designs map directly onto our hybrid: lancer's per-host priority
+  (decay on touch, boost on Monitor) ~= `HybridBluePolicy(priority_fn)`;
+  punch's file-density>0.9 host flag -> belongs in our belief features;
+  UC's persistent malicious-event flags + present-host encoding (killed
+  invalid actions) -> feature work.
+- Four subagent reviews (parallel): TERLA (HGT + 5-action collapse + action
+  waiting + shaped training reward); SR-DRL/GACD/CyberDreamcatcher
+  (host-then-command factorization wins, OT/GAT-REINFORCE rejected);
+  Set-Transformer/REFIL/factored-actions (Thm 1 formalizes our MLP-bottleneck
+  diagnosis; REFIL mask pattern ports to EPyMARL); HPPO/H-MARL (learned
+  gating ~= null result; expert-rule master already equals our fixed rules).
+- Decision: (1) harden hybrid first (S); (2) host-then-command factorized
+  actor + optional 1-layer entity attention (M); (3) phishing/stealthy/
+  aggressive-style red variants as held-out suite. Parked/rejected: full
+  GNN, learned PPO master, curiosity, shaped training rewards,
+  factored-additive Q. Next concrete task: lancer-style priority + density
+  flag + `HybridBluePolicy(None)` == round-robin parity proof, >=8 seeds.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
