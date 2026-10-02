@@ -46,8 +46,15 @@ def run_cell(cell):
     if _HERE not in sys.path:  # spawn re-import: fix path in the child
         sys.path.insert(0, _HERE)
     from blue_baselines import run_episode
-    from blue_policy_registry import build
-    policy = build(cell["policy"], **cell.get("policy_kwargs", {}))
+    from blue_policy_registry import build, needs_torch
+    kwargs = dict(cell.get("policy_kwargs", {}))
+    if needs_torch(cell["policy"]):
+        # Size the checkpoint probe (and geometry checks) from the same env
+        # flags as the rollout env; _build_ckpt forwards them to the probe.
+        for key in ("temporal_features", "include_root_session"):
+            kwargs.setdefault(key, cell.get("env_kwargs", {}).get(key))
+        kwargs.setdefault("steps", cell["steps"])
+    policy = build(cell["policy"], **kwargs)
     res = run_episode(policy, seed=cell["seed"], steps=cell["steps"],
                       snapshot_steps=tuple(cell.get("snapshot_steps",
                                                    (cell["steps"],))),
@@ -136,10 +143,12 @@ def main():
     if unknown:
         raise SystemExit(f"unknown policies {unknown}; known: {names()}")
     policy_kwargs = {}
-    if "mappo_ckpt" in cli.policies:
+    ckpt_policies = [p for p in cli.policies if needs_torch(p)]
+    if ckpt_policies:
         if not cli.mappo_ckpt:
-            raise SystemExit("mappo_ckpt needs --mappo-ckpt DIR")
-        policy_kwargs["mappo_ckpt"] = {"ckpt_dir": cli.mappo_ckpt}
+            raise SystemExit(f"{ckpt_policies} need --mappo-ckpt DIR")
+        for p in ckpt_policies:
+            policy_kwargs[p] = {"ckpt_dir": cli.mappo_ckpt}
     use_torch = any(needs_torch(p) for p in cli.policies)
     if use_torch:
         try:

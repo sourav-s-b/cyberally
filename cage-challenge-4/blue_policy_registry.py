@@ -31,7 +31,9 @@ REGISTRY = {
                          "model_path": "results/risk_model_v2.pkl"}}),
 }
 
-TORCH_POLICIES = {"mappo_ckpt"}
+TORCH_POLICIES = {"mappo_ckpt", "mappo_ckpt_factorized"}
+_CKPT_AGENT = {"mappo_ckpt": "rnn",
+               "mappo_ckpt_factorized": "rnn_factorized"}
 
 
 def needs_torch(name):
@@ -39,22 +41,23 @@ def needs_torch(name):
     return name in TORCH_POLICIES
 
 
-def _build_ckpt(ckpt_dir, hidden_dim=64, steps=400, **env_kwargs):
+def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, **env_kwargs):
     """Greedy MAPPO-checkpoint policy; probe env sizes geometry from flags."""
     import cc4_epymarl_wrapper as wrapper
     from blue_eval_mappo import GreedyCheckpointPolicy
     probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
     env_info = probe.get_env_info()
     return GreedyCheckpointPolicy(ckpt_dir, hidden_dim=hidden_dim,
-                                  env_info=env_info)
+                                  env_info=env_info,
+                                  agent_type=_CKPT_AGENT[name])
 
 
 def build(name, **overrides):
     """Instantiate a fresh policy from its registry spec (call in worker)."""
-    if name == "mappo_ckpt":
+    if name in TORCH_POLICIES:
         if "ckpt_dir" not in overrides:
-            raise ValueError("mappo_ckpt needs ckpt_dir=...")
-        return _build_ckpt(**overrides)
+            raise ValueError(f"{name} needs ckpt_dir=...")
+        return _build_ckpt(name, **overrides)
     if name not in REGISTRY:
         raise KeyError(f"unknown policy {name!r}; known: {sorted(REGISTRY)}")
     module, cls, kwargs = REGISTRY[name]

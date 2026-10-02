@@ -810,6 +810,22 @@ numbers in `docs/proposals/01-hybrid-priority.md`). Sim suite: 82 passed,
 5 skipped. Next: lancer-style priority + density/persistent flags, same
 seeds, then risk scorer.
 
+## Parallel eval harness (2026-10-02)
+
+Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable
+name -> constructor specs, incl. `mappo_ckpt` torch entry),
+`blue_eval_parallel.py` (process pool over policy x seed cells; fork for
+heuristics, spawn + train-venv requirement for torch),
+`cage-challenge-4/blue_compare.py` (table, paired diffs, trace parity,
+proposal-ready markdown). Manifests committed under
+`docs/proposals/manifests/`. Correctness: `tests_blue/test_eval_parallel.py`
+(pool == serial, cross-worker determinism, torch-spec fails loudly) passes.
+Live proof: 8-seed parity re-run through the pool reproduces the serial
+record exactly (16 cells, 66 s on 6 workers; manifest
+`parity-pool-20261002.json`; compare reports +0.0, MATCH). Sim suite: 86
+passed, 5 skipped. Subagent layer: one Task subagent per proposal owns its
+eval end-to-end (run shard, analyze, update proposal file).
+
 ## Lancer v1 beats teacher (2026-10-02, needs replication)
 
 `LancerPriority` in `blue_hybrid.py` + `hybrid_lancer` registry entry;
@@ -846,21 +862,22 @@ ordering dynamics is worthless. Path closed in proposal 01; best remains
 lancer_v2 parity. Next: proposal 02 (factorized actor). Sim suite: 102
 passed, 5 skipped.
 
-## Parallel eval harness (2026-10-02)
+## Factorized actor: head validated, fine-tune diverges (2026-10-02)
 
-Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable
-name -> constructor specs, incl. `mappo_ckpt` torch entry),
-`blue_eval_parallel.py` (process pool over policy x seed cells; fork for
-heuristics, spawn + train-venv requirement for torch),
-`cage-challenge-4/blue_compare.py` (table, paired diffs, trace parity,
-proposal-ready markdown). Manifests committed under
-`docs/proposals/manifests/`. Correctness: `tests_blue/test_eval_parallel.py`
-(pool == serial, cross-worker determinism, torch-spec fails loudly) passes.
-Live proof: 8-seed parity re-run through the pool reproduces the serial
-record exactly (16 cells, 66 s on 6 workers; manifest
-`parity-pool-20261002.json`; compare reports +0.0, MATCH). Sim suite: 86
-passed, 5 skipped. Subagent layer: one Task subagent per proposal owns its
-eval end-to-end (run shard, analyze, update proposal file).
+Proposal 02 built with zero vendor edits (combined-logit trick):
+`blue_factorized_agent.py` + `--agent rnn_factorized` in train/BC drivers +
+`GreedyCheckpointPolicy(agent_type=...)` + `mappo_ckpt_factorized` pool
+entry (spawn path proven: 16 cells, 156 s). BC-distill 21.8% nonsleep-acc
+vs flat 12.2% — architecture VALIDATED. MAPPO fine-tune from distill:
+-296 -> -261 (ckpt 2793) -> -583 (7581) -> ~-1770 (12369, 8 seeds). Same
+divergence disease as flat head, faster. In-training single-episode probe
+(-75) exposed as seed-lottery noise. Also repaired a 6-char typo corruption
+in vendored `rnn_agent.py` (`fc2(h)openco`, isolated, restored to upstream;
+prior torch runs prove prior intactness); pool CLI now forwards env flags
+to torch probe construction. Sim suite 102/6-skip (importorskip guard);
+train subset 13 passed. Full record in proposal 02. Next: stabilized
+fine-tuning (KL-to-teacher, schedules, behavior constraints) — not more
+architecture.
 
 ## Resume prompt for a new conversation
 

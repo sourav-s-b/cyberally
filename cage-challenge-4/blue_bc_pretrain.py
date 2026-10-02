@@ -28,6 +28,9 @@ def main():
     parser.add_argument("--batch-seqs", type=int, default=16)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--agent", default="rnn",
+                        choices=("rnn", "rnn_factorized"),
+                        help="actor head to distill into (proposal 02)")
     parser.add_argument("--out", default=None)
     cli = parser.parse_args()
 
@@ -40,7 +43,8 @@ def main():
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
     from modules.agents import REGISTRY as agent_REGISTRY
-
+    import blue_factorized_agent as factorized
+    agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
     data = np.load(cli.demos)
     obs = data["obs"]        # (E, A, T, D)
     actions = data["actions"]
@@ -58,8 +62,9 @@ def main():
     seq_len = th.from_numpy(np.repeat(lengths, n_agents))
     n_seqs = seq_obs.shape[0]
 
-    args = SN(hidden_dim=cli.hidden_dim, n_actions=n_actions, use_rnn=True)
-    agent = agent_REGISTRY["rnn"](obs_dim, args)
+    args = SN(hidden_dim=cli.hidden_dim, n_actions=n_actions, use_rnn=True,
+              n_agents=n_agents)
+    agent = agent_REGISTRY[cli.agent](obs_dim, args)
     opt = th.optim.Adam(agent.parameters(), lr=cli.lr)
     # Inverse-sqrt class weights: the teacher is ~55% Sleep and the
     # round-robin sweep cursor is unobservable, so unweighted CE collapses
@@ -148,7 +153,7 @@ def main():
             os.path.join(ckpt_dir, "critic_opt.th"))
     with open(os.path.join(out, "bc_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "epochs": cli.epochs, "lr": cli.lr,
-                   "opt_lr": cli.opt_lr,
+                   "opt_lr": cli.opt_lr, "agent": cli.agent,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "weighted": True,
                    "final_acc": tot_correct / tot_toks,

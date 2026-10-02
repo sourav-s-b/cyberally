@@ -41,7 +41,8 @@ class GreedyCheckpointPolicy:
     both here and to the rollout env (see main()).
     """
 
-    def __init__(self, ckpt_dir, hidden_dim=64, env_info=None):
+    def __init__(self, ckpt_dir, hidden_dim=64, env_info=None,
+                 agent_type="rnn"):
         try:
             import torch as th
             from modules.agents import REGISTRY as agent_REGISTRY
@@ -56,8 +57,13 @@ class GreedyCheckpointPolicy:
         self.n_agents, self.obs_dim, self.n_actions = policy_dims(env_info)
         # obs_dim already includes the one-hot id (see policy_dims); no last-act
         input_shape = self.obs_dim
-        args = SN(hidden_dim=hidden_dim, n_actions=self.n_actions, use_rnn=True)
-        self.agent = agent_REGISTRY["rnn"](input_shape, args)
+        args = SN(hidden_dim=hidden_dim, n_actions=self.n_actions,
+                  n_agents=self.n_agents, use_rnn=True)
+        if agent_type == "rnn_factorized":
+            import blue_factorized_agent as factorized
+            agent_REGISTRY["rnn_factorized"] = (
+                factorized.FactorizedRNNAgent)
+        self.agent = agent_REGISTRY[agent_type](input_shape, args)
         state = th.load(os.path.join(ckpt_dir, "agent.th"),
                         map_location="cpu", weights_only=True)
         missing, unexpected = self.agent.load_state_dict(state, strict=False), None

@@ -58,6 +58,10 @@ from utils.logging import Logger, get_logger  # noqa: E402
 
 import cc4_epymarl_wrapper as wrapper  # noqa: E402
 
+import blue_factorized_agent as factorized  # noqa: E402 (tracked module, no vendor edit)
+from modules.agents import REGISTRY as agent_REGISTRY  # noqa: E402
+agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
+
 EPYMARL_PIN = "cbc38c09588064eab978501d0f12c2cf58fa7fc2"
 
 # run_sequential builds its own training env internally through the factory
@@ -81,8 +85,9 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
                  lr=0.0003,
                  temporal_features=("ages", "belief", "freshness", "mission"),
                  include_root_session=True, mask_mode="validity",
-                 init_ckpt="", shaping=False,
-                 warmup_steps=0, warmup_critic_only=True):
+                  init_ckpt="", shaping=False,
+                  warmup_steps=0, warmup_critic_only=True,
+                  agent="rnn"):
     """MAPPO config; algorithm keys mirror EPyMARL's mappo.yaml."""
     return {
         "name": "mappo_cc4",
@@ -113,7 +118,7 @@ def build_config(steps=100, t_max=800, seed=7, results="results",
         "lr": lr,
         "grad_norm_clip": 10,
         "add_value_last_step": True,
-        "agent": "rnn",
+        "agent": agent,
         "use_rnn": True,
         "hidden_dim": 64,
         "obs_agent_id": True,
@@ -243,6 +248,10 @@ if __name__ == "__main__":
     parser.add_argument("--no-warmup-critic-only", dest="warmup_critic_only",
                         action="store_false",
                         help="allow actor updates during warmup (not recommended)")
+    parser.add_argument("--agent", default="rnn",
+                        choices=("rnn", "rnn_factorized"),
+                        help="actor head: flat 155-way or factorized "
+                             "host-then-command (proposal 02)")
     cli = parser.parse_args()
     train(build_config(steps=cli.steps, t_max=cli.t_max, seed=cli.seed,
                        train_seeds=tuple(cli.train_seeds),
@@ -252,4 +261,5 @@ if __name__ == "__main__":
                        mask_mode=cli.mask_mode, init_ckpt=cli.init_ckpt,
                        shaping=cli.shaping,
                        warmup_steps=cli.warmup_steps,
-                       warmup_critic_only=cli.warmup_critic_only))
+                       warmup_critic_only=cli.warmup_critic_only,
+                       agent=cli.agent))
