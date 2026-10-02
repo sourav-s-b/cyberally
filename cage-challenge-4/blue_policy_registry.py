@@ -15,6 +15,9 @@ REGISTRY = {
     "masked_random": ("blue_baselines", "MaskedRandomBaseline", {"seed": 11}),
     "unmasked_random": ("blue_baselines", "UnmaskedRandomBaseline", {"seed": 11}),
     "round_robin": ("blue_baselines", "RoundRobinBaseline", {}),
+    # Representation check (proposal 12): committed version of the scratch
+    # claim_check; pool manifest carries the equality evidence.
+    "stalest_first": ("blue_baselines", "StalestFirstBaseline", {}),
     "suspicion_sweep": ("blue_baselines", "SuspicionSweepBaseline", {}),
     "hybrid_none": ("blue_hybrid", "HybridBluePolicy", {"priority_fn": None}),
     "hybrid_lancer": ("blue_hybrid", "HybridBluePolicy",
@@ -25,6 +28,8 @@ REGISTRY = {
                          {"priority_fn": "lancer",
                           "priority_kwargs": {"fruitless_decay": 0.5}}),
     # Learned risk scorer (model weights live outside git under results/).
+    # KILLED 2026-10-02 (proposal 01 Experiment 4: coverage collapse).
+    # Kept so the failure stays reproducible; do not deploy.
     "hybrid_risk": ("blue_hybrid", "HybridBluePolicy",
                     {"priority_fn": "risk",
                      "priority_kwargs": {

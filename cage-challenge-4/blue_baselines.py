@@ -143,6 +143,67 @@ class RoundRobinBaseline:
         return 0
 
 
+class StalestFirstBaseline:
+    """Representation-check policy (proposal 12): same remediation core as
+    RoundRobinBaseline, but the sweep serves the legal host with the
+    stalest coverage -- never-analysed first, then smallest
+    last_analysis -- instead of following a cursor. If the cursor carried
+    information beyond Blue-visible features, this policy could not match
+    round-robin; the pool manifest decides (see docs/proposals/12).
+    Never issues Monitor; never touches privileged state.
+    """
+
+    def reset(self):
+        pass
+
+    def _legal(self, mask, env, agent, host, action):
+        idx = action_index(env, agent, host, action)
+        return bool(mask[idx])
+
+    def select(self, env, agent):
+        idx = wrapper.BLUE_AGENTS.index(agent)
+        mask = env.get_avail_agent_actions(idx)
+        if int(mask.sum()) <= 1:
+            return 0  # busy (agent-wide pending) or no session: only Sleep legal
+        tracker = env.trackers[agent]
+        hosts = env.hostnames[agent]
+
+        confirmed = [h for h in hosts if tracker.state.get(h) == "CONFIRMED"]
+        for host in confirmed:
+            last_an = tracker.last_analysis.get(host)
+            last_re = tracker.last_remediation.get(host)
+            re_detected = (
+                last_an is not None
+                and last_re is not None
+                and last_an > last_re
+            )
+            if re_detected and self._legal(mask, env, agent, host, "Restore"):
+                return action_index(env, agent, host, "Restore")
+            if self._legal(mask, env, agent, host, "Remove"):
+                return action_index(env, agent, host, "Remove")
+            if self._legal(mask, env, agent, host, "Restore"):
+                return action_index(env, agent, host, "Restore")
+
+        verify = [
+            h
+            for h in hosts
+            if tracker.state.get(h) == "VERIFY"
+            and self._legal(mask, env, agent, h, "Analyse")
+        ]
+        if verify:
+            host = min(verify, key=lambda h: tracker.last_remediation.get(h) or 0)
+            return action_index(env, agent, host, "Analyse")
+
+        cands = [h for h in hosts
+                 if self._legal(mask, env, agent, h, "Analyse")]
+        if not cands:
+            return 0
+        cands.sort(key=lambda h: (tracker.last_analysis.get(h) is not None,
+                                  tracker.last_analysis.get(h) or 0,
+                                  hosts.index(h)))
+        return action_index(env, agent, cands[0], "Analyse")
+
+
 class SuspicionSweepBaseline:
     """Teacher v2: round-robin remediation core, suspicion-ordered coverage.
 

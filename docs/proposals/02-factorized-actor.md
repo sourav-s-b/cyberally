@@ -58,7 +58,7 @@ existing EPyMARL MAPPO loop (joint log-prob bookkeeping for PPO).
 | distilled (0) | -131 | -393 | -364 | -296 (flat BC: -282) |
 | 2793 | -19 | -566 | -197 | -261 |
 | 7581 | -741 | -683 | -325 | -583 |
-| 12369 (8 seeds) | | | | ~-1770 |
+| 12369 (8 seeds) | | | | -1709.5 |
 
   Flat through ~2793, collapse 2793->7581, worse after. Same fine-tune
   divergence as the flat head, faster. (The in-training probe's -75 was a
@@ -85,7 +85,7 @@ existing EPyMARL MAPPO loop (joint log-prob bookkeeping for PPO).
 - Run: same config as the diverged run + KL 0.1 to the distilled ckpt
   (`results/mappo_cc4_seed7_20261002T091421Z`). KL stat live: 0.0003 ->
   0.07 (anchor engaged). 8-seed means: ckpt 5187: -940 (no-KL: -1072);
-  ckpt 12369: -1265 (no-KL: -1770). Collapse SLOWED, not prevented.
+  ckpt 12369: -1265 (no-KL: -1709.5). Collapse SLOWED, not prevented.
 - Key realization: KL 0.07 nats is small, yet returns still went to
   -1000s — the return landscape is razor-thin around the teacher; small
   drifts in host prioritization destroy returns. And the anchor caps at

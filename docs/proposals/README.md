@@ -12,13 +12,15 @@ Each proposal file has: Status, Description, Motivation/evidence, Experiment
 
 Statuses: `tested` (ran, results recorded) · `drafted` (code exists,
 unbenchmarked) · `proposed` (design only) · `deferred` (take pieces now, rest
-later) · `parked` (valid but not now) · `rejected` (evidence against).
+later) · `parked` (valid but not now) · `rejected` (evidence against) ·
+`built+tested` (implemented + pool-evaluated, i.e. tested with code) ·
+`rejected/queued` (rejected as stated, narrower variant queued).
 
 ## Index
 
 | # | Proposal | Status | Verdict |
 |---|---|---|---|
-| 01 | Hybrid rules + learned priority | drafted | BUILD FIRST |
+| 01 | Hybrid rules + learned priority | tested | lancer_v2 at teacher parity; snapshot risk killed; fixed constants exhausted |
 | 02 | Host-then-command factorized actor | built+tested | head validated (distill 21.8%); vanilla MAPPO diverges; KL 0.1 slows only — fine-tune line closed |
 | 03 | Entity-attention encoder | proposed | BUILD WITH 02 |
 | 04 | TERLA-style semantic action collapse | deferred | take action-waiting audit only |
@@ -37,3 +39,8 @@ steps, official CAGE-4 is 500 — compare per-step rates, never raw totals.
 TERLA/H-MARL absolutes come from different builds — only relative deltas
 transfer. Privileged simulator state never enters actors or masks; it may be a
 *training target* or *eval label* only.
+
+Manifests live in `manifests/`: files named `*-20261002.json` with `cells`
+are pool-eval records (returns + trace hashes); files named
+`risk-train-*.json` are trainer records (dataset hash, config, AUC) without
+eval cells.

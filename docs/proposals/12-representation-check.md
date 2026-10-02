@@ -20,7 +20,13 @@ recoverable, the blocker is architectural (how the policy compares slots).
 
 ## Experiment
 
-- Scratch (not committed): `/tmp/opencode/claim_check.py`.
+- Original: scratch (not committed): `/tmp/opencode/claim_check.py` (since
+  lost — scratch dir is not versioned).
+- Reproduced 2026-10-02 with committed code: `StalestFirstBaseline` in
+  `blue_baselines.py` (same remediation core, sweep serves the legal host
+  with min `(analysed?, last_analysis, host_index)`), registry
+  `stalest_first`, pool `stalest-20261002` (manifest committed),
+  `blue_compare --baseline round_robin` MATCH.
 - 8 seeds, 400 steps, native reward:
 
 | policy | mean | std |
@@ -28,8 +34,9 @@ recoverable, the blocker is architectural (how the policy compares slots).
 | round_robin (cursor) | -93.5 | 27.8 |
 | stalest_first (from obs) | -93.5 | 27.8 |
 
-- Action traces byte-identical: 1995 actions/episode, 0 mismatches (verified
-  seeds 7629/7640/7704). The cursor carries zero information the observation
+- Action traces byte-identical: 1995 entries/episode, 0 mismatches on all
+  8 of 7629/7630/7640/7701-7705 (stronger than the original 3-seed
+  check). The cursor carries zero information the observation
   lacks. (Caveat: `ages` saturates at 1.0 for never-analysed and very stale
   hosts alike; equivalence held within 400-step episodes.)
 
@@ -42,9 +49,10 @@ recoverable, the blocker is architectural (how the policy compares slots).
 
 ## Cons
 
-- None as a diagnostic. As documentation risk: the old false claim still
-  exists in earlier handoff text — this file and `faeee08` are the
-  correction; do not cite the old claim.
+- Scratch-script risk retired 2026-10-02: the equality now rests on a
+  committed manifest, not the lost `/tmp` script. As documentation risk:
+  the old false claim still exists in earlier handoff text — this file and
+  `faeee08` are the correction; do not cite the old claim.
 
 ## Verdict
 

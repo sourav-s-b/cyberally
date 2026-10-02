@@ -90,3 +90,37 @@ def test_slot_width_derivation_and_init_hidden():
     q, _ = slim(th.randn(5, 51 * 16 + 5), slim.init_hidden().expand(5, -1))
     assert q.shape == (5, 155)
     assert full.init_hidden().shape == (1, 64)
+
+
+def test_greedy_ckpt_resume_factorized(tmp_path):
+    # Minimal ckpt-resume path: random-weights agent.th in ckpt layout,
+    # GreedyCheckpointPolicy loads it and emits legal actions for a few
+    # quiet steps. Guards the torch eval path behind all MAPPO manifests.
+    import cc4_epymarl_wrapper as wrapper
+    from CybORG.Agents import SleepAgent
+    from blue_eval_mappo import GreedyCheckpointPolicy
+    agent = FactorizedRNNAgent(872, _args())
+    ckpt = tmp_path / "ckpt"
+    ckpt.mkdir()
+    th.save(agent.state_dict(), str(ckpt / "agent.th"))
+    real_red = wrapper.DiscoveryFSRed
+    real_green = wrapper.EnterpriseGreenAgent
+    wrapper.DiscoveryFSRed = SleepAgent
+    wrapper.EnterpriseGreenAgent = SleepAgent
+    try:
+        env = wrapper.CC4MARLEnv(steps=6, temporal_features=("ages", "belief"),
+                                 include_root_session=True)
+        env_info = env.get_env_info()
+        env.reset()
+        pol = GreedyCheckpointPolicy(str(ckpt), env_info=env_info,
+                                     agent_type="rnn_factorized")
+        for _ in range(5):
+            acts = {a: pol.select(env, a) for a in wrapper.BLUE_AGENTS}
+            for a, idx in acts.items():
+                mask = env.get_avail_agent_actions(
+                    wrapper.BLUE_AGENTS.index(a))
+                assert mask[idx] == 1, (a, idx)
+            env.step(acts)
+    finally:
+        wrapper.DiscoveryFSRed = real_red
+        wrapper.EnterpriseGreenAgent = real_green

@@ -19,7 +19,14 @@ names and fixes them. Conclusion up front — **all three are known failure
 modes, two of our mitigations were weaker than the published standard, and
 one of our shaping choices was a textbook violation.**
 
-## F1. PPO fine-tuning degraded the BC policy in 4/4 runs
+## F1. [RETRACTED 2026-10-01 — underpowered] PPO fine-tuning appeared to
+degrade the BC policy in 4/4 runs
+
+RETRACTION: the 8-seed BC eval (mean -393.4, std 276.9; 95% CI ≈ ±313 for
+a 3-seed mean) showed these 3-seed deltas sit inside seed noise. Only
+lr=1e-3 divergence and Sleep-level collapse stand outside noise. The
+literature mapping below is unaffected; the "4/4" empirical claim is
+withdrawn. Original text preserved below for the record.
 
 Measurements: `docs/status/blue-session.md` (4 fine-tunes from one BC init,
 all monotonically worse in native return; monotone in lr).
@@ -50,8 +57,11 @@ names our exact regime); (c) KL(π0,π) as a standing diagnostic.
 **Actionable:** our BC fix was directionally right (it took non-sleep
 accuracy 0.3% → 12%) but is a weaker weighting than the `p/ρ` formulation
 in the paper. Revisitable if BC fidelity ever becomes the bottleneck. Note
-the ceiling: the round-robin sweep cursor is unobservable, so exact-id
-fidelity is capped and only *semantic* fidelity is reachable.
+(CORRECTED 2026-10-01): the old claim here was that "the round-robin sweep
+cursor is unobservable, so exact-id fidelity is capped". That is FALSE —
+stalest-first from Blue-visible features reproduces round-robin
+byte-identically (proposal 12). The fidelity ceiling is architectural (the
+flat head cannot express cross-slot argmax), not informational.
 
 ## F3. Shaped rewards made native return worse (bonus farming)
 
@@ -104,11 +114,13 @@ Relevant lines of work, none of which is hand-shaped bonuses:
    not potential-based, so policy invariance was never guaranteed. Drop it
    or make it potential-based. (The size of its measured harm is subject to
    point 2.)
-4. The capability gap is the thing worth attacking, and it is a
-   *representation* gap: the round-robin sweep cursor is not in the
-   observation, so no policy fine-tune can recover it. This is the case for
-   the neuro-symbolic route, and CG-MARL is the closest precedent — fix the
-   cooperation skeleton, learn the rest.
+4. The capability gap is the thing worth attacking, and it is an
+   *architectural* gap [CORRECTED 2026-10-01: was "representation gap ...
+   the round-robin sweep cursor is not in the observation" — FALSE, see
+   proposal 12]: the flat head cannot express cross-slot argmax, so no
+   flat-head fine-tune can recover the teacher's ordering. This is the case
+   for the neuro-symbolic route, and CG-MARL is the closest precedent — fix
+   the cooperation skeleton, learn the rest.
 5. Keep the KL(π0, π_ft) measurement in the eval harness regardless. It is
    cheap and it is the quantity that would have caught a genuine forgetting
    event; its near-zero value here is itself the finding.

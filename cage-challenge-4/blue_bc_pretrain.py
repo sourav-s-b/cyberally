@@ -66,9 +66,11 @@ def main():
               n_agents=n_agents)
     agent = agent_REGISTRY[cli.agent](obs_dim, args)
     opt = th.optim.Adam(agent.parameters(), lr=cli.lr)
-    # Inverse-sqrt class weights: the teacher is ~55% Sleep and the
-    # round-robin sweep cursor is unobservable, so unweighted CE collapses
-    # to majority-class prediction and never learns rare remediation.
+    # Inverse-sqrt class weights: the teacher is ~55% Sleep and exact
+    # teacher-action prediction is hard (cross-slot argmax through a flat
+    # head; the sweep cursor itself IS recoverable from obs, see proposal
+    # 12), so unweighted CE collapses to majority-class prediction and
+    # never learns rare remediation.
     freq = np.bincount(actions.reshape(-1), minlength=n_actions).astype(np.float64)
     weight = th.from_numpy((1.0 / np.sqrt(freq + 1.0)).astype(np.float32))
     weight = weight * (n_actions / weight.sum())
@@ -98,8 +100,10 @@ def main():
             free = (seq_mask[idx].sum(-1) > 1).float()
             mask = ((th.arange(t).unsqueeze(0) < b_len.unsqueeze(1)).float()
                     * free)
+            # Guard the all-busy degenerate batch (never observed; would NaN).
+            denom = mask.sum().clamp(min=1)
             loss = (loss_fn(logits.reshape(-1, n_actions),
-                            b_act.reshape(-1)).reshape(b, t) * mask).sum() / mask.sum()
+                            b_act.reshape(-1)).reshape(b, t) * mask).sum() / denom
             opt.zero_grad()
             loss.backward()
             th.nn.utils.clip_grad_norm_(agent.parameters(), 10.0)

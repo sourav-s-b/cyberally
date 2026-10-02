@@ -115,3 +115,17 @@ def test_hybrid_lancer_selects_legal(quiet):
                 wrapper.BLUE_AGENTS.index(agent))
             assert mask[idx] == 1, (agent, idx)
         quiet.step(actions)
+
+
+def test_tick_regression_auto_resets(quiet):
+    # Reused policy object across episodes without reset(): a regressing
+    # tick must clear stale cursor/scorer state before scoring.
+    policy = HybridBluePolicy(priority_fn="lancer")
+    agent = "blue_agent_0"
+    for _ in range(4):
+        policy.select(quiet, agent)
+    policy._cursor[agent] = 99  # stale, impossible value
+    policy._tick_seen[agent] = 10 ** 6  # future
+    policy.select(quiet, agent)  # quiet._tick small -> guard fires
+    assert policy._tick_seen[agent] == quiet._tick
+    assert policy._cursor.get(agent) != 99

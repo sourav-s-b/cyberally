@@ -49,6 +49,21 @@ def test_cross_worker_determinism():
     assert first["return"] == second["return"]
 
 
+def test_spawn_matches_serial():
+    # Spawn path (used for torch cells): same numbers as the reference.
+    serial = _serial_results()
+    cells = build_cells(["round_robin", "hybrid_none"], {}, list(SEEDS),
+                        STEPS, "validity", {})
+    by_policy = {}
+    for r in run_pool(cells, 2, "spawn"):
+        by_policy.setdefault(r["policy"], {})[r["seed"]] = r
+    for seed in SEEDS:
+        assert (by_policy["round_robin"][seed]["return"]
+                == serial["round_robin"][seed]["cumulative_return"])
+        assert (by_policy["round_robin"][seed]["trace_sha256"]
+                == by_policy["hybrid_none"][seed]["trace_sha256"])
+
+
 def test_registry_builds_heuristics():
     assert needs_torch("mappo_ckpt") and not needs_torch("round_robin")
     assert isinstance(build("hybrid_none"), HybridBluePolicy)

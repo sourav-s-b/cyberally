@@ -1,6 +1,6 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: drafted — snapshot risk scorer killed by coverage collapse.
+- Status: tested — snapshot risk scorer killed by coverage collapse.
   Best fixed: lancer_v2 at teacher parity. Next: proposal 02.
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
@@ -163,11 +163,6 @@ touch-decay/recency dynamics, so it fixates and starves coverage. AUC
   teacher parity; ordering edge must come from architecture (proposal 02),
   not snapshot classification.
 
-Remaining, not yet run: (1) lancer-style priority + punch-style
-file-density>0.9 flag + UC-style persistent malicious-event flags, same
-seeds; (2) tiny risk scorer on Blue-visible 17-feat vectors. Target: beat
--93.5, approach lancer's constant-size -71 band on equal footing.
-
 ## Pros
 
 - Smallest change that can beat the teacher: keeps everything the teacher
@@ -184,9 +179,13 @@ seeds; (2) tiny risk scorer on Blue-visible 17-feat vectors. Target: beat
   without rule changes — rules become the new bottleneck.
 - The risk scorer trains on sparse, delayed labels; small-model discipline
   needed to avoid re-learning round-robin with extra steps.
-- Draft is uncommitted and has no tests yet.
+- Draft is tracked (`blue_hybrid.py`) with parity, priority, and risk
+  tests (`test_hybrid_parity.py`, `test_hybrid_priority.py`,
+  `test_risk_priority.py`).
 
 ## Verdict
 
-BUILD FIRST. Concrete next task: parity proof, then priority + flags,
->= 8-seed native evals throughout.
+Done (was: BUILD FIRST). Parity proven, lancer v1/v2 and snapshot-risk
+tested: best fixed result is lancer_v2 at teacher parity; adaptive snapshot
+scoring killed by coverage collapse. No further constant-tuning or snapshot
+scoring — ordering edge must come from architecture (proposal 02).

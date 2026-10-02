@@ -50,16 +50,26 @@ class HybridBluePolicy:
         elif priority_kwargs:
             raise ValueError("priority_kwargs need a string priority_fn spec")
         self.priority_fn = priority_fn
-        self._n = {}
         self._cursor = {}
+        self._tick_seen = {}
 
     def reset(self):
-        self._n.clear()
         self._cursor.clear()
+        self._tick_seen.clear()
         if hasattr(self.priority_fn, "reset"):
             self.priority_fn.reset()
 
     def select(self, env, agent):
+        # Episode guard: tick restarts at 0 each episode, so a regressing
+        # tick means a new episode on a reused policy object. Reset instead
+        # of scoring with stale cursor/scorer caches. No behavior change
+        # when reset() is called properly (ticks only advance) or for fresh
+        # policies (pool workers build per cell).
+        tick = getattr(env, "_tick", None)
+        if tick is not None:
+            if tick < self._tick_seen.get(agent, -1):
+                self.reset()
+            self._tick_seen[agent] = tick
         idx = wrapper.BLUE_AGENTS.index(agent)
         mask = env.get_avail_agent_actions(idx)
         if int(mask.sum()) <= 1:
@@ -108,7 +118,6 @@ class HybridBluePolicy:
         else:
             scored = [(self.priority_fn(env, agent, h), h) for h in cands]
             pick = max(scored, key=lambda sh: (sh[0], sh[1]))[1]
-        self._n[agent] = self._n.get(agent, 0) + 1
         return action_index(env, agent, pick, "Analyse")
 
 
@@ -125,6 +134,7 @@ def host_risk_features(env, agent, host):
 
 
 # Indices into the host_to_vector 10-feature layout (blue_obs_features).
+# FRAGILE: assumes FEATURE_NAMES order; reorder there breaks these silently.
 _I_UNKNOWN_FILES = 6
 _I_MAX_DENSITY = 7
 _I_N_EXT_CONN = 9
@@ -270,12 +280,19 @@ class RiskPriority:
     (RISK_GROUPS, RISK_DELTAS below). Only features enter at select time;
     privileged labels were training targets only.
 
-    Predictions are batched per (agent, tick) and cached: one model pass
-    per agent per tick instead of one per candidate. ``env._tick`` keys the
+    Predictions are batched per (agent, tick) and cached — but the cache
+    holds a SINGLE (agent, tick) entry, so with 5 agents selecting per tick
+    each agent evicts the last: up to 5 model passes per tick, not one.
+    Correct, just less cached than the shape suggests; do not "fix" without
+    re-measuring (pool manifests pin current behavior). `env._tick` keys the
     cache; without it every call rebuilds (correct, slower). Scores are
     pure probabilities -- ties break by host string in HybridBluePolicy.
     A coverage collapse would show immediately in pool eval (kept as an
     empirical guard, not extra mechanism).
+
+    KILLED 2026-10-02 (proposal 01 Experiment 4: coverage collapse —
+    803 analyses on 27 hosts vs 793 on 67). Kept so the failure stays
+    reproducible; do not deploy.
     """
 
     GROUPS = ("ages", "belief")

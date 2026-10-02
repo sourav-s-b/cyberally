@@ -34,7 +34,8 @@ def main():
     ap = argparse.ArgumentParser(description="Compare an eval manifest")
     ap.add_argument("manifest")
     ap.add_argument("--baseline", default=None)
-    ap.add_argument("--markdown", action="store_true")
+    ap.add_argument("--markdown", action="store_true",
+                    help="no-op (output is always markdown)")
     cli = ap.parse_args()
     m = load(cli.manifest)
     rows = summarize(m)
@@ -42,6 +43,17 @@ def main():
     if base is not None and base not in rows:
         raise SystemExit(f"baseline {base!r} not in manifest "
                          f"(has {sorted(rows)})")
+    if base is not None:
+        b = m["cells"][base]
+        want = sorted(b)
+        for policy in sorted(rows):
+            if policy == base:
+                continue
+            have = sorted(m["cells"][policy])
+            if have != want:
+                raise SystemExit(
+                    f"seed sets differ: baseline {base} has {want}, "
+                    f"{policy} has {have}")
     lines = []
     lines.append(f"# {m['run_id']} ({m['git_commit'][:12]}, "
                  f"steps={m['steps']}, seeds={m['seeds']})")
@@ -69,10 +81,7 @@ def main():
                       == b[s]["trace_sha256"] for s in sorted(b))
             lines.append(f"  trace parity: {'MATCH' if par else 'differ'}")
     text = "\n".join(lines)
-    if cli.markdown:
-        print(text)
-    else:
-        print(text)
+    print(text)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,9 @@ def run_cell(cell):
     if needs_torch(cell["policy"]):
         # Size the checkpoint probe (and geometry checks) from the same env
         # flags as the rollout env; _build_ckpt forwards them to the probe.
-        for key in ("temporal_features", "include_root_session"):
+        # mask_mode included so validity checks run under the same config.
+        for key in ("temporal_features", "include_root_session",
+                    "mask_mode"):
             kwargs.setdefault(key, cell.get("env_kwargs", {}).get(key))
         kwargs.setdefault("steps", cell["steps"])
     policy = build(cell["policy"], **kwargs)

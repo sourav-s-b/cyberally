@@ -552,7 +552,9 @@ resume; needs full quad — critic.th + both opts, first attempt crashed
 without them), `tests_blue/test_bc_warmstart.py`.
 
 1. Unweighted BC -> Sleep-mode collapse (acc 54.65% = majority). Cause:
-   hidden RR cursor unobservable + Sleep noise. Fix: inverse-sqrt class
+   [EDIT 2026-10-01: "hidden RR cursor unobservable" is FALSE — cursor is
+   recoverable from obs (proposal 12). Cause is class imbalance + the flat
+   head's argmax bottleneck.] Fix: inverse-sqrt class
    weights + zero loss on busy ticks (mask sum<=1).
 2. Weighted BC: nonsleep-acc 0.3%->12% (exact-id ceiling is the hidden
    cursor). Zero-shot semantics transfer: Analyse 565-781, Restore
@@ -617,6 +619,9 @@ ONLY variable vs the unshaped 1e-5 run: NATIVE -723/-337/-597 (mean -552)
 vs unshaped -234/-460/-486 (mean -393). Shaping also degrades.
 
 ## Combined verdict: PPO fine-tuning is net-destructive here (2026-10-01)
+**[RETRACTED 2026-10-01: the 8-seed eval (±313 band) showed these 3-seed
+deltas are inside seed noise. Only lr=1e-3 divergence and Sleep-level
+collapse stand. Table preserved for the record.]**
 
 Four independent fine-tunes, all starting from the SAME BC init, all
 scored on native returns:
@@ -869,7 +874,7 @@ Proposal 02 built with zero vendor edits (combined-logit trick):
 `GreedyCheckpointPolicy(agent_type=...)` + `mappo_ckpt_factorized` pool
 entry (spawn path proven: 16 cells, 156 s). BC-distill 21.8% nonsleep-acc
 vs flat 12.2% — architecture VALIDATED. MAPPO fine-tune from distill:
--296 -> -261 (ckpt 2793) -> -583 (7581) -> ~-1770 (12369, 8 seeds). Same
+-296 -> -261 (ckpt 2793) -> -583 (7581) -> -1709.5 (12369, 8 seeds). Same
 divergence disease as flat head, faster. In-training single-episode probe
 (-75) exposed as seed-lottery noise. Also repaired a 6-char typo corruption
 in vendored `rnn_agent.py` (`fc2(h)openco`, isolated, restored to upstream;
@@ -879,6 +884,25 @@ train subset 13 passed. Full record in proposal 02. Next: stabilized
 fine-tuning (KL-to-teacher, schedules, behavior constraints) — not more
 architecture.
 
+## Review fix batch (2026-10-02)
+
+Three-audit review (docs/code/git) + own verification. Findings fixed:
+-02 mean -1770 -> -1709.5 (recomputed from manifest cells); v2now AUC
+stale-manifest anomaly resolved (buggy-auc era file; regenerated 0.682 —
+docs' "0.68 now" stands).
+- Retraction banners: literature F1 header, 2 cursor lines, bc_pretrain
+comment, session history (net-destructive verdict + cursor cause), 01 stale
+lines; 01 status -> tested, verdict closed; README taxonomy extended.
+- Safe code: HybridBluePolicy tick-regression auto-reset (+ test), _n
+removed, hybrid_risk/RiskPriority killed-markers, --markdown no-op help,
+BC denom guard, pool probe mask_mode forwarding, compare seed-set check,
+FRAGILE index comment; new tests: spawn parity, ckpt-resume, stalest
+determinism. Lancer behavior frozen (measured artifacts).
+- claim_check rebuilt as registry `stalest_first`: pool stalest-20261002
+byte-identical traces on all 8 seeds (stronger than the lost 3-seed
+scratch); proposal 12 updated.
+- professor-brief.md deleted (stale, untracked).
+
 ## KL-to-teacher slows collapse only; line closed (2026-10-02)
 
 Frozen-demonstrator KL in the vendored learner (`teacher_kl` + teacher MAC,
@@ -887,7 +911,7 @@ Frozen-demonstrator KL in the vendored learner (`teacher_kl` + teacher MAC,
 byte-verified; applies after ppo-warmup.patch). Math unit-tested (3 tests;
 caught a flipped expectation). KL run (coef 0.1, same config): KL stat
 0.0003 -> 0.07, 8-seed means ckpt-5187 -940 (was -1072), final -1265 (was
--1770). Slower collapse, same destination; KL 0.07 nats with returns at
+-1709.5). Slower collapse, same destination; KL 0.07 nats with returns at
 -1000s = razor-thin landscape, and the anchor caps at distilled -205
 anyway. Closed absent a better distill. Sim 102/7-skip (torch tests skip);
 train 16 passed. Full record in proposal 02.
