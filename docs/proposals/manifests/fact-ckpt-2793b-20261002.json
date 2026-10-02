@@ -1,0 +1,116 @@
+{
+ "run_id": "fact-ckpt-2793b-20261002",
+ "created": "2026-10-02T14:36:35",
+ "git_commit": "3c4e555c4a40d430cec1a40c75472e9221e32bc9",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief"
+  ],
+  "include_root_session": true
+ },
+ "seeds": [
+  7701,
+  7702,
+  7703,
+  7704,
+  7705
+ ],
+ "policies": [
+  "mappo_ckpt_factorized"
+ ],
+ "policy_kwargs": {
+  "mappo_ckpt_factorized": {
+   "ckpt_dir": "results/models/mappo_cc4_seed7_20261002T082828Z/2793"
+  }
+ },
+ "workers": 5,
+ "start_method": "spawn",
+ "interpreter": "/home/sourav/Projects/cyberally/cage-challenge-4/../.venv-train/bin/python",
+ "cells": {
+  "mappo_ckpt_factorized": {
+   "7701": {
+    "return": -445.0,
+    "steps": 399,
+    "trace_sha256": "0108321184633b2d7a3a5199e2681456e1320a0c253014f0220e649e9d4b050c",
+    "final": {
+     "total": 56,
+     "root": 50
+    },
+    "snapshots": {
+     "200": {
+      "total": 53,
+      "root": 37,
+      "return": -29.0
+     }
+    }
+   },
+   "7702": {
+    "return": -355.0,
+    "steps": 399,
+    "trace_sha256": "71b6d20c1a2bc35a0e1d811c7be61a9a5f413b3e8359bed8eaadf29b582ea9f7",
+    "final": {
+     "total": 73,
+     "root": 50
+    },
+    "snapshots": {
+     "200": {
+      "total": 51,
+      "root": 31,
+      "return": -5.0
+     }
+    }
+   },
+   "7703": {
+    "return": -553.0,
+    "steps": 399,
+    "trace_sha256": "d53077e15c81981fa6e87c9eeccdb86e3c367723c5887efb5b660afffc38ccec",
+    "final": {
+     "total": 58,
+     "root": 50
+    },
+    "snapshots": {
+     "200": {
+      "total": 50,
+      "root": 33,
+      "return": -9.0
+     }
+    }
+   },
+   "7704": {
+    "return": -1882.0,
+    "steps": 399,
+    "trace_sha256": "c69ae2327baf0a8398226a82f35d62341827e8c0239f4579b39021edd965d088",
+    "final": {
+     "total": 63,
+     "root": 50
+    },
+    "snapshots": {
+     "200": {
+      "total": 56,
+      "root": 44,
+      "return": -121.0
+     }
+    }
+   },
+   "7705": {
+    "return": -78.0,
+    "steps": 399,
+    "trace_sha256": "5be832f2cde9d55629d356756a995a240b5c4c8948f92896616e97c15c3b37e4",
+    "final": {
+     "total": 46,
+     "root": 33
+    },
+    "snapshots": {
+     "200": {
+      "total": 36,
+      "root": 23,
+      "return": -64.0
+     }
+    }
+   }
+  }
+ }
+}
