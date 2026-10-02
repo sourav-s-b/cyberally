@@ -971,6 +971,20 @@ PBRS, entity-RL/SR-DRL/GTrXL actor path, DVRL/VariBAD belief, rliable
 reporting now. Caveat: search-existence checked, not read; verify DOI
 before citing/implementing. Next: pick P0–P2 to convert into proposals.
 
+## Recovery proposals 14/16/17/18 (2026-10-02)
+
+Converted survey P1/P2/P4–P8 into four build proposals, each a response to
+a measured failure: 14 offline stitching (IQL-discrete + RvS, do first —
+routes on data-vs-algorithm ceiling); 16 collapse-proof fine-tune (D0
+plasticity Dx → JSRL+AWAC → PEX, kickstarting-decay fallback); 17 critic
+audit (Lyu, parallel) → conditional HAPPO + PBRS-proof densification +
+E3B/NovelD as new-family exploration (distinguished from rejected 07/09);
+18 entity-RL actor + DVRL/VariBAD belief + PLR⊥ now / ACCEL-PSRO later,
+CONDITIONAL on 14–17 producing a surviving updater, with POMCP as the
+no-training planning baseline and an explicit deferred list (diffusion,
+GAIL, DreamerV3-full, program synthesis, Mamba) with trigger conditions.
+README index updated. No code; awaiting build order.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

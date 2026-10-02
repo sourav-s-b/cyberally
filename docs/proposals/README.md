@@ -33,7 +33,11 @@ later) · `parked` (valid but not now) · `rejected` (evidence against) ·
 | 11 | Balanced (inverse-sqrt) BC | tested | beats collapsed BC; still far from teacher |
 | 12 | Representation check (stalest-first) | tested | cursor recoverable from obs; bottleneck is architectural |
 | 13 | Factored-additive Q | rejected | misspecified for 1-of-155 exclusive choice |
+| 14 | Offline stitching (IQL-discrete + RvS) | proposed | P1, do first: exceed teacher from fixed logs, no env change |
 | 15 | Generalization suite | tested | red variety done; rates/durations pending Environment |
+| 16 | Collapse-proof BC-to-RL (JSRL+AWAC → PEX) | proposed | P2: updates that cannot drift, guide curriculum, plasticity Dx |
+| 17 | Critic audit → HAPPO → safe densification | proposed | P4/P5: Lyu audit parallel; PBRS-proof shaping; E3B/NovelD |
+| 18 | Entity-RL actor + belief + red curriculum | proposed | P6–P8: SR-DRL path conditional on surviving updater; PLR⊥ now |
 
 Score-comparability rules (binding for every file here): our episodes are 400
 steps, official CAGE-4 is 500 — compare per-step rates, never raw totals.
