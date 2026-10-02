@@ -22,12 +22,12 @@ accuracy + fresh critic + sparse native reward.
 
 ## Experiment
 
-- Implementation: `cage-challenge-4/blue_train_mappo.py` flags;
+- Implementation: `blue/blue_train_mappo.py` flags;
   `third_party/epymarl/src/learners/ppo_learner.py` skips the actor
   optimizer step during warmup (critic still trains). `third_party/` is
   gitignored, so the exact change is stored as
   `environment/patches/ppo-warmup.patch` + README; fresh clones must apply it.
-- Regression: `cage-challenge-4/tests_blue/test_ppo_warmup.py` (5 tests:
+- Regression: `blue/tests_blue/test_ppo_warmup.py` (5 tests:
   actor bit-identical during warmup, critic still moves, actor resumes after
   boundary, default-off, opt-out). Suites after change: train 90 passed /
   27 warnings; sim 81 passed / 5 skipped.

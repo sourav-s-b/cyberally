@@ -64,11 +64,11 @@ def collect(output, seeds, steps=30, policy_name="round-robin"):
                     done = terminated or truncated
     finally:
         env.close()
-    sources = [Path(__file__), ROOT / "cage-challenge-4/blue_telemetry.py",
-               ROOT / "cage-challenge-4/blue_obs_features.py",
-               ROOT / "cage-challenge-4/cc4_epymarl_wrapper.py",
-               ROOT / "cage-challenge-4/blue_baselines.py",
-               ROOT / "cage-challenge-4/blue_action_masking.py"]
+    sources = [Path(__file__), ROOT / "blue/blue_telemetry.py",
+               ROOT / "blue/blue_obs_features.py",
+               ROOT / "blue/cc4_epymarl_wrapper.py",
+               ROOT / "blue/blue_baselines.py",
+               ROOT / "blue/blue_action_masking.py"]
     manifest = {
         "schema_version": "blue-telemetry-collection-v1-draft",
         "telemetry_version": TELEMETRY_VERSION, "feature_version": FEATURE_VERSION,

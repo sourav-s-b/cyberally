@@ -26,7 +26,7 @@ existing EPyMARL MAPPO loop (joint log-prob bookkeeping for PPO).
 
 ## Experiment 1: built, distilled, fine-tuned, diverged (2026-10-02)
 
-- Implementation `cage-challenge-4/blue_factorized_agent.py`
+- Implementation `blue/blue_factorized_agent.py`
   (`FactorizedRNNAgent`): same GRU recurrence over the flat obs, but the
   final layer is a shared 51-slot encoder + host selector + conditional
   command head + global Sleep/Monitor head, combined as

@@ -3,7 +3,7 @@
 - Status: tested — all ordering variants exhausted. Lancer_v2 parity
   stands; risk hybrids fail the held-out gate. Program: attention
   distill (02 Exp3) or generalization suite (15).
-- Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
+- Draft: `blue/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
 ## Description
@@ -34,7 +34,7 @@ PARITY PROVEN 2026-10-02 (this change: `priority_fn=None` now runs a cursor
 round-robin identical to `RoundRobinBaseline`; the first-draft `cands[0]`
 would have stuck on one host, so it was fixed before measuring).
 
-- Regression: `cage-challenge-4/tests_blue/test_hybrid_parity.py` — 2 seeds,
+- Regression: `blue/tests_blue/test_hybrid_parity.py` — 2 seeds,
   asserts equal native returns AND identical per-tick traces. Passes (69 s).
 - Full manifest, 8 seeds x 400 steps, native reward (scratch
   `/tmp/opencode/parity_8seed.py`, results/ is gitignored so numbers live

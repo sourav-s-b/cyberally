@@ -73,14 +73,14 @@ the trap list that everything below depends on.
 Build a reliable CAGE4 Blue defender, establish strong baselines, then train and
 evaluate MAPPO and attacker adaptation. Read root `AGENTS.md`,
 `docs/implementation-plan.md`, `docs/contracts.md`,
-`cage-challenge-4/blue-agent-plan.md`, and the correction at the top of
-`cage-challenge-4/handoff.md` before changing code.
+`docs/archive/blue-agent-plan.md`, and the correction at the top of
+`docs/archive/handoff.md` before changing code.
 
 ## Current Blue changes
 
 Committed in `7b76fc2` and `58b6cc7` on `blue/foundation`:
 
-- Reworked `cage-challenge-4/cc4_epymarl_wrapper.py`: reset the shared simulator
+- Reworked `blue/cc4_epymarl_wrapper.py`: reset the shared simulator
   once, apply explicit seeds and advance the RNG when none is supplied, reject
   host overflow instead of truncating, track exactly one pending action per
   agent, merge observations for every visible host every tick, keep simulator
@@ -91,10 +91,10 @@ Committed in `7b76fc2` and `58b6cc7` on `blue/foundation`:
   discrete actions, 2550 concatenated state.
 - `CC4BlueWrapper` is a single-agent facade over the same joint-step
   implementation rather than a parallel copy of the bookkeeping.
-- Reworked `cage-challenge-4/blue_action_masking.py`: pending actions no longer
+- Reworked `blue/blue_action_masking.py`: pending actions no longer
   overwrite belief, `Restore` stays reachable in validity mode, and successful
   remediation transitions to `VERIFY` instead of declaring the host clean.
-- Added `cage-challenge-4/tests_blue/test_foundation.py`.
+- Added `blue/tests_blue/test_foundation.py`.
 - Added live tests for lost target sessions (Analyse/Remove/Restore returning
   `FALSE` when the child session disappears mid-action, with the original target
   still attributed and no clean label inferred), overdue-action failure, reset
@@ -805,7 +805,7 @@ Deep literature review complete; decision doc:
 
 ## Hybrid parity proven (2026-10-02)
 
-Proposal 01 step 1 done. `cage-challenge-4/blue_hybrid.py` (now tracked)
+Proposal 01 step 1 done. `blue/blue_hybrid.py` (now tracked)
 fixed so `priority_fn=None` runs a cursor round-robin identical to
 `RoundRobinBaseline` (first draft's `cands[0]` would have stuck on one
 host). New regression `tests_blue/test_hybrid_parity.py` passes. 8-seed
@@ -817,11 +817,11 @@ seeds, then risk scorer.
 
 ## Parallel eval harness (2026-10-02)
 
-Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable
+Per approved plan: `blue/blue_policy_registry.py` (picklable
 name -> constructor specs, incl. `mappo_ckpt` torch entry),
 `blue_eval_parallel.py` (process pool over policy x seed cells; fork for
 heuristics, spawn + train-venv requirement for torch),
-`cage-challenge-4/blue_compare.py` (table, paired diffs, trace parity,
+`blue/blue_compare.py` (table, paired diffs, trace parity,
 proposal-ready markdown). Manifests committed under
 `docs/proposals/manifests/`. Correctness: `tests_blue/test_eval_parallel.py`
 (pool == serial, cross-worker determinism, torch-spec fails loudly) passes.
@@ -1013,14 +1013,29 @@ PARTIAL — update vindicated, transfer is the gap; route to 16 (IQL ckpt
 replaces attention as best init) + 17. Sim 112/9. Manifests
 iql/a05/a03/a07/full/strong/heldout-20261002. Ckpts local-only.
 
+## Repo layout cleanup (2026-10-02)
+
+cage-challenge-4/ is now the pristine simulator only (CybORG/ untouched
+since bootstrap — verified zero commits; plus setup/Requirements/README/
+LICENSE/visualise/team-guide). All Blue code moved to blue/ (23 blue_*.py
++ cc4_epymarl_wrapper.py + tests_blue/ + results/); plan docs to
+docs/archive/; pptx+pdf to assets/. Only bridge: wrapper derives the
+cage path from __file__ (not cwd). Run Blue with cwd=blue/ (results/ and
+relative ckpt paths unchanged); manifests still root-anchored. Fixed
+iforest hardcoded paths + telemetry ROOT + doc pointers (bulk sed) +
+AGENTS.md ownership/plan pointers + README layout rule. Verified: sim
+112/9, torch rvs/iql/factorized 20, heuristic pool smoke, torch spawn
+cell rvs_7629=-93.0 identical to pre-move manifest. CI syntax check 200
+files OK.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
 > on Windows; now also/instead WSL — paths below are relative). Read
 > `AGENTS.md`, `docs/current-state.md`, `docs/status/blue-session.md`,
 > `docs/status/blue.md`, `docs/contracts.md`, `docs/implementation-plan.md`,
-> `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
-> and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
+> `docs/coordination/blue-action-space.md`, `docs/archive/blue-agent-plan.md`,
+> and the correction at the top of `docs/archive/handoff.md`. Preserve my
 > work: inspect `git status --short --branch` and fetch origin first. Blue
 > work is on `blue/mappo-training`, pushed, tracking `origin/blue/mappo-training`
 > (PR #1 merged to main; stale remote `blue` deleted). The `environment/`
