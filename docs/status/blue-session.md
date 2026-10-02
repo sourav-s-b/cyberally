@@ -957,6 +957,20 @@ can't survive the coverage trade with or without dynamics; only supervised
 ordering-learning (attention distill) reached parity. Proposal 01 CLOSED.
 Sim 112/7. Manifests `riskx-20261002.json`, `riskx-heldout-20261002.json`.
 
+## Second literature sweep: RL recovery (2026-10-02)
+
+User asked for 200–500 recent papers across weaknesses, max subagents. Ran
+10 parallel tracks (cyber-MARL, exploration, offline/IL, BC→RL fine-tune,
+MARL credit, architectures, belief/world-models, robustness/UED, hierarchy/
+shielding, eval+security-signals): ~300 entries, ~260 unique after cross-
+track dedup. Deliverable `docs/research/blue-rl-recovery-literature.md`:
+weakness-mapped top-15 bets, track catalogs, ordered P0–P9 program. Top
+bets: IQL-discrete on lancer logs, AWAC/PEX/JSRL from attention ckpt,
+HAPPO + history-critic audit, PLR⊥ red curriculum, E3B/NovelD + dynamic
+PBRS, entity-RL/SR-DRL/GTrXL actor path, DVRL/VariBAD belief, rliable
+reporting now. Caveat: search-existence checked, not read; verify DOI
+before citing/implementing. Next: pick P0–P2 to convert into proposals.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
