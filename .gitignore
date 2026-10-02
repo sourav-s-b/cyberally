@@ -3,6 +3,7 @@
 venv/
 env/
 .tools/
+third_party/
 __pycache__/
 *.py[cod]
 .pytest_cache/

@@ -73,14 +73,14 @@ the trap list that everything below depends on.
 Build a reliable CAGE4 Blue defender, establish strong baselines, then train and
 evaluate MAPPO and attacker adaptation. Read root `AGENTS.md`,
 `docs/implementation-plan.md`, `docs/contracts.md`,
-`cage-challenge-4/blue-agent-plan.md`, and the correction at the top of
-`cage-challenge-4/handoff.md` before changing code.
+`docs/archive/blue-agent-plan.md`, and the correction at the top of
+`docs/archive/handoff.md` before changing code.
 
 ## Current Blue changes
 
 Committed in `7b76fc2` and `58b6cc7` on `blue/foundation`:
 
-- Reworked `cage-challenge-4/cc4_epymarl_wrapper.py`: reset the shared simulator
+- Reworked `blue/cc4_epymarl_wrapper.py`: reset the shared simulator
   once, apply explicit seeds and advance the RNG when none is supplied, reject
   host overflow instead of truncating, track exactly one pending action per
   agent, merge observations for every visible host every tick, keep simulator
@@ -91,10 +91,10 @@ Committed in `7b76fc2` and `58b6cc7` on `blue/foundation`:
   discrete actions, 2550 concatenated state.
 - `CC4BlueWrapper` is a single-agent facade over the same joint-step
   implementation rather than a parallel copy of the bookkeeping.
-- Reworked `cage-challenge-4/blue_action_masking.py`: pending actions no longer
+- Reworked `blue/blue_action_masking.py`: pending actions no longer
   overwrite belief, `Restore` stays reachable in validity mode, and successful
   remediation transitions to `VERIFY` instead of declaring the host clean.
-- Added `cage-challenge-4/tests_blue/test_foundation.py`.
+- Added `blue/tests_blue/test_foundation.py`.
 - Added live tests for lost target sessions (Analyse/Remove/Restore returning
   `FALSE` when the child session disappears mid-action, with the original target
   still attributed and no clean label inferred), overdue-action failure, reset
@@ -246,8 +246,8 @@ the ≥30-seed held-out suite from the Blue plan is Evaluation's build, not this
 > Continue the Blue defender work in `G:\Projects\cyberally`. Read `AGENTS.md`,
 > `docs/current-state.md`, `docs/status/blue-session.md`, `docs/status/blue.md`,
 > `docs/contracts.md`, `docs/implementation-plan.md`,
-> `docs/coordination/blue-action-space.md`, `cage-challenge-4/blue-agent-plan.md`,
-> and the correction at the top of `cage-challenge-4/handoff.md`. Preserve my
+> `docs/coordination/blue-action-space.md`, `docs/archive/blue-agent-plan.md`,
+> and the correction at the top of `docs/archive/handoff.md`. Preserve my
 > work: inspect `git status --short --branch` and fetch origin first. Blue
 > work lives on singular branch `blue` (tracks `origin/blue`); the
 > `environment/` uv drafts stay uncommitted for Environment. Do not reset or

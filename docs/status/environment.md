@@ -5,7 +5,7 @@
 >
 > - **`main` is unblocked.** BLUE-01 wrapper fixes are merged; `main` and
 >   `blue/foundation` are both at `f8a9deb`. Branch from `main` and verify with
->   `cage-challenge-4/tests_blue/` before starting.
+>   `blue/tests_blue/` before starting.
 > - The agreed target is **Python 3.10**, not installed. The local venv is 3.12
 >   with no `torch`; `torch==2.2.0` has no cp312 wheel. The historical Linux venv
 >   is behind the current Windows work and should not be treated as the

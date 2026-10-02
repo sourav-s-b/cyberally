@@ -14,7 +14,7 @@ records the measured behaviour of the simulator, which branch currently holds a
 working wrapper, and the traps that will otherwise cost an assistant an afternoon.
 
 **Branch status:** `main` and `blue/foundation` are both at `f8a9deb` and hold
-identical content, including `cage-challenge-4/tests_blue/`. Everyone may branch
+identical content, including `blue/tests_blue/`. Everyone may branch
 from `main`. Up to `05999fb` the fixes existed only on `blue/foundation`; any note
 saying otherwise is out of date.
 

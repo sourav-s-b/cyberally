@@ -10,7 +10,7 @@ Two corrections that matter most:
 
 1. **Those wrapper fixes are now merged.** `blue/foundation` was fast-forwarded
    into `main`; both refs are at `f8a9deb` and hold the fixed wrapper plus
-   `cage-challenge-4/tests_blue/`. Branch from `main`. **History only:** when this
+   `blue/tests_blue/`. Branch from `main`. **History only:** when this
    file was written, `main` still had `max_hosts=16`
    with `vecs[:self.max_hosts]` truncation, five simulator resets per episode,
    host-local pending masks and no reachable `Restore`.

@@ -14,8 +14,8 @@ Read at session start:
    disagrees with it, say so instead of assuming.
 3. `docs/team-workflow.md` and `docs/contracts.md`.
 4. `docs/implementation-plan.md` and `docs/status/<your-role>.md`.
-5. Blue work: `cage-challenge-4/blue-agent-plan.md` and the correction at the
-   beginning of `cage-challenge-4/handoff.md`.
+5. Blue work: `docs/archive/blue-agent-plan.md` and the correction at the
+   beginning of `docs/archive/handoff.md`.
 6. Blue conversation continuity: `docs/status/blue-session.md` (latest working
    state, tests, outstanding work and a resume prompt).
 
@@ -42,8 +42,9 @@ naming, topology trimming and the EPyMARL fork; do not follow it as instructions
 
 ## Ownership and interfaces
 
-- Blue owns existing root-level `blue_*.py`, `cc4_epymarl_wrapper.py`, Blue tests,
-  training configs and Blue model code under `cage-challenge-4/`.
+- Blue owns `blue/` (`blue_*.py`, `cc4_epymarl_wrapper.py`, Blue tests,
+  training configs, results/). `cage-challenge-4/` is the pristine simulator;
+  do not add role code there.
 - Environment owns `environment/`, simulator changes, dependency/runtime setup.
 - Red owns `red/` and Red adapters. Propose required simulator hooks jointly with
   Environment instead of independently modifying core simulator behavior.

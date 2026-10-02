@@ -15,6 +15,17 @@ from copy import deepcopy
 from collections.abc import Mapping
 import numpy as np
 
+import os as _os
+import sys as _sys
+# Blue lives in blue/; the pristine simulator in cage-challenge-4/. This
+# insert (derived from __file__, not cwd) is the ONLY bridge between them:
+# everything else imports as siblings inside blue/.
+_CAGE = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    "cage-challenge-4")
+if _CAGE not in _sys.path:
+    _sys.path.insert(0, _CAGE)
+
 from CybORG import CybORG
 from CybORG.Simulator.Scenarios import EnterpriseScenarioGenerator
 from CybORG.Agents import SleepAgent, EnterpriseGreenAgent, DiscoveryFSRed
