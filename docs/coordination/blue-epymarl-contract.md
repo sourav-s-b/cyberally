@@ -6,9 +6,12 @@
   Evaluation (step-output reward shape, `episode_limit` bootstrapping flag) and
   Blue training configs. Red: none.
 - Related issue/PR and exact dependency commits: BASE `d05d043`; stacked on
-  BLUE-02 commit `4471c27` (independent files, no dependency). EPyMARL pinned
-  at `uoe-agents/epymarl@cbc38c09` (shallow clone, machine-temp, not in Git;
-  EPyMARL itself is NOT installed).
+   BLUE-02 commit `4471c27` (independent files, no dependency). EPyMARL pinned
+   at `uoe-agents/epymarl@cbc38c09`, vendored 2026-09-30 at
+   `third_party/epymarl/` (gitignored, src unmodified, PIN.txt + upstream
+   LICENSE/NOTICE retained) and linked into `.venv-train` via
+   `cyberally_epymarl.pth`; the SMAC-only `smaclite` dead import is stubbed
+   in Blue training glue (from-source-only package, not PyPI).
 
 ## Problem and current behavior
 

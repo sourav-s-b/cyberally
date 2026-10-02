@@ -1,0 +1,432 @@
+{
+ "run_id": "red-random-20261002",
+ "created": "2026-10-02T16:09:44",
+ "git_commit": "b559b1168e37daa60dbd624afdc7d7b5c8d0951f",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief",
+   "freshness",
+   "mission"
+  ],
+  "include_root_session": true,
+  "red_agent": "random"
+ },
+ "seeds": [
+  8001,
+  8002,
+  8003,
+  8004,
+  8005,
+  8006,
+  8007,
+  8008
+ ],
+ "policies": [
+  "hybrid_lancer_v2",
+  "round_robin",
+  "sleep"
+ ],
+ "policy_kwargs": {
+  "sleep": {},
+  "round_robin": {},
+  "hybrid_lancer_v2": {}
+ },
+ "workers": 6,
+ "start_method": "fork",
+ "interpreter": "/home/sourav/Projects/cyberally/cage-challenge-4/../.venv/bin/python",
+ "cells": {
+  "sleep": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": -281.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 16,
+     "root": 9
+    },
+    "snapshots": {
+     "200": {
+      "total": 16,
+      "root": 5,
+      "return": -84.0
+     }
+    }
+   },
+   "8004": {
+    "return": -1026.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 30,
+     "root": 15
+    },
+    "snapshots": {
+     "200": {
+      "total": 19,
+      "root": 9,
+      "return": -244.0
+     }
+    }
+   },
+   "8005": {
+    "return": -265.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 24,
+     "root": 8
+    },
+    "snapshots": {
+     "200": {
+      "total": 17,
+      "root": 3,
+      "return": -98.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": -5.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": -5.0
+     }
+    }
+   },
+   "8008": {
+    "return": -514.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 27,
+     "root": 15
+    },
+    "snapshots": {
+     "200": {
+      "total": 20,
+      "root": 6,
+      "return": -154.0
+     }
+    }
+   }
+  },
+  "round_robin": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "14097fc13d4fb0b851181e4f9ec50f362eed3d1c9c102ec305629195324a0e25",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "b07b9613b95b62b07cb9f7077e769329ef7da299dfd24fbea1ec8072a923f3ea",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": -179.0,
+    "steps": 399,
+    "trace_sha256": "0576d6967cb646a7f56589e570d9974e22749cd462065d8a6aa5739579334188",
+    "final": {
+     "total": 18,
+     "root": 1
+    },
+    "snapshots": {
+     "200": {
+      "total": 13,
+      "root": 3,
+      "return": -91.0
+     }
+    }
+   },
+   "8004": {
+    "return": -369.0,
+    "steps": 399,
+    "trace_sha256": "6d188d72ff46ace1d6b6dd989b2450e84ccbb8c38da693e355ee222389e2d395",
+    "final": {
+     "total": 20,
+     "root": 5
+    },
+    "snapshots": {
+     "200": {
+      "total": 14,
+      "root": 3,
+      "return": -114.0
+     }
+    }
+   },
+   "8005": {
+    "return": -254.0,
+    "steps": 399,
+    "trace_sha256": "0f4a4cd0a08c4bb9f2adc89cf7fc799f5b54005a4ae8d8dcf3a4a17c45d4f2a5",
+    "final": {
+     "total": 13,
+     "root": 3
+    },
+    "snapshots": {
+     "200": {
+      "total": 13,
+      "root": 5,
+      "return": -92.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "8d73878162ef8a0adcd4fc87ff556cfffa6c2c7223a6bfc52641a2424c3f95a2",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": -5.0,
+    "steps": 399,
+    "trace_sha256": "9ead5f52da95fba4f9d7be6d74de4ac83473559077ff7cf8608f00ab46357f7f",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": -5.0
+     }
+    }
+   },
+   "8008": {
+    "return": -247.0,
+    "steps": 399,
+    "trace_sha256": "63d25d9729c7465a6e4c09308f7e0a893e4d4c6c00b6971e5cd6ffd654b7b2b6",
+    "final": {
+     "total": 23,
+     "root": 4
+    },
+    "snapshots": {
+     "200": {
+      "total": 14,
+      "root": 4,
+      "return": -83.0
+     }
+    }
+   }
+  },
+  "hybrid_lancer_v2": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "06d5da965ce983b2a99f3bebd13428823ce13797570ef0e5af2a5ef562f449b2",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "afdba71ed8d230d60c0624be2671e1a05694ec73cbe8807fe59f1f05c397a76c",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": -125.0,
+    "steps": 399,
+    "trace_sha256": "37c6ebf899f3de4263e936ff1bdad10d205fe4c016e710ad12300eb2c1553055",
+    "final": {
+     "total": 17,
+     "root": 1
+    },
+    "snapshots": {
+     "200": {
+      "total": 10,
+      "root": 4,
+      "return": -67.0
+     }
+    }
+   },
+   "8004": {
+    "return": -273.0,
+    "steps": 399,
+    "trace_sha256": "a6aac94735bc3e443c2bc77e01791cc93bc69f03e2e4a8b27b13d24a8615d64d",
+    "final": {
+     "total": 16,
+     "root": 3
+    },
+    "snapshots": {
+     "200": {
+      "total": 16,
+      "root": 6,
+      "return": -112.0
+     }
+    }
+   },
+   "8005": {
+    "return": -246.0,
+    "steps": 399,
+    "trace_sha256": "0e634ca33476cfb0367049e95fe97fc2b9ee606c2c3bf85637ec9046dab1d683",
+    "final": {
+     "total": 16,
+     "root": 3
+    },
+    "snapshots": {
+     "200": {
+      "total": 17,
+      "root": 4,
+      "return": -115.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "c36e19b7e1f0c948da088faac2b844010cdcca5ac2040a4b4a5705e6dd61498e",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": -5.0,
+    "steps": 399,
+    "trace_sha256": "15b77f2128a33a8db242d231af9f2a7ca4540ef51125fbb6af1d2c29a742cad2",
+    "final": {
+     "total": 0,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 0,
+      "root": 0,
+      "return": -5.0
+     }
+    }
+   },
+   "8008": {
+    "return": -302.0,
+    "steps": 399,
+    "trace_sha256": "cafe9cf80a150c57361cecdb7d49cd9e7987225ac776d262cc882d0546853898",
+    "final": {
+     "total": 14,
+     "root": 1
+    },
+    "snapshots": {
+     "200": {
+      "total": 13,
+      "root": 3,
+      "return": -96.0
+     }
+    }
+   }
+  }
+ }
+}

@@ -8,7 +8,7 @@
   except that Red action labels may later map to TTP tags.
 - Related issue/PR and exact dependency commits: follows BLUE-01 wrapper
   (`7b76fc2`, merged as `f8a9deb`); consumes `host_to_vector` feature
-  definitions in `cage-challenge-4/blue_obs_features.py`. No dependency on
+  definitions in `blue/blue_obs_features.py`. No dependency on
   container, eBPF, or LLM-Red work — this proposal explicitly does not
   require any of it.
 
@@ -49,7 +49,7 @@ The code refines the sketch below; affected-role review is still required:
 Example, from the root (artifacts under ignored `runs/`):
 
 ```powershell
-.venv-train/Scripts/python.exe cage-challenge-4/blue_collect_telemetry.py --output runs/telemetry-demo --seeds 8123 8124 --steps 30 --policy round-robin
+.venv-train/Scripts/python.exe blue/blue_collect_telemetry.py --output runs/telemetry-demo --seeds 8123 8124 --steps 30 --policy round-robin
 ```
 
 The output directory must be new. JSONL contains five local agent snapshots per
@@ -87,7 +87,7 @@ schemas**; no consumer is forced to move, and nothing about the simulation
 changes.
 
 ```python
-# New module (proposed): cage-challenge-4/blue_telemetry.py
+# New module (proposed): blue/blue_telemetry.py
 @dataclass(frozen=True)
 class ProcEvent:   # eBPF exec-shaped
     ts: int            # sim tick (NOT wall-clock; see Honesty clause)

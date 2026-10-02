@@ -1,0 +1,82 @@
+{
+ "run_id": "fact-traj-2793-20261002",
+ "created": "2026-10-02T14:19:54",
+ "git_commit": "287aa20eebaea876afe3525bbb66655f19ea1610",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief"
+  ],
+  "include_root_session": true
+ },
+ "seeds": [
+  7629,
+  7630,
+  7640
+ ],
+ "policies": [
+  "mappo_ckpt_factorized"
+ ],
+ "policy_kwargs": {
+  "mappo_ckpt_factorized": {
+   "ckpt_dir": "results/models/mappo_cc4_seed7_20261002T082828Z/2793"
+  }
+ },
+ "workers": 3,
+ "start_method": "spawn",
+ "interpreter": "/home/sourav/Projects/cyberally/cage-challenge-4/../.venv-train/bin/python",
+ "cells": {
+  "mappo_ckpt_factorized": {
+   "7629": {
+    "return": -19.0,
+    "steps": 399,
+    "trace_sha256": "460c7d16d0023c99bc1b3542f9081386f1d6b12a5c071a57450aa37a29c977d4",
+    "final": {
+     "total": 69,
+     "root": 42
+    },
+    "snapshots": {
+     "200": {
+      "total": 50,
+      "root": 28,
+      "return": -13.0
+     }
+    }
+   },
+   "7630": {
+    "return": -566.0,
+    "steps": 399,
+    "trace_sha256": "936b51479cd3ec22d52dc4ed04a6d0a99d3ebf9a1d5bfd8c8d9ba0f11dfbb2c8",
+    "final": {
+     "total": 54,
+     "root": 39
+    },
+    "snapshots": {
+     "200": {
+      "total": 45,
+      "root": 32,
+      "return": -41.0
+     }
+    }
+   },
+   "7640": {
+    "return": -197.0,
+    "steps": 399,
+    "trace_sha256": "d8340f69b0cb69e9939809cd7f6bc0c446fe0300616fc151197b6733db09c471",
+    "final": {
+     "total": 52,
+     "root": 33
+    },
+    "snapshots": {
+     "200": {
+      "total": 46,
+      "root": 29,
+      "return": -75.0
+     }
+    }
+   }
+  }
+ }
+}

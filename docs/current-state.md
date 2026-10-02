@@ -27,7 +27,7 @@ this workspace on 2026-09-30. Anything not measured here is marked as planned.
 
 `blue/foundation` was fast-forwarded into `main` on 2026-09-30. **Both refs are
 at `f8a9deb` and `main` contains everything Blue has built**, including
-`cage-challenge-4/tests_blue/`. Environment, Red and Evaluation should branch
+`blue/tests_blue/`. Environment, Red and Evaluation should branch
 from `main` normally:
 
 ```powershell
@@ -59,8 +59,8 @@ need to review the change:
 Verify the merge landed with:
 
 ```powershell
-git ls-tree origin/main --name-only cage-challenge-4/tests_blue/
-Select-String -Path cage-challenge-4/cc4_epymarl_wrapper.py -Pattern 'max_hosts=16'
+git ls-tree origin/main --name-only blue/tests_blue/
+Select-String -Path blue/cc4_epymarl_wrapper.py -Pattern 'max_hosts=16'
 ```
 
 The first must list `test_foundation.py`; the second must return nothing.
@@ -77,12 +77,12 @@ upstream.
 
 | File | Role | State |
 |---|---|---|
-| `cage-challenge-4/blue_obs_features.py` | 10 features per host → vector | works |
-| `cage-challenge-4/blue_action_masking.py` | evidence tracker + masks | works |
-| `cage-challenge-4/cc4_epymarl_wrapper.py` | 5-agent joint env, EPyMARL-shaped | works, **not** an EPyMARL integration |
-| `cage-challenge-4/blue_iforest_experiment.py`, `_v2.py` | anomaly detectors | **broken on this machine** (hardcoded `/home/sourav/...`), results not reproduced |
+| `blue/blue_obs_features.py` | 10 features per host → vector | works |
+| `blue/blue_action_masking.py` | evidence tracker + masks | works |
+| `blue/cc4_epymarl_wrapper.py` | 5-agent joint env, EPyMARL-shaped | works, **not** an EPyMARL integration |
+| `blue/blue_iforest_experiment.py`, `_v2.py` | anomaly detectors | **broken on this machine** (hardcoded `/home/sourav/...`), results not reproduced |
 | `cage-challenge-4/visualise_cc4.py` | SleepAgent spread plot | untested here |
-| `cage-challenge-4/tests_blue/test_foundation.py` | 20 live regression tests | all pass |
+| `blue/tests_blue/test_foundation.py` | 20 live regression tests | all pass |
 | `scripts/check_source.py` | syntax-only CI check | 163 files pass |
 
 `red/`, `environment/` and `loop_eval/` contain **only** an `AGENTS.md` scope
@@ -215,7 +215,7 @@ migration, global-default removal) are unreviewed.
 1. **`main` and `blue/foundation` are both at `f8a9deb` and hold identical
    content.** Branch from `main`. Earlier docs warned that `main` was broken;
    that was true up to `05999fb` and is now history. Section 0.
-2. **Dimensions in the old handoff are unsafe.** `cage-challenge-4/handoff.md`
+2. **Dimensions in the old handoff are unsafe.** `docs/archive/handoff.md`
    once instructed `obs_shape=160, state_shape=800, n_actions=50`. Those are
    marked superseded. Always derive shapes from `get_env_info()`.
 3. **`TrueStateWrapper` is broken against this CAGE4 snapshot.**

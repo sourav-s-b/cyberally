@@ -45,9 +45,13 @@ those warnings are obsolete. Verify your clone with the commands in
 | `cage-challenge-4/team-guide.md` | **Superseded** original planning doc; read the banner before using |
 | `red/`, `environment/`, `loop_eval/` | New team-owned integration work; scope files only so far |
 | `docs/` | Shared contracts, roadmap, handoffs and references |
-| `Zeroth_main.pptx` | Original review deck; aspirational claims are not measured results |
+| `assets/Zeroth_main.pptx` | Original review deck; aspirational claims are not measured results |
 
-Keep the current simulator and Blue file locations to avoid breaking imports.
+Layout rule: `cage-challenge-4/` is the pristine simulator (do not add
+role code there); Blue code lives in `blue/` (run it with cwd=`blue/`);
+only `blue/cc4_epymarl_wrapper.py` bridges to `CybORG` via a
+`__file__`-derived path insert. Keep these locations to avoid breaking
+imports.
 Use one shared remote repository, separate clones/worktrees, and task branches.
 The local initial setup starts Blue on `blue/foundation`; other teammates create
 their task branches from the shared `main` after cloning.

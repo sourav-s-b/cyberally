@@ -5,10 +5,10 @@ external deployment or messaging. Replace placeholders with the real task/branch
 
 **Every prompt below starts the same way, for a reason:** `origin/main` and
 `blue/foundation` currently differ in behaviour, not just in content. The `main`
-copy of `cage-challenge-4/cc4_epymarl_wrapper.py` silently truncates host
+copy of `blue/cc4_epymarl_wrapper.py` silently truncates host
 observations to 16 hosts, resets the shared simulator five times per episode and
 cannot reach `Restore`. Verify with
-`git show origin/main:cage-challenge-4/cc4_epymarl_wrapper.py | Select-String max_hosts`
+`git show origin/main:blue/cc4_epymarl_wrapper.py | Select-String max_hosts`
 before you write code, and record which branch you based your work on.
 
 ---
@@ -19,7 +19,7 @@ before you write code, and record which branch you based your work on.
 > `AGENTS.md`, then `docs/current-state.md`, `docs/contracts.md`,
 > `docs/implementation-plan.md`, `docs/status/blue.md`,
 > `docs/coordination/blue-action-space.md`, and the correction at the top of
-> `cage-challenge-4/handoff.md`. BLUE-01 is implemented with 20 passing tests and
+> `docs/archive/handoff.md`. BLUE-01 is implemented with 20 passing tests and
 > **is merged into `main`** (both refs at `f8a9deb`), so branch from `main`
 > normally and treat the earlier "main is broken" warnings as obsolete. Then
 > implement BLUE-02 heuristic baselines (Sleep, built-in random,

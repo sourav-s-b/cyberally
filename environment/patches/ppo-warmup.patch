@@ -1,0 +1,48 @@
+--- a/src/learners/ppo_learner.py
++++ b/src/learners/ppo_learner.py
+@@ -38,6 +38,20 @@
+             rew_shape = (1,) if self.args.common_reward else (self.n_agents,)
+             self.rew_ms = RunningMeanStd(shape=rew_shape, device=device)
+ 
++        # Critic-only warmup (CAGE4 addition, NOT upstream EPyMARL).
++        # When warmup_only_critic is set, the actor is held bit-identical for
++        # the first warmup_steps env steps while the critic is fitted to
++        # on-policy data from the frozen policy. Motivated by WSRL
++        # (ICLR 2025, arXiv:2412.07762): value divergence at the onset of
++        # on-policy fine-tuning unlearns the pretrained policy. Read via
++        # getattr so upstream configs without these keys keep working.
++        self.warmup_only_critic = getattr(args, "warmup_only_critic", False)
++        self.warmup_steps = getattr(args, "warmup_steps", 0)
++        self.warmup_frozen_steps = 0
++
++    def _warmup_active(self, t_env: int) -> bool:
++        return bool(self.warmup_only_critic) and t_env < self.warmup_steps
++
+     def train(self, batch: EpisodeBatch, t_env: int, episode_num: int):
+         # Get the relevant quantities
+ 
+@@ -110,13 +124,17 @@
+                 / mask.sum()
+             )
+ 
+-            # Optimise agents
+-            self.agent_optimiser.zero_grad()
+-            pg_loss.backward()
+-            grad_norm = th.nn.utils.clip_grad_norm_(
+-                self.agent_params, self.args.grad_norm_clip
+-            )
+-            self.agent_optimiser.step()
++            # Optimise agents (skipped during critic-only warmup)
++            grad_norm = th.tensor(0.0)
++            if not self._warmup_active(t_env):
++                self.agent_optimiser.zero_grad()
++                pg_loss.backward()
++                grad_norm = th.nn.utils.clip_grad_norm_(
++                    self.agent_params, self.args.grad_norm_clip
++                )
++                self.agent_optimiser.step()
++            else:
++                self.warmup_frozen_steps += 1
+ 
+         self.old_mac.load_state(self.mac)
+ 
