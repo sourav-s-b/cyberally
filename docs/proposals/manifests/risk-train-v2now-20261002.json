@@ -1,0 +1,19 @@
+{
+ "run_id": "risk-train-v2now-20261002",
+ "model_path": "results/risk_model_v2now.pkl",
+ "data": "results/risk_data_v2.npz",
+ "data_sha256": "cc5416439f277cd8",
+ "n_rows": 244986,
+ "pos_rate": 0.27821589805131725,
+ "metrics": {
+  "auc_all": 0.5174969241166322,
+  "auc_unknown_only": 0.5165441794587959,
+  "unknown_frac": 0.9774885095474843
+ },
+ "config": {
+  "l2": 1.0,
+  "lr": 0.5,
+  "iters": 500,
+  "seed": 0
+ }
+}

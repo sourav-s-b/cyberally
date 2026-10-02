@@ -24,6 +24,11 @@ REGISTRY = {
     "hybrid_lancer_v2": ("blue_hybrid", "HybridBluePolicy",
                          {"priority_fn": "lancer",
                           "priority_kwargs": {"fruitless_decay": 0.5}}),
+    # Learned risk scorer (model weights live outside git under results/).
+    "hybrid_risk": ("blue_hybrid", "HybridBluePolicy",
+                    {"priority_fn": "risk",
+                     "priority_kwargs": {
+                         "model_path": "results/risk_model_v2.pkl"}}),
 }
 
 TORCH_POLICIES = {"mappo_ckpt"}

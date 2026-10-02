@@ -1,7 +1,7 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: drafted — v1 fails held-out replication; v2 == teacher parity.
-  Fixed constants exhausted; next is the adaptive risk scorer.
+- Status: drafted — snapshot risk scorer killed by coverage collapse.
+  Best fixed: lancer_v2 at teacher parity. Next: proposal 02.
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
@@ -132,6 +132,36 @@ improvement claim stands.
   scorer (learned per-host priority from Blue-visible features), which can
   condition on *why* a host looks suspicious instead of applying one bonus
   schedule everywhere.
+
+## Experiment 4: snapshot risk scorer (2026-10-02, TESTED, kills the path)
+
+- Dataset `blue_risk_data.py`: per-tick per-host 17-feat rows (10 base +
+  ages/belief) + privileged compromised-now labels, round-robin episodes on
+  fresh seeds 7901-7908 (244,986 rows, 27.8% pos). v2 adds 4 view-delta
+  features (lancer's Monitor-novelty in feature form) -> 21 feats.
+- Trainer `blue_train_risk.py`: numpy-only L2 logreg, class-balanced,
+  deterministic; no sklearn in either venv (uv install timed out), which
+  turned out fine. Two bugs caught by tests before trusting numbers: a
+  misranked `auc()` (reported 0.52; true 0.67-0.68) and a NameError.
+  Manifests `risk-train-v1/v2/v2now-20261002.json`.
+- Gate results: AUC 0.67 undetected / 0.68 now (bar was >= 0.65) — real but
+  modest signal. Deltas added nothing (0.670 vs 0.668).
+- Scorer `RiskPriority` (batched per agent/tick, pure proba, 8 unit tests):
+  pool `risk-v1-20261002` / `risk-heldout-20261002`:
+
+| policy | regr mean | held-out mean |
+|---|---|---|
+| hybrid_risk | -196.6 ± 150.8 | -190.8 ± 153.1 |
+| round_robin | -93.5 ± 27.8 | -85.1 ± 46.1 |
+
+Worse on 15/16 seeds. Mechanism confirmed on seed 7630: same analysis
+count (803 vs 793) but only 27 distinct hosts vs 67 — pure proba has no
+touch-decay/recency dynamics, so it fixates and starves coverage. AUC
+0.67 does not convert to episode return without ordering dynamics.
+- Verdict: snapshot risk scoring CLOSED (would need risk x recency
+  dynamics — noted, not built). The program's best remains lancer_v2 at
+  teacher parity; ordering edge must come from architecture (proposal 02),
+  not snapshot classification.
 
 Remaining, not yet run: (1) lancer-style priority + punch-style
 file-density>0.9 flag + UC-style persistent malicious-event flags, same

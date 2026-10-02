@@ -835,6 +835,17 @@ no improvement claim stands; next is the adaptive risk scorer, not more
 constant-tuning. Manifests `lancer-v2-20261002.json`,
 `lancer-heldout-20261002.json`. Sim suite: 94 passed, 5 skipped.
 
+## Snapshot risk scorer killed (2026-10-02)
+
+`blue_risk_data.py` (245k rows, fresh seeds 7901-7908) + `blue_train_risk.py`
+(numpy logreg; AUC 0.67 undetected) + `RiskPriority` scorer + registry
+`hybrid_risk` + 11 tests, all passing. Pool: hybrid_risk -196.6 / -190.8 vs
+teacher -93.5 / -85.1 (worse 15/16 seeds). Cause confirmed: 803 analyses on
+27 hosts vs 793 on 67 — pure proba fixates, no touch dynamics. AUC without
+ordering dynamics is worthless. Path closed in proposal 01; best remains
+lancer_v2 parity. Next: proposal 02 (factorized actor). Sim suite: 102
+passed, 5 skipped.
+
 ## Parallel eval harness (2026-10-02)
 
 Per approved plan: `cage-challenge-4/blue_policy_registry.py` (picklable

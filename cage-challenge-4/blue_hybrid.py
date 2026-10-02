@@ -19,6 +19,9 @@ inputs — see contracts: only observations entering actors/masks are
 Blue-restricted.
 """
 
+import os
+import pickle
+
 import numpy as np
 
 import cc4_epymarl_wrapper as wrapper
@@ -240,6 +243,7 @@ class LancerPriority:
 
 PRIORITY_BUILDERS = {
     "lancer": LancerPriority,
+    # "risk" handled in make_priority (needs model_path to locate weights).
 }
 
 
@@ -247,8 +251,93 @@ def make_priority(spec, **kwargs):
     """Build a priority scorer from a string spec (or pass through)."""
     if spec is None or callable(spec):
         return spec
+    if spec == "risk":
+        return RiskPriority(**kwargs)
     try:
         return PRIORITY_BUILDERS[spec](**kwargs)
     except KeyError:
         raise ValueError(f"unknown priority {spec!r}; known: "
                          f"{sorted(PRIORITY_BUILDERS)}")
+
+
+class RiskPriority:
+    """Learned P(compromised | Blue-visible features) sweep scorer.
+
+    Loads a blue_train_risk.py model (weights + standardization) and scores
+    each sweep candidate with its predicted probability. Features replicate
+    the training rows exactly: 10 base + ages/belief temporal + 4 view
+    deltas, so the collector, trainer, and scorer share one contract
+    (RISK_GROUPS, RISK_DELTAS below). Only features enter at select time;
+    privileged labels were training targets only.
+
+    Predictions are batched per (agent, tick) and cached: one model pass
+    per agent per tick instead of one per candidate. ``env._tick`` keys the
+    cache; without it every call rebuilds (correct, slower). Scores are
+    pure probabilities -- ties break by host string in HybridBluePolicy.
+    A coverage collapse would show immediately in pool eval (kept as an
+    empirical guard, not extra mechanism).
+    """
+
+    GROUPS = ("ages", "belief")
+    N_DELTA = 4
+    DELTA_IDX = (6, 7, 8, 9)  # into the 10 base features
+
+    def __init__(self, model_path):
+        from blue_obs_features import temporal_len
+        path = model_path
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                path)
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"risk model not found: {path}")
+        with open(path, "rb") as f:
+            model = pickle.load(f)
+        self.w = np.asarray(model["w"], dtype=np.float64)
+        self.b = float(model["b"])
+        self.mean = np.asarray(model["mean"], dtype=np.float64)
+        self.std = np.asarray(model["std"], dtype=np.float64)
+        expect = 10 + temporal_len(self.GROUPS) + self.N_DELTA
+        if model["n_feats"] != expect or len(self.w) != expect:
+            raise ValueError(
+                f"risk model geometry {model['n_feats']} != scorer {expect}")
+        self.model_path = path
+        self.reset()
+
+    def reset(self):
+        self._prev = {}
+        self._cache_key = None
+        self._cache = {}
+
+    def _row(self, env, agent, host):
+        from blue_obs_features import host_to_temporal, host_to_vector
+        tracker = env.trackers[agent]
+        busy = agent in env._awaiting
+        base = host_to_vector(env.views[agent].get(host, {}), agent,
+                              env.subnets[agent][host]
+                              if isinstance(env.subnets[agent], dict)
+                              else env.subnets[agent])
+        row = (base + host_to_temporal(
+            tracker, host, env.observed_at[agent][host], env._tick,
+            env.episode_limit, busy, self.GROUPS))
+        sig = tuple(base[j] for j in self.DELTA_IDX)
+        key = (agent, host)
+        old = self._prev.get(key, sig)
+        row += [s - o for s, o in zip(sig, old)]
+        self._prev[key] = sig
+        return row
+
+    def _predict_all(self, env, agent):
+        hosts = env.hostnames[agent]
+        X = np.array([self._row(env, agent, h) for h in hosts],
+                     dtype=np.float64)
+        z = (X - self.mean) / self.std
+        p = 0.5 * (1.0 + np.tanh(0.5 * (z @ self.w + self.b)))
+        return dict(zip(hosts, (float(v) for v in p)))
+
+    def __call__(self, env, agent, host):
+        tick = getattr(env, "_tick", None)
+        key = (agent, tick)
+        if key != self._cache_key:
+            self._cache = self._predict_all(env, agent)
+            self._cache_key = key
+        return self._cache[host]
