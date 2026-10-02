@@ -81,3 +81,38 @@ RUNG 2 ROUTING (2026-10-02): RvS tied — proceed to IQL-discrete
 (expectile V tau 0.7–0.9, SARSA backup, AWR extraction over VALID actions
 only, factorized head). Same held-out gate. If IQL also ties, the ceiling
 is data (14-diagnostic, second clause) and 16/17 become mandatory.
+
+## Rung 2 results: IQL-discrete (2026-10-02, PARTIAL — regression win, gate failed)
+
+- Implementation: `blue_iql.py` — feedforward Q/V MLPs on single-step
+  transitions (obs already carries ages/belief), expectile V (tau 0.7),
+  MSE Q backup (gamma 0.99, target net), AWR extraction into a plain
+  factorized GRU (keys match EPyMARL layout → pool via
+  `mappo_ckpt_factorized`). `--awr-alpha` blends AWR with uniform BC.
+- Diagnostics healthy: loss_v 0.15, loss_q 1.6; adv std 0.54, max 6.9;
+  weights clip 0.03%.
+- Pure AWR (alpha=1.0) collapses a seed (-826 on 7630, touches 66 vs 86
+  hosts): mechanism CONFIRMED — AWR drops zero-advantage sweep actions and
+  narrows coverage. Beta 0.3 only halves it (-430). The `--awr-alpha`
+  coverage guardrail is the fix, not beta.
+- Regression-8 (RR -93.5 ± 27.8): alpha=1.0 → -174.8±265; 0.7 → -127.5±95;
+  0.3 → -136±152; **0.5 → -82.0±27.7, paired +11.5** (+21 +35 +1 +19 +68
+  +16 -48 -20). FIRST learned policy to beat the teacher MEAN on
+  regression, with teacher-matched variance.
+- Data follow-ups (regression): 60-ep log (added 8125–8160, tails to
+  -578) → -110.0±63.6; strong-40 (weak teacher filtered) → -100.4±26.3.
+  Both LOSE to the 24-ep mix: counter-intuitive, weak-teacher tails seem
+  to sharpen the envelope (or train-seed noise) — recorded, not concluded.
+- Held-out (alpha=0.5 champion, target of record): **-96.0 ± 47.5 vs RR
+  -85.1 ± 46.1, paired -10.9** (-25 -37 -16 -25 +17 +24 -2 -23). No
+  catastrophe, two seed wins (-34 and +24 diffs), but uniform mild
+  degradation elsewhere. GATE FAILED.
+- Manifests: `iql/a05/a03/a07/full/strong/heldout-20261002.json`.
+  Ckpts local-only (`results/models/iql_14*/`).
+- RUNG-2 VERDICT: stitching works IN-DISTRIBUTION (regression +11.5, 5/8
+  seed wins) but does not transfer — neither diagnostic clause fires
+  cleanly. The update is vindicated, transfer is the gap. Route: 16
+  (online improvement from the IQL ckpt, which now replaces attention as
+  the best init) and 17 (critic audit may explain the uniform held-out
+  degradation). Second held-out look budget: SPENT cautiously (one fair
+  run); further tuning stays regression-side; pristine 8201+ untouched.

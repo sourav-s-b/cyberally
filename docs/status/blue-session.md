@@ -999,6 +999,20 @@ Routing: rung 2 IQL-discrete. Sim 112/8; torch rvs/factorized/baseline
 tests pass. Manifests rvs/rvs-t80/rvs-heldout-20261002. Ckpt local-only
 (results/models/rvs_14/).
 
+## Proposal 14 rung 2: IQL stitches in-distribution, gate failed (2026-10-02)
+
+`blue_iql.py`: expectile-V + Q backup + AWR extraction into stock
+factorized GRU (pool via mappo_ckpt_factorized). Pure AWR collapses a
+seed (-826, 66 vs 86 hosts: drops zero-advantage sweeps — mechanism
+confirmed, beta can't fix, `--awr-alpha` blend is the fix). Alpha=0.5:
+regression -82.0±27.7 vs RR -93.5 (paired +11.5 — FIRST learned
+regression-beat); held-out -96.0±47.5 vs -85.1 (paired -10.9, no
+catastrophe, two seed wins). 60-ep and strong-40 logs both lose to the
+24-ep mix on regression (weak tails may sharpen envelope — open). Verdict:
+PARTIAL — update vindicated, transfer is the gap; route to 16 (IQL ckpt
+replaces attention as best init) + 17. Sim 112/9. Manifests
+iql/a05/a03/a07/full/strong/heldout-20261002. Ckpts local-only.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`
