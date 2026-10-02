@@ -33,6 +33,7 @@ later) · `parked` (valid but not now) · `rejected` (evidence against) ·
 | 11 | Balanced (inverse-sqrt) BC | tested | beats collapsed BC; still far from teacher |
 | 12 | Representation check (stalest-first) | tested | cursor recoverable from obs; bottleneck is architectural |
 | 13 | Factored-additive Q | rejected | misspecified for 1-of-155 exclusive choice |
+| 15 | Generalization suite | tested | red variety done; rates/durations pending Environment |
 
 Score-comparability rules (binding for every file here): our episodes are 400
 steps, official CAGE-4 is 500 — compare per-step rates, never raw totals.

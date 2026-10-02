@@ -53,7 +53,7 @@ def run_cell(cell):
         # flags as the rollout env; _build_ckpt forwards them to the probe.
         # mask_mode included so validity checks run under the same config.
         for key in ("temporal_features", "include_root_session",
-                    "mask_mode"):
+                    "mask_mode", "red_agent"):
             kwargs.setdefault(key, cell.get("env_kwargs", {}).get(key))
         kwargs.setdefault("steps", cell["steps"])
     policy = build(cell["policy"], **kwargs)
@@ -135,6 +135,10 @@ def main():
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--mask-mode", default="validity",
                     choices=["validity", "evidence"])
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=["discovery", "finite", "verbose", "random",
+                             "sleep"],
+                    help="red behavior variant (proposal 15)")
     ap.add_argument("--temporal-groups", nargs="*",
                     default=["ages", "belief", "freshness", "mission"])
     ap.add_argument("--drop-root-session", action="store_true")
@@ -163,7 +167,8 @@ def main():
     else:
         start_method = "fork"
     env_kwargs = {"temporal_features": tuple(cli.temporal_groups),
-                  "include_root_session": not cli.drop_root_session}
+                  "include_root_session": not cli.drop_root_session,
+                  "red_agent": cli.red_agent}
     run_id = cli.run_id or (time.strftime("%Y%m%dT%H%M%S") + "-eval")
     cells = build_cells(cli.policies, policy_kwargs, cli.seeds, cli.steps,
                         cli.mask_mode, env_kwargs)

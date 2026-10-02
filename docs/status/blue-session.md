@@ -916,6 +916,20 @@ caught a flipped expectation). KL run (coef 0.1, same config): KL stat
 anyway. Closed absent a better distill. Sim 102/7-skip (torch tests skip);
 train 16 passed. Full record in proposal 02.
 
+## Generalization suite phase 1 (2026-10-02)
+
+Wrapper `red_agent=` flag (discovery/finite/verbose/random/sleep; default
+preserves all prior results) + pool `--red-agent` + `test_red_variants.py`
+(3 tests). 5 reds x 3 policies x fresh seeds 8001-8008 (120 cells):
+finite much harsher than discovery (-139 vs -59 teacher); verbose bit-
+identical to finite (printing-only subclass — expected, good determinism
+cross-check); random mild; sleep-red all zeros (flag sanity). lancer_v2 ≈
+teacher on every red (±15, noise) — regression win does not transfer.
+Proposal 15 + manifests `red-*-20261002.json`. Green rates/durations need
+simulator hooks: coordination proposal `docs/coordination/blue-red-
+variants.md` (draft, needs Environment review; Blue will not modify core
+sim).
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

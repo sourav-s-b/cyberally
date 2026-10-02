@@ -25,6 +25,19 @@ import numpy as np
 from CybORG import CybORG
 from CybORG.Simulator.Scenarios import EnterpriseScenarioGenerator
 from CybORG.Agents import SleepAgent, EnterpriseGreenAgent, DiscoveryFSRed
+from CybORG.Agents.SimpleAgents.FiniteStateRedAgent import FiniteStateRedAgent
+from CybORG.Agents.SimpleAgents.FSMRedVariants import VerboseFSRed
+from CybORG.Agents.SimpleAgents.RandomSelectRedAgent import RandomSelectRedAgent
+
+# Generalization suite (proposal 15): red behavior is a config flag, not a
+# code change. Names mirror the published CAGE-4 variants plus in-tree reds.
+RED_AGENTS = {
+    "discovery": DiscoveryFSRed,  # default; matches all prior results
+    "finite": FiniteStateRedAgent,
+    "verbose": VerboseFSRed,
+    "random": RandomSelectRedAgent,
+    "sleep": SleepAgent,
+}
 from CybORG.Simulator.Actions import Sleep
 from CybORG.Simulator.Actions.AbstractActions import Monitor, Analyse, Remove, Restore
 from blue_obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
@@ -84,7 +97,8 @@ class CC4MARLEnv:
                  mask_mode="validity", common_reward=False,
                  reward_scalarisation="sum", per_agent_bounds=False,
                  seed_cycle=None, temporal_features=(),
-                 include_root_session=True, shaping=None):
+                 include_root_session=True, shaping=None,
+                 red_agent="discovery"):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
@@ -98,6 +112,10 @@ class CC4MARLEnv:
                 raise ValueError(f"unknown shaping keys: {sorted(unknown)}")
         if reward_scalarisation not in ("sum", "mean"):
             raise ValueError("reward_scalarisation must be sum or mean")
+        if red_agent not in RED_AGENTS:
+            raise ValueError(f"unknown red_agent {red_agent!r}; known: "
+                             f"{sorted(RED_AGENTS)}")
+        self.red_agent = red_agent
         if per_agent_bounds and max_hosts != DEFAULT_MAX_HOSTS:
             raise ValueError("explicit max_hosts is incompatible with "
                              "per_agent_bounds (bounds come from the scenario)")
@@ -155,7 +173,8 @@ class CC4MARLEnv:
         self.n_actions = max(self.n_actions_per_agent)
         self.obs_size = max(self.obs_size_per_agent)
         sg = EnterpriseScenarioGenerator(blue_agent_class=SleepAgent,
-            green_agent_class=EnterpriseGreenAgent, red_agent_class=DiscoveryFSRed,
+            green_agent_class=EnterpriseGreenAgent,
+            red_agent_class=RED_AGENTS[self.red_agent],
             steps=steps)
         self.cyborg = CybORG(scenario_generator=sg, seed=seed)
         self.env = self.cyborg.environment_controller
@@ -307,6 +326,7 @@ class CC4MARLEnv:
                 "host_vector_len": self.host_vector_len,
                 "include_root_session": self.include_root_session,
                 "shaping": dict(self.shaping) if self.shaping else None,
+                "red_agent": self.red_agent,
                 "wrapper_version": WRAPPER_VERSION}
 
     def _consume(self, agent, data):
