@@ -20,7 +20,7 @@ later) · `parked` (valid but not now) · `rejected` (evidence against) ·
 
 | # | Proposal | Status | Verdict |
 |---|---|---|---|
-| 01 | Hybrid rules + learned priority | tested | lancer_v2 at teacher parity; snapshot risk killed; fixed constants exhausted |
+| 01 | Hybrid rules + learned priority | tested | CLOSED: lancer_v2 parity best; risk, snapshot, and riskx hybrids all fail held-out |
 | 02 | Host-then-command factorized actor | built+tested | attention distill at teacher parity (held-out); KL-PPO unlocked with stop-rules |
 | 03 | Entity-attention encoder | tested | 1-layer attention in factorized head; parity driver (see 02 Exp3) |
 | 04 | TERLA-style semantic action collapse | deferred | take action-waiting audit only |

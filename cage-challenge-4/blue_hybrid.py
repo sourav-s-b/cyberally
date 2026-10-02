@@ -181,7 +181,14 @@ class LancerPriority:
         self.novelty_boost = novelty_boost
         self.suspicious_bonus = suspicious_bonus
         self.fruitless_decay = fruitless_decay
-        self.reset()
+        # Inline field init (not self.reset(): subclasses override reset()
+        # and must not run it before their own state exists).
+        self._v = {}
+        self._acct_an = {}
+        self._acct_re = {}
+        self._state = {}
+        self._sig = {}
+        self._fruitless = {}
 
     def reset(self):
         self._v = {}
@@ -263,6 +270,8 @@ def make_priority(spec, **kwargs):
         return spec
     if spec == "risk":
         return RiskPriority(**kwargs)
+    if spec == "risk_recency":
+        return RiskRecencyPriority(**kwargs)
     try:
         return PRIORITY_BUILDERS[spec](**kwargs)
     except KeyError:
@@ -318,7 +327,11 @@ class RiskPriority:
             raise ValueError(
                 f"risk model geometry {model['n_feats']} != scorer {expect}")
         self.model_path = path
-        self.reset()
+        # Inline field init (not self.reset(): subclasses override reset()
+        # and must not run it before their own state exists).
+        self._prev = {}
+        self._cache_key = None
+        self._cache = {}
 
     def reset(self):
         self._prev = {}
@@ -358,3 +371,71 @@ class RiskPriority:
             self._cache = self._predict_all(env, agent)
             self._cache_key = key
         return self._cache[host]
+
+
+class RiskRecencyPriority(LancerPriority):
+    """Risk x recency hybrid (proposal 01, phase 3): learned snapshot
+    probability modulated by lancer touch dynamics, so scoring cannot
+    fixate the way pure proba did (Experiment 4: 803 analyses on 27
+    hosts). Three modes (constructor `mode`):
+
+    - "decay": score = proba * fruitless_decay**n_fruitless. High-risk
+      hosts get served first, but repeated fruitless re-analyses fade
+      them back into the rotation (coverage preserved structurally).
+    - "bonus": full lancer score + bonus_weight * proba. Lancer dynamics
+      unchanged; the model only reorders within them.
+    - "gate": hosts with proba >= gate_threshold are ordered by lancer
+      value; below threshold score -inf. If NO candidate passes, the gate
+      abstains and all hosts keep lancer values (never starve coverage).
+
+    Reuses RiskPriority as the proba engine (batched per agent/tick) and
+    LancerPriority for event tracking. Picklable (plain params + file
+    path); reset() clears both halves (called by HybridBluePolicy.reset
+    and the tick-regression guard).
+    """
+
+    MODES = ("decay", "bonus", "gate")
+
+    def __init__(self, model_path="results/risk_model_v2.pkl",
+                 mode="decay", fruitless_decay=0.5, bonus_weight=2.0,
+                 gate_threshold=0.3, **lancer_kwargs):
+        if mode not in self.MODES:
+            raise ValueError(f"unknown mode {mode!r}; known: {self.MODES}")
+        super().__init__(fruitless_decay=fruitless_decay, **lancer_kwargs)
+        self._risk = RiskPriority(model_path=model_path)
+        self.mode = mode
+        self.bonus_weight = bonus_weight
+        self.gate_threshold = gate_threshold
+        self._proba_key = None
+        self._proba = {}
+
+    def reset(self):
+        super().reset()
+        self._risk.reset()
+        self._proba_key = None
+        self._proba = {}
+
+    def _proba_dict(self, env, agent):
+        tick = getattr(env, "_tick", None)
+        key = (agent, tick)
+        if key != self._proba_key:
+            self._proba = self._risk._predict_all(env, agent)
+            self._proba_key = key
+        return self._proba
+
+    def __call__(self, env, agent, host):
+        self._sync(env, agent)  # lancer event tracking (idempotent)
+        key = (agent, host)
+        proba = self._proba_dict(env, agent)[host]
+        if self.mode == "decay":
+            return proba * (self.fruitless_decay
+                            ** self._fruitless.get(key, 0))
+        if self.mode == "bonus":
+            base = LancerPriority.__call__(self, env, agent, host)
+            return base + self.bonus_weight * proba
+        # gate mode
+        if proba >= self.gate_threshold:
+            return self._v.get(key, self.init)
+        if max(self._proba_dict(env, agent).values()) < self.gate_threshold:
+            return self._v.get(key, self.init)  # gate abstains: no starve
+        return -1e9

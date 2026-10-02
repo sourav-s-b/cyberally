@@ -34,6 +34,17 @@ REGISTRY = {
                     {"priority_fn": "risk",
                      "priority_kwargs": {
                          "model_path": "results/risk_model_v2.pkl"}}),
+    # Risk x recency hybrids (proposal 01 phase 3): snapshot proba with
+    # touch-decay dynamics. Gate: beat lancer_v2 on held-out, not regr.
+    "hybrid_rx_decay": ("blue_hybrid", "HybridBluePolicy",
+                        {"priority_fn": "risk_recency",
+                         "priority_kwargs": {"mode": "decay"}}),
+    "hybrid_rx_bonus": ("blue_hybrid", "HybridBluePolicy",
+                        {"priority_fn": "risk_recency",
+                         "priority_kwargs": {"mode": "bonus"}}),
+    "hybrid_rx_gate": ("blue_hybrid", "HybridBluePolicy",
+                       {"priority_fn": "risk_recency",
+                        "priority_kwargs": {"mode": "gate"}}),
 }
 
 TORCH_POLICIES = {"mappo_ckpt", "mappo_ckpt_factorized"}

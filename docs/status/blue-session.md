@@ -945,6 +945,18 @@ identical. Cost ~500 s/8 cells. Full record proposal 02 Exp3, proposal 03
 tested. Ladder gate PASSED; KL-PPO unlocked with stop-rules. Sim 108/7;
 train 22 passed.
 
+## Risk x recency gate failed (2026-10-02)
+
+Phase 3. `RiskRecencyPriority` (decay/bonus/gate) + 3 registry entries;
+unit-caught init-order trap fixed (overridden reset mid-construction).
+Pool 5x8x2 (80 cells): decay -203/-105, bonus -186/-251, gate -96/-165
+vs teacher -93.5/-85.1 and lancer_v2 -75.2/-91.2. Gate (beat lancer_v2
+held-out) FAILED all three: decay adds noise not signal, bonus inherits
+fixations, gate doesn't abstain safely. Lesson: 0.67-AUC snapshot signal
+can't survive the coverage trade with or without dynamics; only supervised
+ordering-learning (attention distill) reached parity. Proposal 01 CLOSED.
+Sim 112/7. Manifests `riskx-20261002.json`, `riskx-heldout-20261002.json`.
+
 ## Resume prompt for a new conversation
 
 > Continue the Blue defender work in your checkout (was `G:\Projects\cyberally`

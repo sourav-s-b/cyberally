@@ -129,3 +129,62 @@ def test_tick_regression_auto_resets(quiet):
     policy.select(quiet, agent)  # quiet._tick small -> guard fires
     assert policy._tick_seen[agent] == quiet._tick
     assert policy._cursor.get(agent) != 99
+
+
+def _toy_risk_model(path, bias):
+    import pickle as _pickle
+    model = {"w": [0.0] * 21, "b": bias,
+             "mean": [0.0] * 21, "std": [1.0] * 21, "n_feats": 21}
+    with open(path, "wb") as f:
+        _pickle.dump(model, f)
+    return path
+
+
+def test_risk_recency_decay_math(quiet, tmp_path):
+    from blue_hybrid import RiskRecencyPriority
+    path = _toy_risk_model(str(tmp_path / "m.pkl"), -1.0)
+    scorer = RiskRecencyPriority(model_path=path, mode="decay")
+    agent = "blue_agent_0"
+    host = quiet.hostnames[agent][0]
+    s0 = scorer(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 5
+    s1 = scorer(quiet, agent, host)
+    quiet.trackers[agent].last_analysis[host] = 9
+    s2 = scorer(quiet, agent, host)
+    assert s1 == pytest.approx(s0 * 0.5)
+    assert s2 == pytest.approx(s0 * 0.25)
+
+
+def test_risk_recency_bonus_adds_to_lancer(quiet, tmp_path):
+    from blue_hybrid import LancerPriority, RiskRecencyPriority
+    path = _toy_risk_model(str(tmp_path / "m.pkl"), 0.0)
+    agent = "blue_agent_0"
+    host = quiet.hostnames[agent][0]
+    lancer = LancerPriority(fruitless_decay=0.5)
+    rx = RiskRecencyPriority(model_path=path, mode="bonus",
+                             bonus_weight=2.0, fruitless_decay=0.5)
+    for _ in range(3):
+        lv = lancer(quiet, agent, host)
+        rv = rx(quiet, agent, host)
+    proba = rx._proba_dict(quiet, agent)[host]
+    assert rv == pytest.approx(lv + 2.0 * proba)
+
+
+def test_risk_recency_gate_abstains(quiet, tmp_path):
+    from blue_hybrid import RiskRecencyPriority
+    path = _toy_risk_model(str(tmp_path / "m.pkl"), -100.0)  # all ~0
+    scorer = RiskRecencyPriority(model_path=path, mode="gate",
+                                 gate_threshold=0.3)
+    agent = "blue_agent_0"
+    scores = [scorer(quiet, agent, h) for h in quiet.hostnames[agent]]
+    assert all(s > -1e8 for s in scores)  # abstain: lancer values, no -inf
+
+
+def test_risk_recency_bad_mode_and_pickle(tmp_path):
+    import pickle as _pickle
+    from blue_hybrid import RiskRecencyPriority
+    path = _toy_risk_model(str(tmp_path / "m.pkl"), 0.0)
+    with pytest.raises(ValueError, match="mode"):
+        RiskRecencyPriority(model_path=path, mode="nope")
+    blob = _pickle.dumps(RiskRecencyPriority(model_path=path, mode="gate"))
+    assert isinstance(_pickle.loads(blob), RiskRecencyPriority)

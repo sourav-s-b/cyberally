@@ -1,7 +1,8 @@
 # Proposal 01: Hybrid rules + learned scan priority
 
-- Status: tested — snapshot risk scorer killed by coverage collapse.
-  Best fixed: lancer_v2 at teacher parity. Next: proposal 02.
+- Status: tested — all ordering variants exhausted. Lancer_v2 parity
+  stands; risk hybrids fail the held-out gate. Program: attention
+  distill (02 Exp3) or generalization suite (15).
 - Draft: `cage-challenge-4/blue_hybrid.py` (`HybridBluePolicy`)
 - Date: 2026-10-01 / reviewed 2026-10-02
 
@@ -162,6 +163,36 @@ touch-decay/recency dynamics, so it fixates and starves coverage. AUC
   dynamics — noted, not built). The program's best remains lancer_v2 at
   teacher parity; ordering edge must come from architecture (proposal 02),
   not snapshot classification.
+
+## Experiment 5: risk x recency hybrids (2026-10-02, TESTED, gate failed)
+
+- Implementation: `RiskRecencyPriority` (subclasses lancer, embeds
+  `RiskPriority` as proba engine): (a) decay = proba x 0.5^fruitless;
+  (b) bonus = full lancer + 2.0 x proba; (c) gate = lancer-ordered among
+  proba >= 0.3, abstains to lancer values if none pass. Registry
+  `hybrid_rx_decay/bonus/gate`. Fixed a real init-order trap found by
+  tests (overridden `reset()` running mid-construction — inlined field
+  init in both scorer `__init__`s). 4 unit tests.
+- Pool, 5 policies x 8 seeds x 2 sets (80 cells), manifests
+  `riskx-20261002.json` / `riskx-heldout-20261002.json`:
+
+| policy | regr | held-out |
+|---|---|---|
+| round_robin | -93.5 ± 27.8 | -85.1 ± 46.1 |
+| hybrid_lancer_v2 | -75.2 ± 33.6 | -91.2 ± 48.5 |
+| hybrid_rx_decay | -203.4 ± 221.8 | -104.5 ± 45.8 |
+| hybrid_rx_bonus | -186.2 ± 176.5 | -251.1 ± 214.1 |
+| hybrid_rx_gate | -95.5 ± 23.8 | -164.9 ± 123.5 |
+
+- Gate (beat lancer_v2 on held-out): FAILED by all three. Decay is the
+  safest learned variant (uniformly ~-20, never catastrophic) but adds
+  noise, not signal. Bonus inherits risk fixations (-715, -367). Gate
+  does not abstain safely on hard seeds (-398, -318 at tau 0.3).
+- Lesson: AUC 0.67 snapshot signal is too weak to survive the
+  coverage/return trade at decision time, with or without dynamics.
+  Only the attention distill — which learns the ordering function
+  itself, supervised, with cross-slot comparison — reached parity.
+  Proposal 01 closed: no further ordering-variant spend.
 
 ## Pros
 
