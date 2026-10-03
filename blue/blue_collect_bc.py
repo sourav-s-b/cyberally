@@ -64,6 +64,12 @@ def collect_episode(seed, steps=400, teacher="rr"):
             "teacher": teacher, "return": float(rewards.sum())}
 
 
+def _collect_task(job):
+    """Picklable (seed, steps, teacher) unit for fork-parallel collection."""
+    seed, steps, teacher = job
+    return collect_episode(seed, steps=steps, teacher=teacher)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Collect BC demonstrations")
     parser.add_argument("--seeds", type=int, nargs="+",
@@ -78,13 +84,25 @@ def main():
     parser.add_argument("--mix", type=str, default=None,
                         help="comma-separated teachers cycled over seeds, "
                              "e.g. 'lancer_v2,rr,masked_random'")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="fork-parallel workers over seeds (Phase C; "
+                             "heuristic teachers need no torch, env is "
+                             "process-safe). 1 = serial (default).")
     parser.add_argument("--out", default="results/bc_demos_rr.npz")
     cli = parser.parse_args()
 
     teachers = cli.mix.split(",") if cli.mix else [cli.teacher]
-    episodes = [collect_episode(s, steps=cli.steps,
-                                teacher=teachers[k % len(teachers)])
-                for k, s in enumerate(cli.seeds)]
+    jobs = [(s, cli.steps, teachers[k % len(teachers)])
+            for k, s in enumerate(cli.seeds)]
+    if cli.workers > 1:
+        import concurrent.futures as cf
+        import multiprocessing as mp
+        ctx = mp.get_context("fork")
+        with cf.ProcessPoolExecutor(max_workers=cli.workers,
+                                    mp_context=ctx) as pool:
+            episodes = list(pool.map(_collect_task, jobs))
+    else:
+        episodes = [_collect_task(j) for j in jobs]
     lengths = [e["steps"] for e in episodes]
     max_len = max(lengths)
     n_agents = episodes[0]["obs"].shape[0]

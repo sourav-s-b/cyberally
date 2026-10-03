@@ -58,7 +58,16 @@ def main():
                              "actions have ~zero advantage and are dropped "
                              "by pure AWR.")
     parser.add_argument("--gamma", type=float, default=0.99)
-    parser.add_argument("--q-iters", type=int, default=20000)
+    parser.add_argument("--q-iters", type=int, default=None,
+                        help="Q/V update iters. Default: scaled to data "
+                             "(Q_EPOCHS passes over transitions; Phase C "
+                             "rule — fixed iters undertrain big logs and "
+                             "over-updating diverges, see proposal 14 "
+                             "Phase A). Set explicitly to override.")
+    parser.add_argument("--q-epochs", type=int, default=210,
+                        help="target passes over transitions when --q-iters "
+                             "is unset (24-ep @20k iters ~= 210 epochs, the "
+                             "stable rung-2 regime)")
     parser.add_argument("--batch", type=int, default=512)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--pol-epochs", type=int, default=30)
@@ -120,6 +129,11 @@ def main():
         for _ in range(n_agents):
             D[off + t - 1] = 1.0
             off += t
+    q_iters = cli.q_iters
+    if q_iters is None:
+        q_iters = max(1, int(cli.q_epochs * n_tr / cli.batch))
+        print(f"q-iters auto: {q_iters} ({cli.q_epochs} epochs x "
+              f"{n_tr} transitions / batch {cli.batch})")
     print(f"transitions: {n_tr} (from {n_eps} eps x {n_agents} agents), "
           f"free frac {F.mean():.3f}, reward range [{R.min():.1f}, {R.max():.1f}]")
 
@@ -136,7 +150,7 @@ def main():
     opt_q = th.optim.Adam(q.parameters(), lr=cli.lr)
     opt_v = th.optim.Adam(v.parameters(), lr=cli.lr)
 
-    for it in range(1, cli.q_iters + 1):
+    for it in range(1, q_iters + 1):
         idx = th.from_numpy(np.random.choice(n_tr, cli.batch, replace=False))
         s, a, r, ns, d = tS[idx], tA[idx], tR[idx], tNS[idx], tD[idx]
         with th.no_grad():
@@ -240,7 +254,8 @@ def main():
     with open(os.path.join(out, "iql_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "tau": cli.tau, "beta": cli.beta,
                    "awr_alpha": cli.awr_alpha,
-                   "gamma": cli.gamma, "q_iters": cli.q_iters,
+                   "gamma": cli.gamma, "q_iters": q_iters,
+                   "q_epochs": cli.q_epochs,
                    "pol_epochs": cli.pol_epochs,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "final_loss_v": float(loss_v), "final_loss_q": float(loss_q),

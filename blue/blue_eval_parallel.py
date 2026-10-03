@@ -31,6 +31,74 @@ if _HERE not in sys.path:
 MANIFEST_DIR = os.path.join(os.path.dirname(_HERE), "docs", "proposals",
                             "manifests")
 
+# Persisted cell-result cache (Phase C): results keyed by everything that
+# affects the number — policy spec, checkpoint bytes, code files, env
+# config, seed. Re-running teacher baselines across experiments then costs
+# zero cells. Cache lives in blue/.cache/ (gitignored); any code/ckpt
+# change alters the key, so stale hits require identical bytes.
+_CACHE_DIR = os.path.join(_HERE, ".cache")
+_CACHE_PATH = os.path.join(_CACHE_DIR, "pool_cells.json")
+# Source files whose bytes affect cell results (policies, harness, wrapper).
+_CACHE_SOURCES = ("blue_eval_parallel.py", "blue_baselines.py",
+                  "blue_policy_registry.py", "cc4_epymarl_wrapper.py",
+                  "blue_hybrid.py", "blue_eval_mappo.py", "blue_eval_rvs.py")
+
+
+def _file_sha(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _cell_key(cell):
+    """Content hash identifying a cell's result. Any change that could
+    alter the number (code, ckpt, config, seed) changes the key."""
+    parts = [cell["policy"], str(cell["seed"]), str(cell["steps"]),
+             cell.get("mask_mode", "validity"),
+             json.dumps(cell.get("env_kwargs", {}), sort_keys=True,
+                        default=str),
+             json.dumps(cell.get("policy_kwargs", {}), sort_keys=True,
+                        default=str)]
+    srcs = list(_CACHE_SOURCES)
+    kwargs = cell.get("policy_kwargs", {})
+    if "ckpt_dir" in kwargs:
+        ckpt = os.path.join(kwargs["ckpt_dir"], "agent.th")
+        if os.path.exists(ckpt):
+            parts.append("ckpt:" + _file_sha(ckpt))
+        else:
+            parts.append("ckpt:missing")
+    else:
+        parts.append("ckpt:heuristic")
+        try:
+            from blue_policy_registry import REGISTRY
+            if cell["policy"] in REGISTRY:
+                srcs.append(REGISTRY[cell["policy"]][0] + ".py")
+        except Exception:
+            pass
+    for src in sorted(set(srcs)):
+        p = os.path.join(_HERE, src)
+        if os.path.exists(p):
+            parts.append(src + ":" + _file_sha(p))
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
+
+
+def _load_cache():
+    try:
+        with open(_CACHE_PATH) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_cache(cache):
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    tmp = _CACHE_PATH + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(cache, f)
+    os.replace(tmp, _CACHE_PATH)
+
 
 def _canonical_trace(trace):
     return json.dumps([[t["step"], t["agent"], t["action"], t["host"]]
@@ -41,12 +109,31 @@ def trace_sha(trace):
     return hashlib.sha256(_canonical_trace(trace).encode()).hexdigest()
 
 
+# Per-worker policy cache (Phase C): ProcessPoolExecutor reuses worker
+# processes across cells, so a policy built once serves all its cells in
+# that worker. Safe because run_episode() calls policy.reset() at the
+# start of every episode, restoring deterministic RNG/hidden state —
+# cached reuse is bit-identical to fresh builds (covered by
+# test_eval_parallel equivalence + test_pool_policy_cache below).
+_POLICY_CACHE = {}
+
+
+def _cached_build(name, kwargs):
+    key = name + "|" + json.dumps(kwargs, sort_keys=True, default=str)
+    policy = _POLICY_CACHE.get(key)
+    if policy is None:
+        from blue_policy_registry import build
+        policy = build(name, **kwargs)
+        _POLICY_CACHE[key] = policy
+    return policy
+
+
 def run_cell(cell):
     """Execute one (policy, seed) cell. Must stay module-level (picklable)."""
     if _HERE not in sys.path:  # spawn re-import: fix path in the child
         sys.path.insert(0, _HERE)
     from blue_baselines import run_episode
-    from blue_policy_registry import build, needs_torch
+    from blue_policy_registry import needs_torch
     kwargs = dict(cell.get("policy_kwargs", {}))
     if needs_torch(cell["policy"]):
         # Size the checkpoint probe (and geometry checks) from the same env
@@ -58,7 +145,7 @@ def run_cell(cell):
             if val is not None:
                 kwargs.setdefault(key, val)
         kwargs.setdefault("steps", cell["steps"])
-    policy = build(cell["policy"], **kwargs)
+    policy = _cached_build(cell["policy"], kwargs)
     res = run_episode(policy, seed=cell["seed"], steps=cell["steps"],
                       snapshot_steps=tuple(cell.get("snapshot_steps",
                                                    (cell["steps"],))),
@@ -92,11 +179,42 @@ def build_cells(policies, policy_kwargs, seeds, steps, mask_mode, env_kwargs):
     return cells
 
 
-def run_pool(cells, workers, start_method):
-    ctx = mp.get_context(start_method)
-    with cf.ProcessPoolExecutor(max_workers=workers,
-                                mp_context=ctx) as pool:
-        return list(pool.map(run_cell, cells))
+def run_pool(cells, workers, start_method, use_cache=True):
+    """Run cells, serving content-hash cache hits without a worker.
+
+    Returns results aligned with ``cells``; each carries "cached": bool.
+    The persisted cache (blue/.cache/, gitignored) is keyed by code + ckpt
+    + config + seed, so hits are bit-identical reruns, not approximations.
+    """
+    cache = _load_cache() if use_cache else {}
+    pending, order, results = [], [], [None] * len(cells)
+    hits = 0
+    for i, cell in enumerate(cells):
+        key = _cell_key(cell)
+        if use_cache and key in cache:
+            r = dict(cache[key])
+            r["cached"] = True
+            results[i] = r
+            hits += 1
+        else:
+            order.append(i)
+            pending.append(cell)
+    if pending:
+        ctx = mp.get_context(start_method)
+        with cf.ProcessPoolExecutor(max_workers=workers,
+                                    mp_context=ctx) as pool:
+            fresh = list(pool.map(run_cell, pending))
+        for pos, (i, r) in enumerate(zip(order, fresh)):
+            r["cached"] = False
+            results[i] = r
+            if use_cache:
+                cache[_cell_key(pending[pos])] = {
+                    k: r[k] for k in ("policy", "seed", "return", "steps",
+                                      "trace_sha256", "final", "snapshots")}
+        if use_cache:
+            _save_cache(cache)
+    print(f"cache: {hits}/{len(cells)} hits", flush=True)
+    return results
 
 
 def write_manifest(run_id, cells, cell_results, steps, mask_mode, env_kwargs,

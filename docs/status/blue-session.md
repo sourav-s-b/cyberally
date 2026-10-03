@@ -1024,6 +1024,18 @@ champion → Phase B held-out look CANCELLED, one-look budget preserved.
 Lesson: rung-2 IQL is a lottery ticket; rung 3 needs value stabilization
 first (17-adjacent). Manifests iql-s1/s2-20261002 added.
 
+## Phase C: local speedups landed (2026-10-02)
+
+No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`
+auto-scales Q-iters to data in blue_iql.py (210-epoch stable regime;
+codifies the Phase A lesson); (2) `--workers` fork-parallel collection
+in blue_collect_bc.py, verified bit-identical vs serial; (3) per-worker
+policy cache in the pool (`_cached_build`, reset-per-episode reuse proven
+identical by new test); (4) persisted content-hash cell cache
+(blue/.cache/, gitignored; key = code + ckpt bytes + config + seed) —
+repeat teacher runs go 24.5s → 0.0s. Sim 114/9; torch 27 pass. Next: 16
+(JSRL/AWAC from IQL ckpt) + 17 (critic audit), now 5-10x cheaper to run.
+
 ## Repo layout cleanup (2026-10-02)
 
 cage-challenge-4/ is now the pristine simulator only (CybORG/ untouched
