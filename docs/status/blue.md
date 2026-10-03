@@ -1,5 +1,23 @@
 # Blue program summary (general index)
 
+## Research audit, 2026-10-03
+
+On `blue/mappo-training` at `a6eab7e` (main dependency `6f1d1ca`),
+[`blue-rl-feasibility-audit-20261003.md`](../research/blue-rl-feasibility-audit-20261003.md)
+reviews primary sources against the current Blue code and experiment records.
+It identifies an invalid FQE regression (logged actions ignored), an unused IQL
+target Q, lost final offline reward, extraction/deployment mask mismatch, and
+linear actor context that cancels in same-command host comparisons. The latest
+FQE note's value-indistinguishability conclusion is retracted pending a valid
+evaluation method. No new policy result or simulator check is claimed.
+Next: audit/fix the offline data and FQE equations, then compare episode-valid
+extraction and contextual host scoring on development seeds before more RL.
+This research document changes no shared schema or runtime contract and needs
+no dependent branch migration. Exact tests run: documentation `git diff --check`;
+training/simulator tests skipped because this handoff changes no executable
+code. PR review should verify paper links and algebra, and keep 8201+ final
+seeds untouched.
+
 Objective: a CAGE-4 Blue defender that beats the round-robin teacher
 (-93.5 ± 27.8, 400-step native episodes) and holds up off-distribution.
 Branch `blue/mappo-training` (pushed, tracks origin). Details live in
