@@ -1107,6 +1107,23 @@ best) => failure is rollout-side (recurrent drift F6), not values. New
 tool: FQE-vs-rollout divergence as drift detector for Stream D/V6.
 Next: Stream A (V1 validation splits BC/RvS).
 
+## Stream A done: V1 validation splits, gate FAILED on rollout (2026-10-03)
+
+New `blue/blue_val_split.py` (episode-blocked 80/20, Prechelt stopper
++ best-restore) wired into `blue_bc_pretrain.py` + `blue_rvs_pretrain.py`
+(--val-frac/--val-seed/--early-stop-patience; 0 = legacy). Class weights
+now train-episodes-only. BC gate: stopped == legacy (best epoch 30 =
+last; 12-ep log, 2-ep val, no overfit signal). RvS gate on
+offline_logs_14 (5 val eps): best val @25, restored; rollout target -50
+regression: legacy(epoch30) -81.8 vs stopped(@25) -101.9, paired -20.1
+(5/8 seeds worse). Manifest `val-v1-20261003.json` + pool manifests
+`rvs-v1legacy/rvs-v1stop-20261003.json`. Mechanism works (selects,
+restores, reports) but raw val CE does NOT predict rollout return --
+our own Mandlekar/Codevilla replication. Do NOT trust early stopping
+from val CE alone. Next: rollout-proxy validators (true-FQE rank
+stopped-vs-legacy ckpts; perturbed-trajectory val metric), then
+Stream B (V2 ESS gating in IQL).
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`

@@ -36,6 +36,12 @@ def main():
     parser.add_argument("--batch-seqs", type=int, default=16)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--val-frac", type=float, default=0.2,
+                        help="episode-blocked validation fraction (V1)")
+    parser.add_argument("--val-seed", type=int, default=0)
+    parser.add_argument("--early-stop-patience", type=int, default=8,
+                        help="Prechelt strips before stop + best restore; "
+                             "0 = legacy fixed --epochs")
     parser.add_argument("--attn-layers", type=int, default=0)
     parser.add_argument("--agent", default="rnn_factorized",
                         choices=("rnn", "rnn_factorized"))
@@ -49,6 +55,7 @@ def main():
 
     import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import blue_val_split as valsplit
     sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
     from modules.agents import REGISTRY as agent_REGISTRY
     import blue_factorized_agent as factorized
@@ -77,8 +84,17 @@ def main():
     seq_len = th.from_numpy(np.repeat(lengths, n_agents))
     n_seqs = seq_in.shape[0]
     in_dim = obs_dim + 1
+    # V1: episode-blocked split BEFORE any fitting (class weights included).
+    seq_episode = np.repeat(np.arange(n_eps), n_agents)
+    train_eps, val_eps = valsplit.blocked_split(n_eps, cli.val_frac,
+                                                cli.val_seed)
+    train_idx, val_idx = valsplit.seq_split(seq_episode, train_eps)
+    print(f"split: {len(train_eps)} train eps / {len(val_eps)} val eps "
+          f"(seed {cli.val_seed})")
+    stopper = valsplit.EarlyStopper(patience=cli.early_stop_patience)
 
-    freq = np.bincount(actions.reshape(-1), minlength=n_actions).astype(np.float64)
+    freq = np.bincount(actions[train_eps].reshape(-1),
+                       minlength=n_actions).astype(np.float64)
     weight = th.from_numpy((1.0 / np.sqrt(freq + 1.0)).astype(np.float32))
     weight = weight * (n_actions / weight.sum())
     loss_fn = th.nn.CrossEntropyLoss(weight=weight, reduction="none")
@@ -91,7 +107,7 @@ def main():
     agent = agent_REGISTRY[cli.agent](in_dim, args)
     opt = th.optim.Adam(agent.parameters(), lr=cli.lr)
 
-    order = np.arange(n_seqs)
+    order = train_idx.copy()
     tot_nonsleep_correct = tot_nonsleep = 0
     host_correct = host_toks = 0
     use_aux = cli.aux_host_weight > 0
@@ -101,7 +117,7 @@ def main():
     for epoch in range(1, cli.epochs + 1):
         np.random.shuffle(order)
         tot_loss, tot_correct, tot_toks = 0.0, 0, 0
-        for start in range(0, n_seqs, cli.batch_seqs):
+        for start in range(0, len(order), cli.batch_seqs):
             idx = order[start:start + cli.batch_seqs]
             b_in = seq_in[idx]
             b_act = seq_act[idx]
@@ -159,6 +175,40 @@ def main():
                   f"nonsleep-acc {tot_nonsleep_correct/max(tot_nonsleep,1):.4f}"
                   f"{host_acc_term if use_aux else ''}",
                   flush=True)
+        # V1 validation pass (no grad, same masking/weights).
+        with th.no_grad():
+            v_loss, v_toks = 0.0, 0
+            for start in range(0, len(val_idx), cli.batch_seqs):
+                idx = val_idx[start:start + cli.batch_seqs]
+                b_in = seq_in[idx]
+                b_act = seq_act[idx]
+                b_len = seq_len[idx]
+                b, t, _ = b_in.shape
+                hh = th.zeros(b, cli.hidden_dim)
+                logits = []
+                for step in range(t):
+                    q, hh = agent(b_in[:, step], hh)
+                    logits.append(q)
+                logits = th.stack(logits, dim=1)
+                free = (seq_mask[idx].sum(-1) > 1).float()
+                mask = ((th.arange(t).unsqueeze(0)
+                         < b_len.unsqueeze(1)).float() * free)
+                denom = mask.sum().clamp(min=1)
+                vl = (loss_fn(logits.reshape(-1, n_actions),
+                              b_act.reshape(-1)).reshape(b, t)
+                      * mask).sum() / denom
+                v_loss += float(vl) * int(mask.sum())
+                v_toks += int(mask.sum())
+            val_loss = v_loss / max(v_toks, 1)
+        print(f"epoch {epoch:3d} val-loss {val_loss:.4f} "
+              f"(best {stopper.best if stopper.best is not None else float('nan'):.4f} "
+              f"@{stopper.best_epoch})", flush=True)
+        if stopper.update(epoch, val_loss, agent):
+            print(f"early stop at epoch {epoch} "
+                  f"(best val {stopper.best:.4f} @{stopper.best_epoch})",
+                  flush=True)
+            break
+    stopper.restore(agent)
 
     import datetime
     out = cli.out or ("results/models/rvs_"
@@ -177,6 +227,10 @@ def main():
                    "attn_layers": cli.attn_layers,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "rtg_scale": RTG_SCALE, "weighted": True,
+                   "val_frac": cli.val_frac, "val_seed": cli.val_seed,
+                   "val_eps": [int(e) for e in val_eps],
+                   **{"val_" + k: v for k, v in
+                      stopper.summary().items()},
                    "final_acc": tot_correct / tot_toks,
                    "final_nonsleep_acc": (tot_nonsleep_correct
                                           / max(tot_nonsleep, 1))}, f, indent=1)

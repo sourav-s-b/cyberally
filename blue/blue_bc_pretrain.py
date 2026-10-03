@@ -28,6 +28,16 @@ def main():
     parser.add_argument("--batch-seqs", type=int, default=16)
     parser.add_argument("--hidden-dim", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--val-frac", type=float, default=0.2,
+                        help="episode-blocked validation fraction (V1; "
+                             "agents of an episode stay together)")
+    parser.add_argument("--val-seed", type=int, default=0,
+                        help="seed for the blocked split (inner/nested "
+                             "splits vary this)")
+    parser.add_argument("--early-stop-patience", type=int, default=8,
+                        help="Prechelt strips of rising val-loss before "
+                             "stop + best restore; 0 = legacy fixed "
+                             "--epochs (reproducible)")
     parser.add_argument("--attn-layers", type=int, default=0,
                         help="cross-slot self-attention layers in the "
                              "factorized head (proposal 03); 0 = off")
@@ -49,6 +59,7 @@ def main():
 
     import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import blue_val_split as valsplit
     sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
     from modules.agents import REGISTRY as agent_REGISTRY
     import blue_factorized_agent as factorized
@@ -69,6 +80,14 @@ def main():
     seq_mask = th.from_numpy(masks.reshape(-1, max_len, n_actions))
     seq_len = th.from_numpy(np.repeat(lengths, n_agents))
     n_seqs = seq_obs.shape[0]
+    # V1: episode-blocked split BEFORE any fitting (class weights included).
+    seq_episode = np.repeat(np.arange(n_eps), n_agents)
+    train_eps, val_eps = valsplit.blocked_split(n_eps, cli.val_frac,
+                                                cli.val_seed)
+    train_idx, val_idx = valsplit.seq_split(seq_episode, train_eps)
+    print(f"split: {len(train_eps)} train eps / {len(val_eps)} val eps "
+          f"(seed {cli.val_seed})")
+    stopper = valsplit.EarlyStopper(patience=cli.early_stop_patience)
 
     args = SN(hidden_dim=cli.hidden_dim, n_actions=n_actions, use_rnn=True,
               n_agents=n_agents, attn_layers=cli.attn_layers)
@@ -79,12 +98,13 @@ def main():
     # head; the sweep cursor itself IS recoverable from obs, see proposal
     # 12), so unweighted CE collapses to majority-class prediction and
     # never learns rare remediation.
-    freq = np.bincount(actions.reshape(-1), minlength=n_actions).astype(np.float64)
+    freq = np.bincount(actions[train_eps].reshape(-1),
+                       minlength=n_actions).astype(np.float64)
     weight = th.from_numpy((1.0 / np.sqrt(freq + 1.0)).astype(np.float32))
     weight = weight * (n_actions / weight.sum())
     loss_fn = th.nn.CrossEntropyLoss(weight=weight, reduction="none")
 
-    order = np.arange(n_seqs)
+    torder = train_idx.copy()
     tot_nonsleep_correct = tot_nonsleep = 0
     host_correct = host_toks = 0
     use_aux = cli.aux_host_weight > 0
@@ -92,10 +112,10 @@ def main():
         raise SystemExit("--aux-host-weight needs --agent rnn_factorized")
     aux_fn = th.nn.CrossEntropyLoss(ignore_index=-100, reduction="none")
     for epoch in range(1, cli.epochs + 1):
-        np.random.shuffle(order)
+        np.random.shuffle(torder)
         tot_loss, tot_correct, tot_toks = 0.0, 0, 0
-        for start in range(0, n_seqs, cli.batch_seqs):
-            idx = order[start:start + cli.batch_seqs]
+        for start in range(0, len(torder), cli.batch_seqs):
+            idx = torder[start:start + cli.batch_seqs]
             b_obs = seq_obs[idx]
             b_act = seq_act[idx]
             b_len = seq_len[idx]
@@ -157,6 +177,41 @@ def main():
                   f"nonsleep-acc {tot_nonsleep_correct/max(tot_nonsleep,1):.4f}"
                   f"{host_acc_term if use_aux else ''}",
                   flush=True)
+        # V1 validation pass (no grad, same masking/weights, hidden
+        # zero-init per sequence exactly as in training).
+        with th.no_grad():
+            v_loss, v_toks = 0.0, 0
+            for start in range(0, len(val_idx), cli.batch_seqs):
+                idx = val_idx[start:start + cli.batch_seqs]
+                b_obs = seq_obs[idx]
+                b_act = seq_act[idx]
+                b_len = seq_len[idx]
+                b, t, _ = b_obs.shape
+                hh = th.zeros(b, cli.hidden_dim)
+                logits = []
+                for step in range(t):
+                    q, hh = agent(b_obs[:, step], hh)
+                    logits.append(q)
+                logits = th.stack(logits, dim=1)
+                free = (seq_mask[idx].sum(-1) > 1).float()
+                mask = ((th.arange(t).unsqueeze(0)
+                         < b_len.unsqueeze(1)).float() * free)
+                denom = mask.sum().clamp(min=1)
+                vl = (loss_fn(logits.reshape(-1, n_actions),
+                              b_act.reshape(-1)).reshape(b, t)
+                      * mask).sum() / denom
+                v_loss += float(vl) * int(mask.sum())
+                v_toks += int(mask.sum())
+            val_loss = v_loss / max(v_toks, 1)
+        print(f"epoch {epoch:3d} val-loss {val_loss:.4f} "
+              f"(best {stopper.best if stopper.best is not None else float('nan'):.4f} "
+              f"@{stopper.best_epoch})", flush=True)
+        if stopper.update(epoch, val_loss, agent):
+            print(f"early stop at epoch {epoch} "
+                  f"(best val {stopper.best:.4f} @{stopper.best_epoch})",
+                  flush=True)
+            break
+    stopper.restore(agent)
 
     stamp = th.__version__  # noqa: keep linters quiet about unused import shape
     del stamp
@@ -198,6 +253,10 @@ def main():
                    "attn_layers": cli.attn_layers,
                    "hidden_dim": cli.hidden_dim, "seed": cli.seed,
                    "weighted": True,
+                   "val_frac": cli.val_frac, "val_seed": cli.val_seed,
+                   "val_eps": [int(e) for e in val_eps],
+                   **{"val_" + k: v for k, v in
+                      stopper.summary().items()},
                    "final_acc": tot_correct / tot_toks,
                    "final_nonsleep_acc": (tot_nonsleep_correct
                                           / max(tot_nonsleep, 1))}, f, indent=1)
