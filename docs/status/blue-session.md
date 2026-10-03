@@ -1103,8 +1103,10 @@ FQE order a05>s1>s2 reproduces regression, STABLE (range 5.8, spreads
 <=2.2). Batch2 (stab): FQE stab1~stab2>stab DISAGREES with regression
 (stab>>stab1>>stab2), self-flags UNSTABLE (stab spread 4.0 vs range
 2.4). stab2's -161 rollout tail invisible in FQE value (-17.4, trio
-best) => failure is rollout-side (recurrent drift F6), not values. New
-tool: FQE-vs-rollout divergence as drift detector for Stream D/V6.
+best). NOTE (review 2026-10-03): the drift-detector reading is WITHDRAWN --
+Stream B later showed FQE-vs-rollout disagreement on policies with no drift
+story, so disagreement is not a drift signal. FQE-vs-rollout divergence is
+uninterpreted until a validator is calibrated.
 Next: Stream A (V1 validation splits BC/RvS).
 
 ## Stream A done: V1 validation splits, gate FAILED on rollout (2026-10-03)
@@ -1118,41 +1120,76 @@ offline_logs_14 (5 val eps): best val @25, restored; rollout target -50
 regression: legacy(epoch30) -81.8 vs stopped(@25) -101.9, paired -20.1
 (5/8 seeds worse). Manifest `val-v1-20261003.json` + pool manifests
 `rvs-v1legacy/rvs-v1stop-20261003.json`. Mechanism works (selects,
-restores, reports) but raw val CE does NOT predict rollout return --
-our own Mandlekar/Codevilla replication. Do NOT trust early stopping
+restores, reports) but stopped underperformed last-epoch by paired -20.1
+on ONE run, 8 seeds, deltas -78..+77: no evidence either way about val CE
+as a selector (review 2026-10-03 softens the earlier
+replication claim). Do NOT trust early stopping
 from val CE alone. Next: rollout-proxy validators (true-FQE rank
 stopped-vs-legacy ckpts; perturbed-trajectory val metric), then
 Stream B (V2 ESS gating in IQL).
 
-## Stream B done: V2 ESS-gated extraction, temperature is not the lottery (2026-10-03)
+## Stream B done: V2 ESS-gated extraction (2026-10-03; numbers corrected on review)
 
 `blue_iql.py`: `ess_frac` monitor + `auto_beta` bisection (MPO
 dual-style) hitting `--ess-target 0.3`, `--awr-mode fixed/auto/binary`
 (CRR), uniformity-escape restandardization; manifest records beta_used +
 ESS. Reran a05-regime (tau .7/alpha .5) seeds 0/1/2: betas solved
 0.72/0.022/0.193 (30x adaptation across spike regimes), ESS exactly
-0.30, zero clipping all three. Rollout regression: auto -102.0/-86.6/
--76.0 vs fixed -82.0/-105.6/-108.1. Mean +10.4, worst seed -108.1 ->
--76.0, s0 worsened -82 -> -102; spread NOT shrunk (26.0 vs 26.1).
-FQE gate fails: order inverted vs rollout, UNSTABLE, worst for most
-off-log s2 (resid 4.4) -- FQE degrades exactly where policies leave the
-logs. Verdict: V2 works as spike-guard (keep as default), but the
-lottery lives in Q/V fits, not temperature. Route spread to V4/V5
-ensembles. Manifests `ess-v2-20261003.json` + `iql-v2auto-s{0,1,2}` pool.
+0.30, zero clipping all three. CORRECTION: rollout regression is auto
+-89.5/-86.6/-76.0 (s0 was misreported -102.0; true mean of
+-58/-38/-100/-93/-93/-58/-120/-156), NOT -102.0/-86.6/-76.0. Corrected:
+mean -84.0 vs fixed -98.6 (+14.6), range 13.5 vs 26.1 (roughly halved) --
+suggestive but n=3 per arm on selection seeds, no evidence either way;
+all earlier claims built on -102.0 are withdrawn (see CORRECTION note in
+`ess-v2-20261003.json`). FQE gate fails: order inverted vs rollout,
+UNSTABLE, worst for most off-log s2 (resid 4.4). Ordered follow-up:
+fixed seeds 3,4 + auto seeds 3,4, then held-out. Manifests
+`ess-v2-20261003.json` + `iql-v2auto-s{0,1,2}` pool.
 
-## Stream D done: V6 hidden-reset, memory is load-bearing (2026-10-03)
+## Stream D done: V6 hidden-reset (2026-10-03; headline softened on review)
 
 `GreedyCheckpointPolicy(reset_interval)` + registry pop-through +
-`--reset-interval` pool flag (RvS excluded). stab2: carried -161.2 vs
-ri1 -131.4 (with -465 @7704) vs ri50 -194.8 (with -832 @7702) --
-resets shift catastrophes across seeds, never remove them. Control
-a05 ri1: -82 -> mean -1725 (worst -2612): memoryless scoring destroys
-even the best ckpt. Verdict: hidden-reset is NOT a fix; GRU memory
-carries needed belief (cursor/staleness) absent from obs; stab2 has a
-bad-memory problem, not wipeable drift. GRU-vs-MLP answered for current
-obs: recurrence required. Next: inspect-don't-wipe (hidden-norm growth
-tail-vs-clean; burn-in init) or observability work for feedforward.
-Manifest `drift-v6-20261003.json` + three pool manifests.
+`--reset-interval` pool flag (RvS excluded). Cache key verified by code
+inspection to include reset_interval (policy_kwargs in _cell_key + ckpt
+sha + source bytes), so ri0/ri1/ri50 runs are keyed apart. stab2:
+carried historic -161.2 (per-seed -105/-59/-126/-62/-543/-48/-117/-230,
+median -111) vs ri1 -131.4 (with -465 @7704) vs ri50 -194.8 (with -832
+@7702) -- single runs where one outlier dominates each mean (non-outlier
+means ~-84 ri1, ~-104 ri50; medians -77.0/-112.5 vs carried median -111)
+-- could equally be noise in an already volatile policy, NOT evidence of
+catastrophe-shifting. Solid finding:
+control a05 ri1: -82 -> mean -1725 (7/8 seeds below -1300): memoryless
+scoring destroys a good ckpt, so the GRU carries obs-absent information
+and resets are no cheap fix. Caveat cutting the other way: ri1 hurts a05
+far more than stab2, so stab2's tails are NOT pure memory drift either.
+Missing: paired ri0 rerun on same code path, hidden-norm inspection.
+Ordered: stab2 ri0/ri1/ri50 reruns with medians. Manifest
+`drift-v6-20261003.json` + three pool manifests (verdict text there also
+softened).
+
+## Review follow-up: corrections + ordered experiments (2026-10-03)
+
+Review caught a wrong s0 mean (-102.0 reported, -89.5 true: per-seed
+-58/-38/-100/-93/-93/-58/-120/-156). ess-v2 manifest carries a
+CORRECTION note (not silent); B/D/A verdicts softened; drift-detector
+claim withdrawn; cache key verified by inspection (reset_interval in
+_cell_key via policy_kwargs). One further correction TO the review:
+ri50 non-outlier mean recomputed -103.7, not ~-89; medians
+ri0/ri1/ri50 = -111/-77/-112.5.
+Held-out (7801-7808, teacher lancer_v2 -85.1): v2auto s0 -77.1, s1
+-105.8, s2 -136.8 (tail -413 @7804). s0 beats teacher on means, single
+run, needs replication; selection-best s2 becomes held-out-worst --
+transfer gap hits the best selection ckpt hardest.
+5-per-arm (fixed s3/s4, auto s3/s4 new): fixed mean -99.8 median -105.6
+range 36; auto mean -90.8 median -89.5 range 32.1; same-seed paired
++9.0 mixed (3 better/2 worse). No evidence on spread.
+stab2 paired reruns: ri0 fresh-compute reproduces historic bit-exact
+(-161.25, determinism across code versions); ri1/ri50 served 8/8 from
+content-hash cache (bit-identical repro). Per-seed ri1-ri0: 4 better /
+4 worse -- pure redistribution, noise verdict stands.
+Manifest `review-followup-20261003.json`. Standing: nothing demonstrates
+a reliable learned > heuristic; every positive is selection-seed and/or
+single-run.
 
 ## Phase C: local speedups landed (2026-10-02)
 
