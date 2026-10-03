@@ -27,7 +27,7 @@ resume prompt after the standard project instructions.
 
 `main` and `blue/foundation` are both at `f8a9deb` and hold identical content.
 Branch from `main` normally. Up to `05999fb`, `main` held a broken
-`cage-challenge-4/cc4_epymarl_wrapper.py` that truncated host observations to 16
+`blue/cc4_epymarl_wrapper.py` that truncated host observations to 16
 hosts, reset the shared simulator once per Blue agent and left `Restore`
 unreachable; `blue/foundation` has since been fast-forwarded into `main`, so
 those warnings are obsolete. Verify your clone with the commands in
@@ -38,10 +38,10 @@ those warnings are obsolete. Verify your clone with the commands in
 | Path | Purpose / primary owner |
 |---|---|
 | `cage-challenge-4/CybORG/` | Existing upstream simulator, unmodified; Environment owns team changes |
-| `cage-challenge-4/blue_*.py`, `cc4_epymarl_wrapper.py` | Blue experiments and wrappers; Blue |
-| `cage-challenge-4/tests_blue/` | Blue live regression suite; Blue |
-| `cage-challenge-4/blue-agent-plan.md` | Detailed Blue design, audit and experiments |
-| `cage-challenge-4/handoff.md` | Historical Blue handoff; read correction at its top |
+| `blue/blue_*.py`, `cc4_epymarl_wrapper.py` | Blue experiments and wrappers; Blue |
+| `blue/tests_blue/` | Blue live regression suite; Blue |
+| `docs/archive/blue-agent-plan.md` | Detailed Blue design, audit and experiments |
+| `docs/archive/handoff.md` | Historical Blue handoff; read correction at its top |
 | `cage-challenge-4/team-guide.md` | **Superseded** original planning doc; read the banner before using |
 | `red/`, `environment/`, `loop_eval/` | New team-owned integration work; scope files only so far |
 | `docs/` | Shared contracts, roadmap, handoffs and references |

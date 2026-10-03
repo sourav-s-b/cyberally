@@ -15,8 +15,7 @@ import os
 import sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)  # sibling blue modules
-sys.path.insert(0, os.path.join(os.path.dirname(_HERE),
-                                "cage-challenge-4"))  # pristine simulator
+sys.path.insert(0, os.path.join(os.path.dirname(_HERE), "cage-challenge-4"))  # pristine simulator
 
 import numpy as np
 from sklearn.ensemble import IsolationForest
