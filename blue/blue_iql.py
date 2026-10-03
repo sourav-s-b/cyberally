@@ -34,6 +34,35 @@ def awr_weights(adv, beta, max_w=100.0):
     return w.clamp(max=max_w), clipped
 
 
+def ess_frac(w):
+    """Effective-sample-size fraction (Martino et al. 2017): (Sw)^2/Sw^2 / N.
+    1.0 = uniform (degenerate, no selection); ->0 = single-point collapse."""
+    import torch as th
+    w = w.float()
+    n = w.numel()
+    return float((w.sum().pow(2) / w.pow(2).sum().clamp(min=1e-12)) / max(n, 1))
+
+
+def auto_beta(adv, target=0.3, lo=0.0, hi=8.0, iters=25):
+    """Bisection on beta so ESS frac of exp(beta*adv) hits target (V2/MPO:
+    dual-solved temperature replaces the static-alpha hack). Monotone
+    decreasing in beta, so bisection is exact. Returns (beta, achieved)."""
+    import torch as th
+    assert adv.numel() > 0
+    for _ in range(iters):
+        mid = 0.5 * (lo + hi)
+        with th.no_grad():
+            w = th.exp(mid * adv).clamp(max=100.0)
+        if ess_frac(w) > target:
+            lo = mid
+        else:
+            hi = mid
+    beta = 0.5 * (lo + hi)
+    with th.no_grad():
+        achieved = ess_frac(th.exp(beta * adv).clamp(max=100.0))
+    return float(beta), float(achieved)
+
+
 class QNet:
     pass
 
@@ -58,7 +87,15 @@ def main():
     parser.add_argument("--tau", type=float, default=0.7,
                         help="expectile for V (upper envelope)")
     parser.add_argument("--beta", type=float, default=1.0,
-                        help="AWR inverse temperature")
+                        help="AWR inverse temperature (fixed mode, or the "
+                             "upper bound for auto mode)")
+    parser.add_argument("--awr-mode", default="fixed",
+                        choices=("fixed", "auto", "binary"),
+                        help="fixed: exp(beta*adv) as before; auto: bisect "
+                             "beta for --ess-target (V2/MPO dual-style); "
+                             "binary: CRR-style 1[adv>0] filter (spike-proof)")
+    parser.add_argument("--ess-target", type=float, default=0.3,
+                        help="target ESS fraction for auto mode")
     parser.add_argument("--awr-alpha", type=float, default=1.0,
                         help="blend AWR weights with uniform BC (1.0 = pure "
                              "IQL, 0.0 = BC). Coverage guardrail: sweeping "
@@ -201,13 +238,39 @@ def main():
         Q_all = q(tS).gather(1, tA.unsqueeze(1)).squeeze(1)
         V_all = v(tS).squeeze(1)
         adv = Q_all - V_all
-    w, frac_clip = awr_weights(adv, cli.beta)
     free_t = th.from_numpy(F)  # busy ticks contribute nothing (as in BC)
+    adv_free = adv[free_t.bool()]
+    beta_used = cli.beta
+    awr_note = cli.awr_mode
+    if cli.awr_mode == "binary":
+        # CRR-style: keep positives at full weight, floor the rest (never
+        # 0: zero-advantage sweeps stay legal under the alpha blend).
+        w = th.where(adv > 0, th.ones_like(adv), th.full_like(adv, 0.05))
+        frac_clip = th.tensor(0.0)
+    else:
+        if cli.awr_mode == "auto":
+            beta_used, ess_hit = auto_beta(adv_free, target=cli.ess_target,
+                                           hi=cli.beta)
+            awr_note = f"auto(beta={beta_used:.3f},ess={ess_hit:.3f})"
+        w, frac_clip = awr_weights(adv, beta_used)
+    ess0 = ess_frac((w * free_t)[free_t.bool()])
+    if ess0 > 0.9 and cli.awr_mode == "auto":
+        # Uniformity escape (RLPD-style): advantages collapsed (~0 std);
+        # standardize over free ticks and re-solve so selection exists.
+        with th.no_grad():
+            mu, sd = adv_free.mean(), adv_free.std().clamp(min=1e-6)
+            adv_std = (adv - mu) / sd
+        beta_used, ess_hit = auto_beta(
+            adv_std[free_t.bool()], target=cli.ess_target, hi=cli.beta)
+        w, frac_clip = awr_weights(adv_std, beta_used)
+        ess0 = ess_frac((w * free_t)[free_t.bool()])
+        awr_note = (f"auto-standardized(beta={beta_used:.3f},ess={ess_hit:.3f})")
     w = w * free_t
     if cli.awr_alpha < 1.0:
         w = cli.awr_alpha * w + (1.0 - cli.awr_alpha) * free_t
     print(f"adv: mean {float(adv.mean()):.3f} std {float(adv.std()):.3f} "
-          f"max {float(adv.max()):.2f} | w mean {float(w.mean()):.3f} "
+          f"max {float(adv.max()):.2f} | mode {awr_note} "
+          f"ess_frac {ess0:.3f} | w mean {float(w.mean()):.3f} "
           f"frac_clipped {float(frac_clip):.4f} "
           f"frac_zero(free) {(float((w == 0).float().mean())):.3f}")
 
@@ -269,6 +332,9 @@ def main():
     th.save(policy.state_dict(), os.path.join(ckpt_dir, "agent.th"))
     with open(os.path.join(out, "iql_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "tau": cli.tau, "beta": cli.beta,
+                   "awr_mode": cli.awr_mode, "ess_target": cli.ess_target,
+                   "beta_used": beta_used, "ess_frac": ess0,
+                   "awr_note": awr_note,
                    "awr_alpha": cli.awr_alpha,
                    "reward_scale": cli.reward_scale,
                    "layernorm": cli.layernorm,

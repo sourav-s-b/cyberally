@@ -72,12 +72,14 @@ def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, attn_layers=0,
                                    agent_type=_CKPT_AGENT[name],
                                    attn_layers=attn_layers)
     from blue_eval_mappo import GreedyCheckpointPolicy
+    reset_interval = env_kwargs.pop("reset_interval", 0)
     probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
     env_info = probe.get_env_info()
     return GreedyCheckpointPolicy(ckpt_dir, hidden_dim=hidden_dim,
                                    env_info=env_info,
                                    agent_type=_CKPT_AGENT[name],
-                                   attn_layers=attn_layers)
+                                   attn_layers=attn_layers,
+                                   reset_interval=reset_interval)
 
 
 def build(name, **overrides):

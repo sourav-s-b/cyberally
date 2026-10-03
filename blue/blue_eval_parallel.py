@@ -253,6 +253,10 @@ def main():
                     help="RvS conditioning target (rvs_ckpt only, proposal 14)")
     ap.add_argument("--attn-layers", type=int, default=0,
                     help="cross-slot attention layers of the ckpt's head")
+    ap.add_argument("--reset-interval", type=int, default=0,
+                    help="zero carried GRU hidden every K per-agent steps "
+                         "(V6 drift ablation; 1 = memoryless; ckpt policies "
+                         "except rvs_ckpt)")
     ap.add_argument("--seeds", type=int, nargs="+",
                     default=[7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705])
     ap.add_argument("--steps", type=int, default=400)
@@ -279,7 +283,8 @@ def main():
             raise SystemExit(f"{ckpt_policies} need --mappo-ckpt DIR")
         for p in ckpt_policies:
             policy_kwargs[p] = {"ckpt_dir": cli.mappo_ckpt,
-                                "attn_layers": cli.attn_layers}
+                                "attn_layers": cli.attn_layers,
+                                "reset_interval": cli.reset_interval}
             if p == "rvs_ckpt":
                 policy_kwargs[p]["target_return"] = cli.target_return
     use_torch = any(needs_torch(p) for p in cli.policies)

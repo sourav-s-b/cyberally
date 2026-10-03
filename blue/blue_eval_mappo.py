@@ -42,7 +42,12 @@ class GreedyCheckpointPolicy:
     """
 
     def __init__(self, ckpt_dir, hidden_dim=64, env_info=None,
-                 agent_type="rnn", attn_layers=0):
+                 agent_type="rnn", attn_layers=0, reset_interval=0):
+        """reset_interval: zero the carried GRU hidden every K per-agent
+        steps (V6 hidden-refresh ablation). 0 = never (legacy rollout);
+        1 = memoryless scoring, the no-retraining GRU-vs-feedforward test:
+        if tails vanish with resets, the failure is recurrent drift (F6),
+        not state values. RvS policies (blue_eval_rvs) do not support it."""
         try:
             import torch as th
             from modules.agents import REGISTRY as agent_REGISTRY
@@ -70,6 +75,7 @@ class GreedyCheckpointPolicy:
         missing, unexpected = self.agent.load_state_dict(state, strict=False), None
         assert not missing.missing_keys and not missing.unexpected_keys, missing
         self.agent.eval()
+        self.reset_interval = int(reset_interval)
         self.reset()
 
     def reset(self):
@@ -77,8 +83,14 @@ class GreedyCheckpointPolicy:
             a: self._th.zeros(1, self.agent.args.hidden_dim)
             for a in wrapper.BLUE_AGENTS
         }
+        self.steps = {a: 0 for a in wrapper.BLUE_AGENTS}
 
     def select(self, env, agent):
+        i = wrapper.BLUE_AGENTS.index(agent)
+        self.steps[agent] += 1
+        if self.reset_interval > 0 and self.steps[agent] % self.reset_interval == 0:
+            self.hidden[agent] = self._th.zeros(
+                1, self.agent.args.hidden_dim)
         i = wrapper.BLUE_AGENTS.index(agent)
         obs = np.concatenate(
             [env.get_obs_agent(i), np.eye(self.n_agents)[i]]).astype(np.float32)

@@ -1124,6 +1124,36 @@ from val CE alone. Next: rollout-proxy validators (true-FQE rank
 stopped-vs-legacy ckpts; perturbed-trajectory val metric), then
 Stream B (V2 ESS gating in IQL).
 
+## Stream B done: V2 ESS-gated extraction, temperature is not the lottery (2026-10-03)
+
+`blue_iql.py`: `ess_frac` monitor + `auto_beta` bisection (MPO
+dual-style) hitting `--ess-target 0.3`, `--awr-mode fixed/auto/binary`
+(CRR), uniformity-escape restandardization; manifest records beta_used +
+ESS. Reran a05-regime (tau .7/alpha .5) seeds 0/1/2: betas solved
+0.72/0.022/0.193 (30x adaptation across spike regimes), ESS exactly
+0.30, zero clipping all three. Rollout regression: auto -102.0/-86.6/
+-76.0 vs fixed -82.0/-105.6/-108.1. Mean +10.4, worst seed -108.1 ->
+-76.0, s0 worsened -82 -> -102; spread NOT shrunk (26.0 vs 26.1).
+FQE gate fails: order inverted vs rollout, UNSTABLE, worst for most
+off-log s2 (resid 4.4) -- FQE degrades exactly where policies leave the
+logs. Verdict: V2 works as spike-guard (keep as default), but the
+lottery lives in Q/V fits, not temperature. Route spread to V4/V5
+ensembles. Manifests `ess-v2-20261003.json` + `iql-v2auto-s{0,1,2}` pool.
+
+## Stream D done: V6 hidden-reset, memory is load-bearing (2026-10-03)
+
+`GreedyCheckpointPolicy(reset_interval)` + registry pop-through +
+`--reset-interval` pool flag (RvS excluded). stab2: carried -161.2 vs
+ri1 -131.4 (with -465 @7704) vs ri50 -194.8 (with -832 @7702) --
+resets shift catastrophes across seeds, never remove them. Control
+a05 ri1: -82 -> mean -1725 (worst -2612): memoryless scoring destroys
+even the best ckpt. Verdict: hidden-reset is NOT a fix; GRU memory
+carries needed belief (cursor/staleness) absent from obs; stab2 has a
+bad-memory problem, not wipeable drift. GRU-vs-MLP answered for current
+obs: recurrence required. Next: inspect-don't-wipe (hidden-norm growth
+tail-vs-clean; burn-in init) or observability work for feedforward.
+Manifest `drift-v6-20261003.json` + three pool manifests.
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`
