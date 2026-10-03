@@ -1,22 +1,18 @@
-"""Rollout-free checkpoint ranking via FQE-V(s0) (Stream C / V3).
+"""Rollout-free checkpoint ranking via TRUE FQE-V(s0) (Stream C redo / V3).
 
-For each candidate factorized-GRU checkpoint: fit a fresh feedforward Q
-with plain MSE TD backups *under the candidate's own greedy actions*
-(Fitted Q Evaluation — never queries the sim), then score
-V(s0) = mean_e,i Q(s0_ep,i, pi(s0_ep,i)) over log-episode initial ticks.
-Rank candidates by seed-averaged V(s0).
+v3 was invalid (see feasibility audit 2026-10-03): it regressed Q(s,pi(s))
+on rewards earned by logged actions. This version implements Le et al.,
+ICML 2019, Algorithm 3 faithfully:
 
-Cross-checks (BVFT-lite, honest version):
-  - every candidate is fit TWICE (two fit seeds); rank agreement across
-    fit seeds is reported. A ranking that flips with the fit seed is not
-    a ranking (this is the F1 lottery applied to the selector itself).
-  - Monte-Carlo logging-policy anchor: mean per-episode log return. A
-    sane FQE value sits near/above it, not 10x away (blowup detector).
+  - regression on LOGGED actions:  Q(s_t, a_t) <- r_t + gamma*Q(s_{t+1}, pi(s_{t+1}))
+  - bootstrap actions from the candidate with CARRIED GRU hidden state
+    (zero-init at episode start, stepped through each sequence) and the
+    DEPLOYMENT validity mask (masked argmax), matching rollout behavior.
+  - discounted Monte-Carlo anchor for the logging policy (same gamma).
 
 Usage:
   python blue_fqe_select.py --demos results/offline_logs_14.npz \
-      --ckpt results/models/iql_14 --ckpt results/models/iql_14a05 \
-      --label iql_14 --label iql_14a05 --out /tmp/fqe.jsonl
+      --ckpt results/models/iql_14a05 --label iql_14a05 --out /tmp/fqe.jsonl
 """
 
 import argparse
@@ -28,11 +24,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-N_AGENTS_FALLBACK = 5
 
-
-def flatten_log(demos):
-    """Same transition layout as blue_iql (s, a, r, s', done, free) + s0."""
+def flatten_log(demos, gamma):
+    """Transitions (s, a_logged, r, s', done) + s0 + masks + sequences."""
     data = np.load(demos)
     obs = data["obs"]        # (E, A, T, D)
     actions = data["actions"]
@@ -41,7 +35,8 @@ def flatten_log(demos):
     lengths = data["lengths"]
     n_eps, n_agents, max_len, obs_dim = obs.shape
     n_actions = int(masks.shape[3])
-    S, A, R, NS, S0 = [], [], [], [], []
+    S, A, R, NS = [], [], [], []
+    seq_s, seq_m, seq_len = [], [], []  # full sequences for carried-hidden
     for e in range(n_eps):
         t = int(lengths[e])
         for i in range(n_agents):
@@ -49,17 +44,19 @@ def flatten_log(demos):
             ep_a = actions[e, i, :t]
             ep_m = masks[e, i, :t]
             ep_r = rewards[e, :t]
-            free = (ep_m.sum(-1) > 1).astype(np.float32)
             S.append(ep_o[:-1])
             A.append(ep_a[:-1])
             R.append(ep_r[:-1])
             NS.append(ep_o[1:])
-            S0.append(ep_o[0])
+            seq_s.append(ep_o)
+            seq_m.append(ep_m)
+            seq_len.append(t)
     S = np.concatenate(S).astype(np.float32)
     A = np.concatenate(A)
     R = np.concatenate(R).astype(np.float32)
     NS = np.concatenate(NS).astype(np.float32)
-    S0 = np.stack(S0).astype(np.float32)
+    S0 = np.stack([obs[e, i, 0] for e in range(n_eps)
+                   for i in range(n_agents)]).astype(np.float32)
     n_tr = S.shape[0]
     D = np.zeros(n_tr, dtype=np.float32)
     off = 0
@@ -68,8 +65,14 @@ def flatten_log(demos):
         for _ in range(n_agents):
             D[off + t - 1] = 1.0
             off += t
-    mc_anchor = float(rewards[:, :].sum(axis=1).mean())  # per-ep return
-    return S, A, R, NS, D, S0, obs_dim, n_actions, n_agents, max_len, mc_anchor
+    disc = gamma ** np.arange(max_len, dtype=np.float32)
+    mc_anchor = float(((rewards[:, :max_len] * disc).sum(axis=1)).mean())
+    mc_undisc = float(rewards.sum(axis=1).mean())
+    return {"S": S, "A": A, "R": R, "NS": NS, "D": D, "S0": S0,
+            "seq_s": seq_s, "seq_m": seq_m, "seq_len": seq_len,
+            "obs_dim": obs_dim, "n_actions": n_actions,
+            "n_agents": n_agents, "max_len": max_len,
+            "mc_anchor": mc_anchor, "mc_undisc": mc_undisc}
 
 
 def load_policy(ckpt_dir, obs_dim, n_actions, n_agents, hidden_dim,
@@ -86,33 +89,58 @@ def load_policy(ckpt_dir, obs_dim, n_actions, n_agents, hidden_dim,
     return policy
 
 
-def greedy_actions(policy, S, hidden_dim, batch=4096):
-    """Greedy actions with zero-init hidden per transition (memoryless
-    scoring; matches how Q/V MLPs see the data, not full recurrence)."""
+def carried_greedy_actions(policy, flat, hidden_dim):
+    """Masked argmax per tick with carried hidden state (zero-init at each
+    sequence start). Returns pi_S, pi_NS aligned to transitions + pi_S0."""
     import torch as th
-    out = np.empty(S.shape[0], dtype=np.int64)
+    seq_s, seq_m, seq_len = flat["seq_s"], flat["seq_m"], flat["seq_len"]
+    n_seq = len(seq_s)
+    max_len = flat["max_len"]
+    n_actions = flat["n_actions"]
+    # Pad to batch.
+    b_obs = np.zeros((n_seq, max_len, flat["obs_dim"]), dtype=np.float32)
+    b_msk = np.zeros((n_seq, max_len, n_actions), dtype=np.float32)
+    for k in range(n_seq):
+        t = seq_len[k]
+        b_obs[k, :t] = seq_s[k]
+        b_msk[k, :t] = seq_m[k]
+    t_obs = th.from_numpy(b_obs)
+    t_msk = th.from_numpy(b_msk)
+    lens = th.tensor(seq_len)
+    pi = np.zeros((n_seq, max_len), dtype=np.int64)
     with th.no_grad():
-        for s in range(0, S.shape[0], batch):
-            b = th.from_numpy(S[s:s + batch])
-            h = th.zeros(b.shape[0], hidden_dim)
-            logits, _ = policy(b, h)
-            out[s:s + batch] = logits.argmax(-1).numpy()
-    return out
+        h = th.zeros(n_seq, hidden_dim)
+        for step in range(max_len):
+            logits, h_new = policy(t_obs[:, step], h)
+            masked = logits + (1.0 - t_msk[:, step]) * -1e9
+            pi[:, step] = masked.argmax(-1).numpy()
+            # Freeze hidden past sequence end (keep last valid).
+            alive = (step + 1 < lens).float().unsqueeze(1)
+            h = h_new * alive + h * (1.0 - alive)
+    pi_S, pi_NS, pi_S0 = [], [], []
+    for k in range(n_seq):
+        t = seq_len[k]
+        pi_S.append(pi[k, :t - 1])
+        pi_NS.append(pi[k, 1:t])
+        pi_S0.append(pi[k, 0])
+    return (np.concatenate(pi_S), np.concatenate(pi_NS),
+            np.array(pi_S0, dtype=np.int64))
 
 
-def fit_fqe(S, A, R, NS, D, pi_S, pi_NS, obs_dim, n_actions, gamma,
+def fit_fqe(flat, pi_NS, obs_dim, n_actions, gamma,
             q_iters, batch, lr, seed):
-    """Plain MSE FQE under fixed greedy actions pi(*). Returns Q net."""
+    """TRUE FQE: regress Q(s, a_logged); bootstrap Q(s', pi(s'))."""
     import torch as th
     from blue_iql import build_mlp
     th.manual_seed(seed)
     rng = np.random.RandomState(seed)
+    S, A, R, NS, D = flat["S"], flat["A"], flat["R"], flat["NS"], flat["D"]
     n_tr = S.shape[0]
     tS = th.from_numpy(S)
+    tA = th.from_numpy(A)
     tR = th.from_numpy(R)
     tNS = th.from_numpy(NS)
     tD = th.from_numpy(D)
-    tPiS = th.from_numpy(pi_S)
     tPiNS = th.from_numpy(pi_NS)
     q = build_mlp(obs_dim, n_actions)
     qt = build_mlp(obs_dim, n_actions)
@@ -120,11 +148,11 @@ def fit_fqe(S, A, R, NS, D, pi_S, pi_NS, obs_dim, n_actions, gamma,
     opt = th.optim.Adam(q.parameters(), lr=lr)
     for it in range(1, q_iters + 1):
         idx = th.from_numpy(rng.choice(n_tr, batch, replace=False))
-        s, r, ns, d = tS[idx], tR[idx], tNS[idx], tD[idx]
+        s, a, r, ns, d = (tS[idx], tA[idx], tR[idx], tNS[idx], tD[idx])
         with th.no_grad():
             tq = r + gamma * (1.0 - d) * qt(ns).gather(
                 1, tPiNS[idx].unsqueeze(1)).squeeze(1)
-        pred = q(s).gather(1, tPiS[idx].unsqueeze(1)).squeeze(1)
+        pred = q(s).gather(1, a.unsqueeze(1)).squeeze(1)  # LOGGED action
         loss = th.nn.functional.mse_loss(pred, tq)
         opt.zero_grad()
         loss.backward()
@@ -133,32 +161,28 @@ def fit_fqe(S, A, R, NS, D, pi_S, pi_NS, obs_dim, n_actions, gamma,
             for p, pt in zip(q.parameters(), qt.parameters()):
                 pt.mul_(0.995).add_(p, alpha=0.005)
     with th.no_grad():
-        pred_all = q(tS).gather(1, tPiS.unsqueeze(1)).squeeze(1)
-        with th.no_grad():
-            tq_all = tR + gamma * (1.0 - tD) * qt(tNS).gather(
-                1, tPiNS.unsqueeze(1)).squeeze(1)
-        bellman_resid = float(th.nn.functional.mse_loss(
-            pred_all, tq_all))
+        pred_all = q(tS).gather(1, tA.unsqueeze(1)).squeeze(1)
+        tq_all = tR + gamma * (1.0 - tD) * qt(tNS).gather(
+            1, tPiNS.unsqueeze(1)).squeeze(1)
+        bellman_resid = float(th.nn.functional.mse_loss(pred_all, tq_all))
     return q, float(loss.detach()), bellman_resid
 
 
-def score_candidate(demos_flat, ckpt_dir, hidden_dim, attn_layers, rtg_dim,
+def score_candidate(flat, ckpt_dir, hidden_dim, attn_layers, rtg_dim,
                     gamma, q_iters, batch, lr, fit_seeds):
     import torch as th
-    S, A, R, NS, D, S0, obs_dim, n_actions, n_agents, _, _ = demos_flat
-    policy = load_policy(ckpt_dir, obs_dim, n_actions, n_agents,
+    obs_dim, n_actions = flat["obs_dim"], flat["n_actions"]
+    policy = load_policy(ckpt_dir, obs_dim, n_actions, flat["n_agents"],
                          hidden_dim, attn_layers, rtg_dim)
-    pi_S = greedy_actions(policy, S, hidden_dim)
-    pi_S0 = greedy_actions(policy, S0, hidden_dim)
-    pi_NS = greedy_actions(policy, NS, hidden_dim)
+    pi_S, pi_NS, pi_S0 = carried_greedy_actions(policy, flat, hidden_dim)
+    assert pi_S.shape[0] == flat["S"].shape[0]
     v_s0, resids = [], []
     with th.no_grad():
-        tS0 = th.from_numpy(S0)
+        tS0 = th.from_numpy(flat["S0"])
         tPiS0 = th.from_numpy(pi_S0)
     for fs in fit_seeds:
-        q, final_loss, resid = fit_fqe(S, A, R, NS, D, pi_S, pi_NS,
-                                      obs_dim, n_actions, gamma,
-                                      q_iters, batch, lr, fs)
+        q, final_loss, resid = fit_fqe(flat, pi_NS, obs_dim, n_actions,
+                                      gamma, q_iters, batch, lr, fs)
         with th.no_grad():
             v = float(q(tS0).gather(1, tPiS0.unsqueeze(1)).squeeze(1)
                       .mean())
@@ -168,18 +192,14 @@ def score_candidate(demos_flat, ckpt_dir, hidden_dim, attn_layers, rtg_dim,
 
 
 def main():
-    ap = argparse.ArgumentParser(description="FQE-V(s0) ckpt ranking")
+    ap = argparse.ArgumentParser(description="true-FQE V(s0) ckpt ranking")
     ap.add_argument("--demos", default="results/offline_logs_14.npz")
-    ap.add_argument("--ckpt", action="append", default=[],
-                    help="candidate ckpt dir (repeatable)")
-    ap.add_argument("--label", action="append", default=[],
-                    help="label per --ckpt (repeatable, same order)")
+    ap.add_argument("--ckpt", action="append", default=[])
+    ap.add_argument("--label", action="append", default=[])
     ap.add_argument("--gamma", type=float, default=0.99)
-    ap.add_argument("--q-iters", type=int, default=20000,
-                    help="fixed FQE budget per candidate per fit seed "
-                         "(ranking needs consistency, not convergence)")
+    ap.add_argument("--q-iters", type=int, default=30000)
     ap.add_argument("--batch", type=int, default=512)
-    ap.add_argument("--lr", type=float, default=3e-4)
+    ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--hidden-dim", type=int, default=64)
     ap.add_argument("--attn-layers", type=int, default=0)
     ap.add_argument("--rtg-dim", type=int, default=0)
@@ -191,10 +211,10 @@ def main():
                            for c in cli.ckpt]
     assert len(labels) == len(cli.ckpt), "--label count must match --ckpt"
 
-    flat = flatten_log(cli.demos)
-    mc_anchor = flat[-1]
-    print(f"demos {cli.demos}: {flat[0].shape[0]} transitions, "
-          f"MC log-policy anchor {mc_anchor:.1f}")
+    flat = flatten_log(cli.demos, cli.gamma)
+    print(f"demos {cli.demos}: {flat['S'].shape[0]} transitions, "
+          f"MC log-policy anchor disc {flat['mc_anchor']:.1f} "
+          f"(undisc {flat['mc_undisc']:.1f})")
 
     rows = []
     for ckpt_dir, label in zip(cli.ckpt, labels):
@@ -207,15 +227,17 @@ def main():
                "v_s0_seeds": [float(v) for v in v_s0],
                "v_s0_spread": float(max(v_s0) - min(v_s0)),
                "bellman_resid": [float(r) for r in resids],
-               "mc_anchor": mc_anchor, "gamma": cli.gamma,
-               "q_iters": cli.q_iters, "fit_seeds": cli.fit_seeds}
+               "mc_anchor_disc": flat["mc_anchor"],
+               "mc_anchor_undisc": flat["mc_undisc"],
+               "gamma": cli.gamma, "q_iters": cli.q_iters,
+               "fit_seeds": cli.fit_seeds}
         rows.append(row)
         print(f"{label:16s} V(s0) {row['v_s0_mean']:+8.1f} "
               f"seeds {[f'{v:+.1f}' for v in v_s0]} "
               f"spread {row['v_s0_spread']:.1f} resid {resids[0]:.3f}")
 
     rows.sort(key=lambda r: -r["v_s0_mean"])
-    print("\nrank (FQE-V(s0), higher is better): "
+    print("\nrank (true-FQE V(s0), higher is better): "
           + " > ".join(r["label"] for r in rows))
     if len(rows) > 1 and len(cli.fit_seeds) > 1:
         total_range = abs(rows[0]["v_s0_mean"] - rows[-1]["v_s0_mean"])

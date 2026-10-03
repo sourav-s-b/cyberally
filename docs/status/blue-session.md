@@ -1092,6 +1092,21 @@ reframes F1 as extraction/rollout noise, not value signal. Next
 policies must separate by >>1.2 in V(s0). Next: Stream A (V1 validation
 splits BC/RvS).
 
+## Stream C redo: TRUE FQE (2026-10-03, audit-driven)
+
+Rewrote `blue_fqe_select.py` as Le et al. 2019 Alg.3: regression on
+LOGGED (s,a), bootstrap Q(s',pi_masked(s')) with carried (not zeroed)
+GRU hidden + deployment mask, discounted MC anchor (-32.1; undisc
+-133.1). v3 manifest marked SUPERSEDED in-file (failure record
+retained). New manifest `fqe-v3r2-20261003.json`. Batch1 (IQL seeds):
+FQE order a05>s1>s2 reproduces regression, STABLE (range 5.8, spreads
+<=2.2). Batch2 (stab): FQE stab1~stab2>stab DISAGREES with regression
+(stab>>stab1>>stab2), self-flags UNSTABLE (stab spread 4.0 vs range
+2.4). stab2's -161 rollout tail invisible in FQE value (-17.4, trio
+best) => failure is rollout-side (recurrent drift F6), not values. New
+tool: FQE-vs-rollout divergence as drift detector for Stream D/V6.
+Next: Stream A (V1 validation splits BC/RvS).
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`
