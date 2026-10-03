@@ -1049,6 +1049,22 @@ ESS monitor (one line), FQE-V(s0)/BVFT selection (ends test-env picks),
 snapshot/SWA de-lottery, SPOT/TD3+BC support knob, burn-in/hidden-reset
 ablations, diversity-over-size logging.
 
+## Stream C done: FQE-V(s0) rollout-free selection (2026-10-03, V3)
+
+New `blue/blue_fqe_select.py`: per-candidate MSE FQE fit (fixed 30k-iter
+budget, 2 fit seeds) under candidate greedy actions (zero-hidden
+memoryless scoring) + V(s0) rank + MC anchor (-133.1 undiscounted) +
+fit-seed stability flag. CPU venv `.venv-train` (torch 2.14.1 CPU-only);
+~5 min/fit. Manifest `docs/proposals/manifests/fqe-v3-20261003.json`.
+RESULT on all six lottery ckpts: value band [-23.1,-20.5] with ~1.2 fit
+noise — value-indistinguishable; regression gaps (-82 vs -108) are NOT
+offline value differences. Batch1 rank reproduces regression order
+(a05>s1>s2), batch2 swaps stab/stab1, both flagged UNSTABLE (spread ~=
+range). Verdict: selector correctly refuses to certify near-ties;
+reframes F1 as extraction/rollout noise, not value signal. Next
+policies must separate by >>1.2 in V(s0). Next: Stream A (V1 validation
+splits BC/RvS).
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`
