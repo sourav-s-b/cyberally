@@ -1036,6 +1036,19 @@ User asked: would changing the MLP solve it? Did it (LayerNorm +
 Missing discipline found: validation-split early stopping on extraction
 CE. Manifests iql-stab/stab1/stab2-20261002.
 
+## Second sweep: extraction-lottery literature (2026-10-02)
+
+User ordered deep search on current failure modes pre-/compact. 8 tracks
+(OPE/selection, BC fragility, AWR mechanics, transfer, recurrence,
+coverage cloning, ensembles, validation); 7 returned ~200 papers (~190
+unique). Deliverable `docs/research/blue-extraction-lottery-literature.md`:
+failure modes F1-F6 with numbers, top-8 bets, 7 track catalogs, ordered
+V1-V8 program (V1 validation+early-stopping first — cheapest, unlocks
+all). BC-fragility track empty; re-run post-compact. Top actionable:
+ESS monitor (one line), FQE-V(s0)/BVFT selection (ends test-env picks),
+snapshot/SWA de-lottery, SPOT/TD3+BC support knob, burn-in/hidden-reset
+ablations, diversity-over-size logging.
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`
