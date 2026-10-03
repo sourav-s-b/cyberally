@@ -1024,6 +1024,18 @@ champion → Phase B held-out look CANCELLED, one-look budget preserved.
 Lesson: rung-2 IQL is a lottery ticket; rung 3 needs value stabilization
 first (17-adjacent). Manifests iql-s1/s2-20261002 added.
 
+## MLP-structure intervention (2026-10-02)
+
+User asked: would changing the MLP solve it? Did it (LayerNorm +
+--reward-scale/--layernorm in blue_iql.py): values fixed (loss_q
+1.6→0.062, zero clipping) but seeds collapse the other way (adv_std
+0.01 — extraction degenerates to BC). Regression: stab0 -88.8 (+4.8, wins
++50/+40/+37, losses -64/-29); stab1 -107.8 (-244); stab2 -161.2
+(-543/-230). MLP was A lottery layer, not THE lottery — extraction
+(GRU cloning, never validation-stopped) is seed-fragile on its own.
+Missing discipline found: validation-split early stopping on extraction
+CE. Manifests iql-stab/stab1/stab2-20261002.
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`

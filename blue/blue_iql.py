@@ -38,11 +38,18 @@ class QNet:
     pass
 
 
-def build_mlp(in_dim, out_dim, hidden=256):
+def build_mlp(in_dim, out_dim, hidden=256, layernorm=False):
     import torch.nn as nn
-    return nn.Sequential(nn.Linear(in_dim, hidden), nn.ReLU(),
-                         nn.Linear(hidden, hidden), nn.ReLU(),
-                         nn.Linear(hidden, out_dim))
+    layers = [nn.Linear(in_dim, hidden)]
+    if layernorm:
+        layers.append(nn.LayerNorm(hidden))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(hidden, hidden))
+    if layernorm:
+        layers.append(nn.LayerNorm(hidden))
+    layers.append(nn.ReLU())
+    layers.append(nn.Linear(hidden, out_dim))
+    return nn.Sequential(*layers)
 
 
 def main():
@@ -57,6 +64,13 @@ def main():
                              "IQL, 0.0 = BC). Coverage guardrail: sweeping "
                              "actions have ~zero advantage and are dropped "
                              "by pure AWR.")
+    parser.add_argument("--reward-scale", type=float, default=1.0,
+                        help="divide team rewards by this before Q/V "
+                             "training (100.0 matches the RvS RTG scale; "
+                             "tames bootstrap magnitudes)")
+    parser.add_argument("--layernorm", action="store_true",
+                        help="LayerNorm in Q/V MLPs (value-stabilization "
+                             "variant, rung-3 groundwork)")
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--q-iters", type=int, default=None,
                         help="Q/V update iters. Default: scaled to data "
@@ -139,14 +153,16 @@ def main():
 
     tS = th.from_numpy(S)
     tA = th.from_numpy(A)
-    tR = th.from_numpy(R)
+    tR = th.from_numpy(R / cli.reward_scale)
+    print(f"reward scale 1/{cli.reward_scale}, scaled range "
+          f"[{float(tR.min()):.3f}, {float(tR.max()):.3f}]")
     tNS = th.from_numpy(NS)
     tD = th.from_numpy(D)
 
-    q = build_mlp(obs_dim, n_actions)
-    qt = build_mlp(obs_dim, n_actions)
+    q = build_mlp(obs_dim, n_actions, layernorm=cli.layernorm)
+    qt = build_mlp(obs_dim, n_actions, layernorm=cli.layernorm)
     qt.load_state_dict(q.state_dict())
-    v = build_mlp(obs_dim, 1)
+    v = build_mlp(obs_dim, 1, layernorm=cli.layernorm)
     opt_q = th.optim.Adam(q.parameters(), lr=cli.lr)
     opt_v = th.optim.Adam(v.parameters(), lr=cli.lr)
 
@@ -254,6 +270,8 @@ def main():
     with open(os.path.join(out, "iql_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "tau": cli.tau, "beta": cli.beta,
                    "awr_alpha": cli.awr_alpha,
+                   "reward_scale": cli.reward_scale,
+                   "layernorm": cli.layernorm,
                    "gamma": cli.gamma, "q_iters": q_iters,
                    "q_epochs": cli.q_epochs,
                    "pol_epochs": cli.pol_epochs,

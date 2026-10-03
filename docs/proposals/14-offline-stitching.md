@@ -130,8 +130,17 @@ is data (14-diagnostic, second clause) and 16/17 become mandatory.
   including the 24-vs-60/strong data gaps (confounded with train seed).
 - Gate: nothing beat -82 → Phase B second held-out look CANCELLED,
   one-look budget PRESERVED.
-- Lesson: rung-2 IQL works only as an optimization lottery ticket here.
-  A rung 3 needs value stabilization FIRST (reward /100 to RTG scale,
-  LayerNorm, lower lr / harder targets) before bigger logs — that work is
-  17-adjacent. Manifests `iql-s1/s2-20261002.json` (no pool for the
-  diverged 50k ckpt — diagnostics condemned it).
+## MLP-structure intervention: values fixed, extraction exposed (2026-10-02)
+
+Changed the MLP (LayerNorm + `--reward-scale 1/100` + `--layernorm` flags in
+`blue_iql.py`): value stability fixed mechanically — loss_q 1.6→0.062,
+adv_max 6.9→2.2, zero clipping on seed 0. But train seeds diverge the
+OTHER way: s1/s2 collapse to adv_std 0.01–0.02 (zero signal → extraction
+degenerates toward BC). Regression: stab0 -88.8±31.8 (paired +4.8, no
+catastrophe, wins +50/+40/+37 but losses -64/-29); stab1 -107.8±61.4
+(-244 tail); stab2 -161.2±164.7 (-543, -230 tails). The MLP was A lottery
+layer, not THE lottery: extraction itself (GRU cloning, never validated)
+is seed-fragile independent of advantage quality. Missing discipline:
+validation-split early stopping on extraction CE (never done — all runs
+use fixed 30 epochs). Next: mid-scale rewards (/10) + val-split stopping;
+then 16 regardless. Manifests `iql-stab/stab1/stab2-20261002.json`.

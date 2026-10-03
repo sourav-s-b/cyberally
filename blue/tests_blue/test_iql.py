@@ -99,3 +99,13 @@ def test_qv_mlp_shapes():
     x = th.randn(7, 872)
     assert q(x).shape == (7, 155)
     assert v(x).shape == (7, 1)
+
+
+def test_qv_mlp_layernorm_shapes_and_norm():
+    q = build_mlp(872, 155, layernorm=True)
+    v = build_mlp(872, 1, layernorm=True)
+    assert any(isinstance(m, th.nn.LayerNorm) for m in q.modules())
+    x = th.randn(7, 872)
+    assert q(x).shape == (7, 155)
+    assert v(x).shape == (7, 1)
+    assert th.isfinite(q(x)).all() and th.isfinite(v(x)).all()
