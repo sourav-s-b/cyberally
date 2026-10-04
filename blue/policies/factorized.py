@@ -16,7 +16,7 @@ then 2+3*slot+cmd):
 
 Because the output is still plain 155-way logits, masking, Boltzmann
 sampling, PPO log-probs, and agent.th save/load all work unchanged; no
-vendor edit is needed (register at runtime, see blue_train_mappo.py).
+vendor edit is needed (register at runtime, see blue.training.mappo).
 
 Slot width derives from input_shape so root-session ablations keep working:
 slot_feats = (input_shape - n_agents) // 51. Requires args.n_agents

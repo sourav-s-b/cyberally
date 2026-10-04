@@ -12,9 +12,9 @@ from types import SimpleNamespace as SN
 
 import numpy as np
 
-import cc4_epymarl_wrapper as wrapper
-from blue_eval_mappo import policy_dims
-from blue_rvs_pretrain import RTG_SCALE
+import blue.core.wrapper as wrapper
+from blue.policies.eval_mappo import policy_dims
+from blue.training.rvs import RTG_SCALE
 
 
 class RvSCheckpointPolicy:
@@ -38,7 +38,7 @@ class RvSCheckpointPolicy:
                   n_agents=self.n_agents, use_rnn=True,
                   attn_layers=attn_layers, rtg_dim=1)
         if agent_type == "rnn_factorized":
-            import blue_factorized_agent as factorized
+            from blue.policies import factorized
             agent_REGISTRY["rnn_factorized"] = (
                 factorized.FactorizedRNNAgent)
         self.agent = agent_REGISTRY[agent_type](self.obs_dim + 1, args)

@@ -24,24 +24,26 @@ import subprocess
 import sys
 import time
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-if _HERE not in sys.path:
-    sys.path.insert(0, _HERE)
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
-MANIFEST_DIR = os.path.join(os.path.dirname(_HERE), "docs", "proposals",
-                            "manifests")
+MANIFEST_DIR = os.path.join(_REPO_ROOT, "docs", "proposals", "manifests")
 
 # Persisted cell-result cache (Phase C): results keyed by everything that
 # affects the number — policy spec, checkpoint bytes, code files, env
 # config, seed. Re-running teacher baselines across experiments then costs
 # zero cells. Cache lives in blue/.cache/ (gitignored); any code/ckpt
 # change alters the key, so stale hits require identical bytes.
-_CACHE_DIR = os.path.join(_HERE, ".cache")
+_CACHE_DIR = os.path.join(_REPO_ROOT, "blue", ".cache")
 _CACHE_PATH = os.path.join(_CACHE_DIR, "pool_cells.json")
 # Source files whose bytes affect cell results (policies, harness, wrapper).
-_CACHE_SOURCES = ("blue_eval_parallel.py", "blue_baselines.py",
-                  "blue_policy_registry.py", "cc4_epymarl_wrapper.py",
-                  "blue_hybrid.py", "blue_eval_mappo.py", "blue_eval_rvs.py")
+_CACHE_SOURCES = ("blue/policies/eval_parallel.py",
+                  "blue/core/baselines.py",
+                  "blue/policies/registry.py", "blue/core/wrapper.py",
+                  "blue/policies/hybrid.py", "blue/policies/eval_mappo.py",
+                  "blue/policies/eval_rvs.py")
 
 
 def _file_sha(path):
@@ -72,13 +74,14 @@ def _cell_key(cell):
     else:
         parts.append("ckpt:heuristic")
         try:
-            from blue_policy_registry import REGISTRY
+            from blue.policies.registry import REGISTRY
             if cell["policy"] in REGISTRY:
-                srcs.append(REGISTRY[cell["policy"]][0] + ".py")
+                srcs.append(REGISTRY[cell["policy"]][0].replace(".", "/")
+                            + ".py")
         except Exception:
             pass
     for src in sorted(set(srcs)):
-        p = os.path.join(_HERE, src)
+        p = os.path.join(_REPO_ROOT, src)
         if os.path.exists(p):
             parts.append(src + ":" + _file_sha(p))
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:32]
@@ -122,7 +125,7 @@ def _cached_build(name, kwargs):
     key = name + "|" + json.dumps(kwargs, sort_keys=True, default=str)
     policy = _POLICY_CACHE.get(key)
     if policy is None:
-        from blue_policy_registry import build
+        from blue.policies.registry import build
         policy = build(name, **kwargs)
         _POLICY_CACHE[key] = policy
     return policy
@@ -130,10 +133,10 @@ def _cached_build(name, kwargs):
 
 def run_cell(cell):
     """Execute one (policy, seed) cell. Must stay module-level (picklable)."""
-    if _HERE not in sys.path:  # spawn re-import: fix path in the child
-        sys.path.insert(0, _HERE)
-    from blue_baselines import run_episode
-    from blue_policy_registry import needs_torch
+    if _REPO_ROOT not in sys.path:  # spawn re-import: fix path in child
+        sys.path.insert(0, _REPO_ROOT)
+    from blue.core.baselines import run_episode
+    from blue.policies.registry import needs_torch
     kwargs = dict(cell.get("policy_kwargs", {}))
     if needs_torch(cell["policy"]):
         # Size the checkpoint probe (and geometry checks) from the same env
@@ -160,7 +163,7 @@ def run_cell(cell):
 def git_commit():
     try:
         return subprocess.check_output(
-            ["git", "-C", os.path.dirname(_HERE), "rev-parse", "HEAD"],
+            ["git", "-C", _REPO_ROOT, "rev-parse", "HEAD"],
             text=True).strip()
     except Exception:
         return "unknown"
@@ -200,7 +203,7 @@ def run_pool(cells, workers, start_method, use_cache=True):
             order.append(i)
             pending.append(cell)
     if pending:
-        import blue_logutil as logutil
+        from blue.common import logutil
         ctx = mp.get_context(start_method)
         cprog = logutil.Progress(len(pending))
         with cf.ProcessPoolExecutor(max_workers=workers,
@@ -256,7 +259,7 @@ def write_manifest(run_id, cells, cell_results, steps, mask_mode, env_kwargs,
 
 
 def main():
-    from blue_policy_registry import names, needs_torch
+    from blue.policies.registry import names, needs_torch
     ap = argparse.ArgumentParser(description="Parallel policy x seed eval")
     ap.add_argument("--policies", nargs="+", required=True,
                     help=f"registry names {names()}")
@@ -307,7 +310,7 @@ def main():
         except ImportError:
             raise SystemExit(
                 "torch cells need the train venv: rerun with "
-                "../.venv-train/bin/python blue_eval_parallel.py ...")
+                "../.venv-train/bin/python -m blue.policies.eval_parallel ...")
         start_method = "spawn"
     else:
         start_method = "fork"

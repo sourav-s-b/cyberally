@@ -24,8 +24,8 @@ import pickle
 
 import numpy as np
 
-import cc4_epymarl_wrapper as wrapper
-from blue_baselines import action_index
+import blue.core.wrapper as wrapper
+from blue.core.baselines import action_index
 
 
 def _legal(mask, env, agent, host, action):
@@ -127,13 +127,13 @@ def host_risk_features(env, agent, host):
     Uses the same host_to_vector encoding the RL actor sees, so the risk
     model and the actor share one feature contract.
     """
-    from blue_obs_features import host_to_vector
+    from blue.core.obs_features import host_to_vector
     subnets = env.subnets[agent]
     own = subnets.get(host, []) if isinstance(subnets, dict) else subnets
     return host_to_vector(env.views[agent].get(host, {}), agent, own)
 
 
-# Indices into the host_to_vector 10-feature layout (blue_obs_features).
+# Indices into the host_to_vector 10-feature layout (blue.core.obs_features).
 # FRAGILE: assumes FEATURE_NAMES order; reorder there breaks these silently.
 _I_UNKNOWN_FILES = 6
 _I_MAX_DENSITY = 7
@@ -282,7 +282,7 @@ def make_priority(spec, **kwargs):
 class RiskPriority:
     """Learned P(compromised | Blue-visible features) sweep scorer.
 
-    Loads a blue_train_risk.py model (weights + standardization) and scores
+    Loads a blue.training.risk model (weights + standardization) and scores
     each sweep candidate with its predicted probability. Features replicate
     the training rows exactly: 10 base + ages/belief temporal + 4 view
     deltas, so the collector, trainer, and scorer share one contract
@@ -309,11 +309,14 @@ class RiskPriority:
     DELTA_IDX = (6, 7, 8, 9)  # into the 10 base features
 
     def __init__(self, model_path):
-        from blue_obs_features import temporal_len
+        from blue.core.obs_features import temporal_len
         path = model_path
         if not os.path.isabs(path):
-            path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                path)
+            # Relative model paths resolve against the blue/ package dir
+            # (blue/results/...), not this module's directory.
+            blue_dir = os.path.dirname(os.path.dirname(
+                os.path.abspath(__file__)))
+            path = os.path.join(blue_dir, path)
         if not os.path.exists(path):
             raise FileNotFoundError(f"risk model not found: {path}")
         with open(path, "rb") as f:
@@ -339,7 +342,7 @@ class RiskPriority:
         self._cache = {}
 
     def _row(self, env, agent, host):
-        from blue_obs_features import host_to_temporal, host_to_vector
+        from blue.core.obs_features import host_to_temporal, host_to_vector
         tracker = env.trackers[agent]
         busy = agent in env._awaiting
         base = host_to_vector(env.views[agent].get(host, {}), agent,

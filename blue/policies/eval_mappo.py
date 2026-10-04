@@ -16,8 +16,8 @@ from types import SimpleNamespace as SN
 
 import numpy as np
 
-import blue_baselines as baselines
-import cc4_epymarl_wrapper as wrapper
+import blue.core.baselines as baselines
+import blue.core.wrapper as wrapper
 
 
 def policy_dims(env_info):
@@ -66,7 +66,7 @@ class GreedyCheckpointPolicy:
                   n_agents=self.n_agents, use_rnn=True,
                   attn_layers=attn_layers)
         if agent_type == "rnn_factorized":
-            import blue_factorized_agent as factorized
+            from blue.policies import factorized
             agent_REGISTRY["rnn_factorized"] = (
                 factorized.FactorizedRNNAgent)
         self.agent = agent_REGISTRY[agent_type](input_shape, args)

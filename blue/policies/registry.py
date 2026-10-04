@@ -11,38 +11,38 @@ actually instantiates the policy.
 import importlib
 
 REGISTRY = {
-    "sleep": ("blue_baselines", "SleepBaseline", {}),
-    "masked_random": ("blue_baselines", "MaskedRandomBaseline", {"seed": 11}),
-    "unmasked_random": ("blue_baselines", "UnmaskedRandomBaseline", {"seed": 11}),
-    "round_robin": ("blue_baselines", "RoundRobinBaseline", {}),
+    "sleep": ("blue.core.baselines", "SleepBaseline", {}),
+    "masked_random": ("blue.core.baselines", "MaskedRandomBaseline", {"seed": 11}),
+    "unmasked_random": ("blue.core.baselines", "UnmaskedRandomBaseline", {"seed": 11}),
+    "round_robin": ("blue.core.baselines", "RoundRobinBaseline", {}),
     # Representation check (proposal 12): committed version of the scratch
     # claim_check; pool manifest carries the equality evidence.
-    "stalest_first": ("blue_baselines", "StalestFirstBaseline", {}),
-    "suspicion_sweep": ("blue_baselines", "SuspicionSweepBaseline", {}),
-    "hybrid_none": ("blue_hybrid", "HybridBluePolicy", {"priority_fn": None}),
-    "hybrid_lancer": ("blue_hybrid", "HybridBluePolicy",
+    "stalest_first": ("blue.core.baselines", "StalestFirstBaseline", {}),
+    "suspicion_sweep": ("blue.core.baselines", "SuspicionSweepBaseline", {}),
+    "hybrid_none": ("blue.policies.hybrid", "HybridBluePolicy", {"priority_fn": None}),
+    "hybrid_lancer": ("blue.policies.hybrid", "HybridBluePolicy",
                       {"priority_fn": "lancer"}),
     # v2: suspicion bonus decays with fruitless re-analyses (0.5 each).
     # v1 ("hybrid_lancer", fruitless_decay=1.0) stays frozen for comparison.
-    "hybrid_lancer_v2": ("blue_hybrid", "HybridBluePolicy",
+    "hybrid_lancer_v2": ("blue.policies.hybrid", "HybridBluePolicy",
                          {"priority_fn": "lancer",
                           "priority_kwargs": {"fruitless_decay": 0.5}}),
     # Learned risk scorer (model weights live outside git under results/).
     # KILLED 2026-10-02 (proposal 01 Experiment 4: coverage collapse).
     # Kept so the failure stays reproducible; do not deploy.
-    "hybrid_risk": ("blue_hybrid", "HybridBluePolicy",
+    "hybrid_risk": ("blue.policies.hybrid", "HybridBluePolicy",
                     {"priority_fn": "risk",
                      "priority_kwargs": {
                          "model_path": "results/risk_model_v2.pkl"}}),
     # Risk x recency hybrids (proposal 01 phase 3): snapshot proba with
     # touch-decay dynamics. Gate: beat lancer_v2 on held-out, not regr.
-    "hybrid_rx_decay": ("blue_hybrid", "HybridBluePolicy",
+    "hybrid_rx_decay": ("blue.policies.hybrid", "HybridBluePolicy",
                         {"priority_fn": "risk_recency",
                          "priority_kwargs": {"mode": "decay"}}),
-    "hybrid_rx_bonus": ("blue_hybrid", "HybridBluePolicy",
+    "hybrid_rx_bonus": ("blue.policies.hybrid", "HybridBluePolicy",
                         {"priority_fn": "risk_recency",
                          "priority_kwargs": {"mode": "bonus"}}),
-    "hybrid_rx_gate": ("blue_hybrid", "HybridBluePolicy",
+    "hybrid_rx_gate": ("blue.policies.hybrid", "HybridBluePolicy",
                        {"priority_fn": "risk_recency",
                         "priority_kwargs": {"mode": "gate"}}),
 }
@@ -61,9 +61,9 @@ def needs_torch(name):
 def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, attn_layers=0,
                 **env_kwargs):
     """Greedy MAPPO-checkpoint policy; probe env sizes geometry from flags."""
-    import cc4_epymarl_wrapper as wrapper
+    import blue.core.wrapper as wrapper
     if name == "rvs_ckpt":
-        from blue_eval_rvs import RvSCheckpointPolicy
+        from blue.policies.eval_rvs import RvSCheckpointPolicy
         target = env_kwargs.pop("target_return", -50.0)
         probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
         env_info = probe.get_env_info()
@@ -71,7 +71,7 @@ def _build_ckpt(name, ckpt_dir, hidden_dim=64, steps=400, attn_layers=0,
                                    hidden_dim=hidden_dim, env_info=env_info,
                                    agent_type=_CKPT_AGENT[name],
                                    attn_layers=attn_layers)
-    from blue_eval_mappo import GreedyCheckpointPolicy
+    from blue.policies.eval_mappo import GreedyCheckpointPolicy
     reset_interval = env_kwargs.pop("reset_interval", 0)
     probe = wrapper.CC4MARLEnv(steps=steps, **env_kwargs)
     env_info = probe.get_env_info()
