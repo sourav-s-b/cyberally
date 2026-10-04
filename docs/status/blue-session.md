@@ -1229,6 +1229,18 @@ tests, 1c3854d indent fix. Docs commands in history unchanged; new
 
 ## Phase 0 done: lancer audit + relabel (2026-10-04)
 
+## Phase 1 done: clean guided.py, bit-exact gate passes (2026-10-04)
+
+New `blue/policies/guided.py`: fresh rules 1-3 + scorer interface
+(`GuidedBluePolicy`) + reimplemented lancer dynamics (`GuidedPriority`,
+fruitless_decay 0.5 to match hybrid_lancer_v2) + `ResidualAnchor`
+Phase 4 contract stub (teacher bonus M, zero-residual == teacher under
+argmax). Gate `tests_blue/test_guided_parity.py`: canonical trace SHAs
+identical vs hybrid_lancer_v2 on 7629/7630/7702 (plus parity-None pair
+and per-call scorer equality) — passed first attempt, no fallback.
+Time-box barely touched. Next: Phase 3 imitation init with
+argmax-agreement rate.
+
 `docs/research/lancer-audit-20261004.md`: decoys structurally absent
 (no Deploy action in wrapper space — environment gap, not impl gap);
 priority dynamics present (touch-decay, detect/novelty boosts,
