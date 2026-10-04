@@ -1,0 +1,191 @@
+"""Phase 2: does host ORDERING have headroom? (No training.)
+
+Compares sweep orderings inside the same fixed rules (HybridBluePolicy
+rules 1-3: remediate CONFIRMED, verify oldest-first, sweep the rest):
+
+  - parity   : cursor round-robin (existing hybrid_none behavior)
+  - lancer   : hybrid_lancer_v2 values
+  - oldest   : never-analysed first, then stalest analysis
+  - obsbump  : current suspicious-view signals only, no carried value
+  - oracle   : DIAGNOSTIC ONLY. Reads privileged _compromised_set() to
+               order compromised hosts by onset. Upper-bounds what any
+               observation-based learner could gain. Never deployed,
+               never a claim.
+
+Metrics per episode (native return PLUS): investigation coverage
+(distinct analysed hosts / zone hosts), max investigation age at end,
+detection delay (compromised-onset tick -> first Analyse tick on that
+host; privileged ground truth, eval-only), undetected count,
+remediation count. Null band: |paired Δ| inside the 95% paired CI on
+the dev block (~±28 at SD 40, n=8; recomputed from data).
+
+Usage (repo root):
+  .venv-train/bin/python -m blue.analysis.ordering \
+      --seeds 7629 7630 7640 7701 7702 7703 7704 7705 --steps 400 \
+      --out /tmp/ordering.jsonl
+"""
+
+import argparse
+import json
+import os
+import sys
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from blue.core.baselines import decode_index
+from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
+from blue.policies.hybrid import (HybridBluePolicy, host_risk_features,
+                                  make_priority)
+
+
+class OldestFirst:
+    """Never-analysed first, then stalest last-analysis. Stateless."""
+
+    def __call__(self, env, agent, host):
+        last = env.trackers[agent].last_analysis.get(host)
+        if last is None:
+            return 0.0
+        return -float(last)
+
+
+class ObsBump:
+    """Current suspicious-view signals only (no carried lancer value)."""
+
+    def __call__(self, env, agent, host):
+        vec = host_risk_features(env, agent, host)
+        unknown, density, n_ext = vec[6], vec[7], vec[9]
+        return float(unknown > 0) + float(density > 0.9) + float(n_ext > 0)
+
+
+class OracleOnset:
+    """DIAGNOSTIC upper bound: compromised hosts first by onset tick.
+
+    Reads privileged compromise state at select time. For measurement
+    only; any policy shipping this would be cheating.
+    """
+
+    def __init__(self):
+        self._onset = {}
+
+    def reset(self):
+        self._onset = {}
+
+    def __call__(self, env, agent, host):
+        comp = env._compromised_set()
+        tick = env._tick
+        for h in comp:
+            self._onset.setdefault((agent, h), tick)
+        if host in comp:
+            return -float(self._onset[(agent, host)])
+        return -1e9
+
+
+def _decode(env, agent, action_idx):
+    name, host = decode_index(env, agent, int(action_idx))
+    return name, host
+
+
+def run_ordering_episode(priority_fn, seed, steps=400, **env_kwargs):
+    """Mirror run_episode stepping + record privileged compromise timeline
+    (eval-only) and per-host analyse ticks for delay/coverage metrics."""
+    env = CC4MARLEnv(seed=seed, steps=steps, **env_kwargs)
+    env.reset(seed=seed)
+    policy = HybridBluePolicy(priority_fn=priority_fn)
+    policy.reset()
+    cumulative = 0.0
+    onset = {}
+    analysed_at = {}
+    analysed_hosts = set()
+    remediations = 0
+    zone_hosts = {a: list(env.hostnames[a]) for a in BLUE_AGENTS}
+    for tick in range(1, steps + 1):
+        for h in env._compromised_set():
+            onset.setdefault(h, tick)
+        actions = {a: int(policy.select(env, a)) for a in BLUE_AGENTS}
+        _, rewards, terminated, truncated, _ = env.step(actions)
+        cumulative += float(rewards[0])
+        for agent in BLUE_AGENTS:
+            name, host = _decode(env, agent, actions[agent])
+            if name == "Analyse" and host is not None:
+                analysed_hosts.add((agent, host))
+                analysed_at.setdefault((agent, host), tick)
+            if name in ("Remove", "Restore"):
+                remediations += 1
+        if terminated or truncated:
+            break
+    delays = []
+    undetected = 0
+    for h, t0 in onset.items():
+        det = [t for (a, hh), t in analysed_at.items()
+               if hh == h and t >= t0]
+        if det:
+            delays.append(min(det) - t0)
+        else:
+            undetected += 1
+    delays.sort()
+    total_hosts = sum(len(v) for v in zone_hosts.values())
+    ages = []
+    for agent in BLUE_AGENTS:
+        for host in zone_hosts[agent]:
+            last = analysed_at.get((agent, host))
+            ages.append(tick - last if last is not None else tick)
+    return {"seed": seed, "steps": tick, "return": cumulative,
+            "n_compromised": len(onset),
+            "coverage": len(analysed_hosts) / max(total_hosts, 1),
+            "max_age": max(ages) if ages else tick,
+            "det_delay_median": (delays[len(delays) // 2] if delays
+                                 else None),
+            "n_undetected": undetected,
+            "n_remediations": remediations}
+
+
+VARIANTS = {
+    "parity": None,
+    "lancer": ("lancer", {"fruitless_decay": 0.5}),  # == hybrid_lancer_v2
+    "oldest": OldestFirst(),
+    "obsbump": ObsBump(),
+    "oracle": OracleOnset(),
+}
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Phase 2 ordering comparison")
+    ap.add_argument("--seeds", type=int, nargs="+",
+                    default=[7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705])
+    ap.add_argument("--steps", type=int, default=400)
+    ap.add_argument("--out", default=None)
+    cli = ap.parse_args()
+    env_kwargs = {"temporal_features": ("ages", "belief"),
+                  "include_root_session": True, "red_agent": "discovery"}
+    for name, spec in VARIANTS.items():
+        if spec is None:
+            fn = None
+        elif isinstance(spec, tuple):
+            fn = make_priority(spec[0], **spec[1])
+        else:
+            fn = spec
+            try:
+                fn.reset()
+            except AttributeError:
+                pass
+        for seed in cli.seeds:
+            r = run_ordering_episode(fn, seed, cli.steps, **env_kwargs)
+            r["variant"] = name
+            line = (f"{name:8s} seed={seed} return={r['return']:+7.1f} "
+                    f"cov={r['coverage']:.2f} maxage={r['max_age']:3d} "
+                    f"detmed={r['det_delay_median']} "
+                    f"undet={r['n_undetected']}/{r['n_compromised']} "
+                    f"rem={r['n_remediations']}")
+            print(line, flush=True)
+            if cli.out:
+                with open(cli.out, "a") as f:
+                    f.write(json.dumps(r) + "\n")
+    if cli.out:
+        print("wrote", cli.out)
+
+
+if __name__ == "__main__":
+    main()

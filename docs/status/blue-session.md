@@ -1209,6 +1209,7 @@ overlap the teacher, recipe is answered; next is host-ordering on the
 teacher's sweep.
 
 ## Phase -1 done: housekeeping, full packaging (2026-10-04)
+
 Deleted dead scripts (iforest x2, compare, train_smoke; history keeps
 them). blue/ repackaged: core/ (wrapper, obs_features, baselines,
 masking, telemetry, collect_telemetry), policies/ (hybrid, factorized,
@@ -1225,6 +1226,32 @@ bit-exact vs historic manifest. Stack: fa2b6b8 deletions, 1a11b78 core,
 4e2a7bc policies, b9cf785 training, 172e67b analysis/common, 8af9bff
 tests, 1c3854d indent fix. Docs commands in history unchanged; new
 -m convention applies going forward.
+
+## Phase 0 done: lancer audit + relabel (2026-10-04)
+
+`docs/research/lancer-audit-20261004.md`: decoys structurally absent
+(no Deploy action in wrapper space — environment gap, not impl gap);
+priority dynamics present (touch-decay, detect/novelty boosts,
+fruitless-decay); rules 1-3 are local evidence-gating, not published
+reproduction; Monitor-equivalence assumed via wrapper merge. Relabel:
+"lancer-style priority sweep with evidence-gated remediation (no-decoy
+local variant)". History keeps old names.
+
+## Phase 2 done: ordering headroom is real, ~16 points (2026-10-04)
+
+New `blue/analysis/ordering.py`: parity / lancer-v2 values /
+oldest-first / obs-signal-only / privileged-oracle orderings under
+fixed rules 1-3, with coverage, max-age, detection-delay (privileged
+onset ground truth, eval-only), undetected, remediation metrics.
+32 dev seeds (7629-7705 + 7706-7729, dev-consumed). Means: parity
+-84.6, lancer -79.4, oldest -75.2, obsbump -366.7 (tails -947),
+oracle -63.2. Paired: lancer-parity +5.2 [-3.8,+14.2] (n=8 suggested
++18 — small-sample exaggeration, why we upsized); oldest-lancer +4.2
+[-3.4,+11.8] null; oracle-lancer +16.2 [+6.7,+25.7] RESOLVED.
+Verdict: ordering matters (obsbump proves the downside; coverage drive
+mandatory), lancer captures most but not all — headroom ~16 pts, above
+the 10-pt regression margin. Pilot target: beat lancer by ~10+ at
+coverage 1.0. Manifest `ordering-phase2-20261004.json` (160 cells).
 
 ## Powered comparison executed (2026-10-03/04)
 
