@@ -11,11 +11,11 @@ from pathlib import Path
 import subprocess
 import sys
 
-from blue_baselines import SleepBaseline, MaskedRandomBaseline, RoundRobinBaseline
-from blue_telemetry import TELEMETRY_VERSION, record_from_dict, records_to_vector
-from cc4_epymarl_wrapper import BLUE_AGENTS, CC4MARLEnv, WRAPPER_VERSION
+from blue.core.baselines import SleepBaseline, MaskedRandomBaseline, RoundRobinBaseline
+from blue.core.telemetry import TELEMETRY_VERSION, record_from_dict, records_to_vector
+from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv, WRAPPER_VERSION
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 FEATURE_VERSION = "host-vector-10-v1"
 
 
@@ -64,11 +64,11 @@ def collect(output, seeds, steps=30, policy_name="round-robin"):
                     done = terminated or truncated
     finally:
         env.close()
-    sources = [Path(__file__), ROOT / "blue/blue_telemetry.py",
-               ROOT / "blue/blue_obs_features.py",
-               ROOT / "blue/cc4_epymarl_wrapper.py",
-               ROOT / "blue/blue_baselines.py",
-               ROOT / "blue/blue_action_masking.py"]
+    sources = [Path(__file__), ROOT / "blue/core/telemetry.py",
+               ROOT / "blue/core/obs_features.py",
+               ROOT / "blue/core/wrapper.py",
+               ROOT / "blue/core/baselines.py",
+               ROOT / "blue/core/masking.py"]
     manifest = {
         "schema_version": "blue-telemetry-collection-v1-draft",
         "telemetry_version": TELEMETRY_VERSION, "feature_version": FEATURE_VERSION,

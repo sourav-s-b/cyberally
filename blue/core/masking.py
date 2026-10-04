@@ -4,7 +4,7 @@ Evidence is not ground truth. Pending actions never overwrite the prior belief,
 and successful remediation requires subsequent verification. The optional
 ``evidence`` mask is a heuristic restriction; wrappers default to validity only.
 """
-from blue_obs_features import is_external
+from blue.core.obs_features import is_external
 
 
 def conn_leaves_zone(conn, own_subnets):

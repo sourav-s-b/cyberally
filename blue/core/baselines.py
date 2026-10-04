@@ -8,7 +8,7 @@ bottom of this file, which must never be called by a policy.
 
 import numpy as np
 
-import cc4_epymarl_wrapper as wrapper
+import blue.core.wrapper as wrapper
 
 ACTION_OFFSET = {"Analyse": 0, "Remove": 1, "Restore": 2}
 

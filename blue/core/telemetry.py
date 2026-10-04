@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from ipaddress import IPv4Address
 import math
 
-from blue_obs_features import extract_subnets, is_external
+from blue.core.obs_features import extract_subnets, is_external
 
 TELEMETRY_VERSION = "blue-telemetry-v1-draft"
 

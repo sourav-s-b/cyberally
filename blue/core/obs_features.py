@@ -54,7 +54,7 @@ VECTOR_LEN = len(FEATURE_NAMES)
 # assumed.
 ROOT_SESSION_INDEX = 5
 
-# Blue-visible belief states tracked by BlueZoneTracker (blue_action_masking).
+# Blue-visible belief states tracked by BlueZoneTracker (blue.core.masking).
 # Ordered for a fixed one-hot layout; append-only if states are ever added.
 BELIEF_STATES = ("UNKNOWN", "CLEAN", "SUSPICIOUS", "CONFIRMED", "VERIFY")
 

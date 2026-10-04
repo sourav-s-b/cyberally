@@ -24,11 +24,13 @@ import numpy as np
 
 import os as _os
 import sys as _sys
-# Blue lives in blue/; the pristine simulator in cage-challenge-4/. This
-# insert (derived from __file__, not cwd) is the ONLY bridge between them:
-# everything else imports as siblings inside blue/.
+# Blue lives in blue/ (packaged as blue.core, blue.policies, ...); the
+# pristine simulator in cage-challenge-4/. This insert (derived from
+# __file__, not cwd) is the ONLY bridge between them: everything else
+# imports as absolute blue.* packages from the repo root.
 _CAGE = _os.path.join(
-    _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))),
+    _os.path.dirname(_os.path.dirname(_os.path.dirname(
+        _os.path.abspath(__file__)))),
     "cage-challenge-4")
 if _CAGE not in _sys.path:
     _sys.path.insert(0, _CAGE)
@@ -51,10 +53,10 @@ RED_AGENTS = {
 }
 from CybORG.Simulator.Actions import Sleep
 from CybORG.Simulator.Actions.AbstractActions import Monitor, Analyse, Remove, Restore
-from blue_obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
+from blue.core.obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
                                host_to_temporal, temporal_len, TEMPORAL_GROUPS,
                                ROOT_SESSION_INDEX)
-from blue_action_masking import BlueZoneTracker
+from blue.core.masking import BlueZoneTracker
 
 BLUE_AGENTS = [f"blue_agent_{i}" for i in range(5)]
 ACTION_TEMPLATES = ("Analyse", "Remove", "Restore")
@@ -302,7 +304,7 @@ class CC4MARLEnv:
 
         Does not change actor features, masks, simulator behavior or action state.
         """
-        from blue_telemetry import telemetry_block
+        from blue.core.telemetry import telemetry_block
         agent = BLUE_AGENTS[agent_id]
         return telemetry_block(self.views[agent], self.observed_at[agent],
                                tick=self._tick, subnets_by_host=self.subnets[agent])
