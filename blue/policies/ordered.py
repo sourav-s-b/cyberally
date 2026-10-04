@@ -27,6 +27,14 @@ def _legal(mask, env, agent, host, action):
     return bool(mask[action_index(env, agent, host, action)])
 
 
+def argmax_pick(scored):
+    """Canonical argmax with reference tie-break: max by (score, host),
+    i.e. ties go to the LARGEST hostname. Every decision path (reference
+    scheduler, sampler hooks, greedy eval) must use this; torch argmax
+    takes the FIRST candidate and diverges on early-episode init ties."""
+    return max(scored, key=lambda sh: (sh[0], sh[1]))[1]
+
+
 class CursorSweep:
     """Stateless-rotation parity scorer (fresh implementation).
 
@@ -202,7 +210,7 @@ class SweepScheduler:
         if order_fn is not None:
             ordered = order_fn(cands, hosts, agent)
             return ordered[0] if ordered else None
-        return max(scored, key=lambda sh: (sh[0], sh[1]))[1]
+        return argmax_pick(scored)
 
 
 class OrderedPolicy:

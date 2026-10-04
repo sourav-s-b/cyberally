@@ -88,12 +88,13 @@ def _decode(env, agent, action_idx):
     return name, host
 
 
-def run_ordering_episode(priority_fn, seed, steps=400, **env_kwargs):
+def run_ordering_episode(policy, seed, steps=400, **env_kwargs):
     """Mirror run_episode stepping + record privileged compromise timeline
-    (eval-only) and per-host analyse ticks for delay/coverage metrics."""
+    (eval-only) and per-host analyse ticks for delay/coverage metrics.
+    Takes a CONSTRUCTED policy (fresh scorer per episode is the caller's
+    job; policy.reset() is called here)."""
     env = CC4MARLEnv(seed=seed, steps=steps, **env_kwargs)
     env.reset(seed=seed)
-    policy = HybridBluePolicy(priority_fn=priority_fn)
     policy.reset()
     cumulative = 0.0
     onset = {}
@@ -157,10 +158,18 @@ def main():
                     default=[7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705])
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--guard", action="store_true",
+                    help="use OrderedPolicy with coverage guard ON (learner "
+                         "regime) instead of HybridBluePolicy; variants map "
+                         "to guard-aware equivalents")
+    ap.add_argument("--only", nargs="*", default=None,
+                    help="run a subset of variants (default: all)")
     cli = ap.parse_args()
     env_kwargs = {"temporal_features": ("ages", "belief"),
                   "include_root_session": True, "red_agent": "discovery"}
     for name, spec in VARIANTS.items():
+        if cli.only is not None and name not in cli.only:
+            continue
         if spec is None:
             fn = None
         elif isinstance(spec, tuple):
@@ -172,8 +181,32 @@ def main():
             except AttributeError:
                 pass
         for seed in cli.seeds:
-            r = run_ordering_episode(fn, seed, cli.steps, **env_kwargs)
+            if cli.guard:
+                from blue.policies.ordered import (
+                    CursorSweep, LancerValues, OrderedPolicy)
+                if name == "parity":
+                    policy = OrderedPolicy(order_fn=CursorSweep(),
+                                           guard=True)
+                elif name == "lancer":
+                    policy = OrderedPolicy(
+                        scorer=LancerValues(fruitless_decay=0.5),
+                        guard=True)
+                elif name == "oracle":
+                    policy = OrderedPolicy(scorer=OracleOnset(),
+                                           guard=True)
+                elif name == "oldest":
+                    policy = OrderedPolicy(scorer=OldestFirst(),
+                                           guard=True)
+                elif name == "obsbump":
+                    policy = OrderedPolicy(scorer=ObsBump(), guard=True)
+                r = run_ordering_episode(policy, seed, cli.steps,
+                                         **env_kwargs)
+            else:
+                policy = HybridBluePolicy(priority_fn=fn)
+                r = run_ordering_episode(policy, seed, cli.steps,
+                                         **env_kwargs)
             r["variant"] = name
+            r["guard"] = bool(cli.guard)
             line = (f"{name:8s} seed={seed} return={r['return']:+7.1f} "
                     f"cov={r['coverage']:.2f} maxage={r['max_age']:3d} "
                     f"detmed={r['det_delay_median']} "

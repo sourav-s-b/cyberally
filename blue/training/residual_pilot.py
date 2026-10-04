@@ -56,6 +56,7 @@ class GreedyHook:
 
     def __call__(self, env, agent, cands, scored):
         import numpy as np
+        from blue.policies.ordered import argmax_pick
         from blue.training.scorer import host_rows
         th = self.th
         F = th.from_numpy(np.asarray(
@@ -63,7 +64,8 @@ class GreedyHook:
         with th.no_grad():
             combined = (th.tensor([s for s, _ in scored])
                         + self.bonus * th.tanh(self.residual(F)))
-        return cands[int(combined.argmax())]
+        return argmax_pick([(float(combined[i]), cands[i])
+                            for i in range(len(cands))])
 
 
 class Recorder:
@@ -98,8 +100,10 @@ class Recorder:
         combined = base + self.bonus * r
         mask = [1.0] * len(cands)
         idx, logp, _ = masked_choice(combined, mask, sample=self.sample)
-        arg_base = int(base.argmax())
-        arg_comb = int(combined.argmax())
+        from blue.policies.ordered import argmax_pick
+        pairs = [(float(combined[i]), cands[i]) for i in range(len(cands))]
+        arg_comb = argmax_pick(pairs)
+        arg_base = argmax_pick([(s, h) for s, h in scored])
         # Deploy-time agreement (argmax vs argmax): sampling exploration
         # must not trip the divergence stop trigger.
         self.agree += int(arg_comb == arg_base)

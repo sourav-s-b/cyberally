@@ -1229,13 +1229,6 @@ tests, 1c3854d indent fix. Docs commands in history unchanged; new
 
 ## Phase 0 done: lancer audit + relabel (2026-10-04)
 
-## Phase 1 done: clean guided.py, bit-exact gate passes (2026-10-04)
-
-SUPERSEDED by the parallel-track merge below: independent
-reimplementation passed its own bit-exact gate, then was removed to
-keep ordered.py canonical; ResidualAnchor ported. Pre-merge
-verification stands as cross-evidence.
-
 `docs/research/lancer-audit-20261004.md`: decoys structurally absent
 (no Deploy action in wrapper space — environment gap, not impl gap);
 priority dynamics present (touch-decay, detect/novelty boosts,
@@ -1275,6 +1268,13 @@ ported into ordered.py. scorer rows: 3306 from 4 dev eps
 
 ## MAPPO smoke + throughput (2026-10-04)
 
+`python -m blue.training.mappo --steps 30 --t-max 120` completes
+end-to-end under the new packaging (rollout + PPO update + save,
+15.7 s wall for 120 env steps; pilot timing later showed ~19 s/ep,
+~21 steps/s sustained — the smoke figure was mostly start-up).
+Also fixed mappo results default to blue/results (smoke run wrote to
+repo-root results/, removed).
+
 ## Phase 4 pilot done: clean run, no improvement (2026-10-04)
 
 New `blue/training/residual.py` (residual MLP + value head, PPO-clip
@@ -1295,13 +1295,31 @@ fixed with non-recording GreedyHook + hook=None controls. Clean eval
 `resid-pilot1-20261004.json`. Next: replication or design change (more
 signal per update: GAE/larger batches/lr) — decide before Phase 5.
 
-`python -m blue.training.mappo --steps 30 --t-max 120` completes
-end-to-end under the new packaging (rollout + PPO update + save,
-15.7 s wall for 120 env steps ≈ 8 env-steps/s incl. updates).
-Implication: a few thousand 400-step episodes ≈ a day+ on this box —
-Phase 4 pilot must budget a few hundred episodes or justify more.
-Also fixed mappo results default to blue/results (smoke run wrote to
-repo-root results/, removed). Next: Phase 4 budgeted pilot design.
+## Review response: tie-break, guarded oracle, guard redesign (2026-10-04)
+
+All review points verified against data, then acted on:
+- s0 -89.5, ri50 non-outlier -103.7 (review's ~-89 corrected), medians
+  -77.0/-112.5 confirmed; 5-arm numbers confirmed.
+- Tie-break bug REAL: hostnames sorted ascending, so torch-argmax
+  (first) opposed reference max-by-(score,host) (largest) on init ties.
+  Fixed via canonical `argmax_pick` in ordered.py, used by scheduler +
+  GreedyHook + Recorder agreement; new zero-residual-hook trace test
+  passes (3/3 parity green).
+- Guarded oracle (32 seeds): -85.7 vs lancer-guarded -82.5, paired -3.1
+  [-12.2,+5.9]; vs unguarded lancer -6.2. Guard costs the oracle ~22
+  pts (-63.2 -> -85.7). Guarded headroom NEGATIVE -> STOP current
+  guard per the pre-registered rule; pilot ceiling was at/below lancer
+  by construction. Next: weaker guard (max-age bound), re-measure,
+  then pilot.
+- Guard cost on lancer: -15.0 on 8 seeds (6/8 worse), -3.1 on 32-seed
+  remeasure (same direction, smaller).
+- Learned-schedcontrol (right paired control): +7.2 SD 48, null.
+- Throughput corrected to ~19 s/ep (~21 steps/s sustained); Phase 5
+  (10x160 eps) ≈ 9 h serial.
+- Held-out 7801-7808 declared spent for decisions; 8501+ reserved for
+  Phase 6 fresh seeds; final block sized by power calc (~126).
+- Phase 3 rows came from eval seeds 7629-7701: noted bias toward
+  teacher (not toward beating it); final block stays disjoint.
 
 ## Phase 1 done: clean rebuild, bit-exact first try (2026-10-04)
 
