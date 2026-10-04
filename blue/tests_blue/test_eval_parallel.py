@@ -1,17 +1,17 @@
 """Parallel harness correctness: pool == serial, cells deterministic.
 
 Uses short horizons for speed; the full >=8-seed parity manifest is produced
-by blue_eval_parallel.py and recorded in docs/proposals/.
+by blue.policies.eval_parallel and recorded in docs/proposals/.
 The torch-spec test never loads a checkpoint: under the sim venv the build
 must fail loudly at the torch import; under the train venv it must fail on
 the bogus ckpt path instead of silently mis-scoring.
 """
 import pytest
 
-from blue_eval_parallel import build_cells, run_pool, trace_sha, _cached_build
-from blue_baselines import RoundRobinBaseline, evaluate_policies, run_episode
-from blue_hybrid import HybridBluePolicy
-from blue_policy_registry import build, needs_torch
+from blue.policies.eval_parallel import build_cells, run_pool, trace_sha, _cached_build
+from blue.core.baselines import RoundRobinBaseline, evaluate_policies, run_episode
+from blue.policies.hybrid import HybridBluePolicy
+from blue.policies.registry import build, needs_torch
 
 SEEDS = (7629, 7640)
 STEPS = 25
@@ -92,7 +92,7 @@ def test_pool_result_cache_serves_identical(tmp_path, monkeypatch):
     # Second identical pool run is served from the persisted cache with
     # bit-identical numbers; disabling the cache reruns everything.
     # Cache path is isolated so repo state never affects this test.
-    import blue_eval_parallel as par
+    import blue.policies.eval_parallel as par
     monkeypatch.setattr(par, "_CACHE_PATH",
                         str(tmp_path / "pool_cells.json"))
     cells = build_cells(["round_robin"], {}, [7701], STEPS, "validity", {})

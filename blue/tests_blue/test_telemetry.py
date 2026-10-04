@@ -7,8 +7,8 @@ import json
 import numpy as np
 import pytest
 
-from blue_obs_features import host_to_vector
-from blue_telemetry import (AuthEvent, ConnEvent, FileEvent, ProcEvent,
+from blue.core.obs_features import host_to_vector
+from blue.core.telemetry import (AuthEvent, ConnEvent, FileEvent, ProcEvent,
                             host_to_records, record_from_dict, record_to_dict,
                             records_to_vector, telemetry_block, TELEMETRY_VERSION)
 
@@ -103,7 +103,7 @@ def test_no_mixed_host_feature_aggregation():
 
 
 def test_live_wrapper_all_agents_reset_passive_and_analysis(monkeypatch):
-    import cc4_epymarl_wrapper as wrapper
+    import blue.core.wrapper as wrapper
     from CybORG.Agents import SleepAgent
     monkeypatch.setattr(wrapper, "DiscoveryFSRed", SleepAgent)
     monkeypatch.setattr(wrapper, "EnterpriseGreenAgent", SleepAgent)
@@ -150,7 +150,7 @@ def test_live_wrapper_all_agents_reset_passive_and_analysis(monkeypatch):
 
 
 def test_real_collection_manifest_and_no_overwrite(tmp_path):
-    from blue_collect_telemetry import collect
+    from blue.core.collect_telemetry import collect
     import hashlib
     output = tmp_path / "collection"
     manifest = collect(output, [8123], steps=4, policy_name="round-robin")

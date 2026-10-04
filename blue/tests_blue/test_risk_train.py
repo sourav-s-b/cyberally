@@ -2,12 +2,12 @@
 
 Separability: deterministic logreg must reach ~1.0 AUC on well-separated
 classes and ~0.5 on pure noise. Guards the numpy implementation, not the
-simulator (simulator-side collection is exercised by blue_risk_data runs
+simulator (simulator-side collection is exercised by blue.training.risk_data runs
 whose manifests are committed).
 """
 import numpy as np
 
-from blue_train_risk import auc, sigmoid, train_logreg
+from blue.training.risk import auc, sigmoid, train_logreg
 
 
 def test_sigmoid_calibrated():

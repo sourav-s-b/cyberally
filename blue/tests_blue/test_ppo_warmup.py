@@ -21,18 +21,6 @@ torch = pytest.importorskip("torch", reason="warmup learner imports torch")
 pytest.importorskip("components.episode_buffer", reason="needs epymarl on path")
 
 
-def _sys_path():
-    import os
-    root = os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))))
-    src = os.path.join(root, "third_party", "epymarl", "src")
-    if src not in os.sys.path:
-        os.sys.path.insert(0, src)
-    return src
-
-
-_sys_path()
-
 from components.episode_buffer import ReplayBuffer  # noqa: E402
 from components.transforms import OneHot  # noqa: E402
 from controllers import REGISTRY as mac_REGISTRY  # noqa: E402
@@ -174,8 +162,8 @@ def test_opt_out_allows_actor_updates_during_warmup():
 
 def test_driver_config_defaults_are_off():
     """A run must be unchanged unless warmup is explicitly requested."""
-    pytest.importorskip("blue_train_mappo", reason="train driver needs torch")
-    from blue_train_mappo import build_config
+    pytest.importorskip("blue.training.mappo", reason="train driver needs torch")
+    from blue.training.mappo import build_config
     assert build_config()["warmup_steps"] == 0
     assert build_config()["warmup_only_critic"] is True
     cfg = build_config(warmup_steps=5000, warmup_critic_only=True)

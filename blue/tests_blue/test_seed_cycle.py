@@ -9,7 +9,7 @@ env.reset_seeds for the run manifest. Uses Sleep red/green for speed; reward
 """
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
+import blue.core.wrapper as wrapper
 from CybORG.Agents import SleepAgent
 
 

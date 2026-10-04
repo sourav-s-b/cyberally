@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-import cc4_epymarl_wrapper as wrapper
-from blue_collect_bc import collect_episode
+import blue.core.wrapper as wrapper
+from blue.training.collect_bc import collect_episode
 
 
 def test_collect_episode_schema():
@@ -22,7 +22,7 @@ def test_collect_episode_schema():
 
 def test_build_config_warmstart_flags():
     pytest.importorskip("torch", reason="train driver imports torch")
-    from blue_train_mappo import build_config
+    from blue.training.mappo import build_config
     cfg = build_config(mask_mode="evidence",
                        init_ckpt="results/models/bc_rr_X")
     assert cfg["env_args"]["mask_mode"] == "evidence"
@@ -35,7 +35,7 @@ def test_build_config_warmstart_flags():
 def test_resume_inherits_checkpoint_opt_lr():
     """Regression: EPyMARL load_models restores optimiser state wholesale,
     INCLUDING lr — so a BC quad stamped at 1e-3 silently overrides the
-    fine-tune --lr. blue_bc_pretrain --opt-lr exists to stamp the intended
+    fine-tune --lr. blue.training.bc --opt-lr exists to stamp the intended
     PPO lr. This pins the mechanism on a toy optimiser."""
     torch = pytest.importorskip("torch", reason="train venv only")
     model = torch.nn.Linear(4, 4)

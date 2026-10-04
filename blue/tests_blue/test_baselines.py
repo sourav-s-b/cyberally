@@ -1,8 +1,8 @@
 """BLUE-02 baseline tests; live sim, Sleep red/green for speed unless noted."""
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-import blue_baselines as baselines
+import blue.core.wrapper as wrapper
+import blue.core.baselines as baselines
 from CybORG.Agents import SleepAgent
 
 

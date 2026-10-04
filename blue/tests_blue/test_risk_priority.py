@@ -9,8 +9,8 @@ import pickle
 import pytest
 from CybORG.Agents import SleepAgent
 
-import cc4_epymarl_wrapper as wrapper
-from blue_hybrid import HybridBluePolicy, RiskPriority, make_priority
+import blue.core.wrapper as wrapper
+from blue.policies.hybrid import HybridBluePolicy, RiskPriority, make_priority
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ actually changes the adversary). Longer comparisons run through the pool.
 """
 import pytest
 
-import cc4_epymarl_wrapper as wrapper
-from blue_baselines import SleepBaseline, run_episode
+import blue.core.wrapper as wrapper
+from blue.core.baselines import SleepBaseline, run_episode
 
 
 def test_unknown_red_rejected():

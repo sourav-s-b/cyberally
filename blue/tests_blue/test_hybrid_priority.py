@@ -8,11 +8,11 @@ the pool (see docs/proposals/01).
 """
 import pickle
 
-import cc4_epymarl_wrapper as wrapper
+import blue.core.wrapper as wrapper
 import pytest
 from CybORG.Agents import SleepAgent
 
-from blue_hybrid import HybridBluePolicy, LancerPriority, make_priority
+from blue.policies.hybrid import HybridBluePolicy, LancerPriority, make_priority
 
 
 @pytest.fixture
@@ -141,7 +141,7 @@ def _toy_risk_model(path, bias):
 
 
 def test_risk_recency_decay_math(quiet, tmp_path):
-    from blue_hybrid import RiskRecencyPriority
+    from blue.policies.hybrid import RiskRecencyPriority
     path = _toy_risk_model(str(tmp_path / "m.pkl"), -1.0)
     scorer = RiskRecencyPriority(model_path=path, mode="decay")
     agent = "blue_agent_0"
@@ -156,7 +156,7 @@ def test_risk_recency_decay_math(quiet, tmp_path):
 
 
 def test_risk_recency_bonus_adds_to_lancer(quiet, tmp_path):
-    from blue_hybrid import LancerPriority, RiskRecencyPriority
+    from blue.policies.hybrid import LancerPriority, RiskRecencyPriority
     path = _toy_risk_model(str(tmp_path / "m.pkl"), 0.0)
     agent = "blue_agent_0"
     host = quiet.hostnames[agent][0]
@@ -171,7 +171,7 @@ def test_risk_recency_bonus_adds_to_lancer(quiet, tmp_path):
 
 
 def test_risk_recency_gate_abstains(quiet, tmp_path):
-    from blue_hybrid import RiskRecencyPriority
+    from blue.policies.hybrid import RiskRecencyPriority
     path = _toy_risk_model(str(tmp_path / "m.pkl"), -100.0)  # all ~0
     scorer = RiskRecencyPriority(model_path=path, mode="gate",
                                  gate_threshold=0.3)
@@ -182,7 +182,7 @@ def test_risk_recency_gate_abstains(quiet, tmp_path):
 
 def test_risk_recency_bad_mode_and_pickle(tmp_path):
     import pickle as _pickle
-    from blue_hybrid import RiskRecencyPriority
+    from blue.policies.hybrid import RiskRecencyPriority
     path = _toy_risk_model(str(tmp_path / "m.pkl"), 0.0)
     with pytest.raises(ValueError, match="mode"):
         RiskRecencyPriority(model_path=path, mode="nope")

@@ -5,8 +5,6 @@ logits layout), factorized structure (flat == host + cmd composition),
 gradient flow into all heads, save/load roundtrip, and slot-width
 derivation for the root-session ablation geometry.
 """
-import os
-import sys
 from types import SimpleNamespace as SN
 
 import pytest
@@ -14,12 +12,9 @@ import pytest
 torch = pytest.importorskip("torch", reason="factorized agent needs torch")
 th = torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
-
 from modules.agents import REGISTRY as agent_REGISTRY
-import blue_factorized_agent as factorized
-from blue_factorized_agent import FactorizedRNNAgent, N_SLOTS
+from blue.policies import factorized
+from blue.policies.factorized import FactorizedRNNAgent, N_SLOTS
 
 agent_REGISTRY["rnn_factorized"] = FactorizedRNNAgent
 
@@ -129,9 +124,9 @@ def test_greedy_ckpt_resume_factorized(tmp_path):
     # Minimal ckpt-resume path: random-weights agent.th in ckpt layout,
     # GreedyCheckpointPolicy loads it and emits legal actions for a few
     # quiet steps. Guards the torch eval path behind all MAPPO manifests.
-    import cc4_epymarl_wrapper as wrapper
+    import blue.core.wrapper as wrapper
     from CybORG.Agents import SleepAgent
-    from blue_eval_mappo import GreedyCheckpointPolicy
+    from blue.policies.eval_mappo import GreedyCheckpointPolicy
     agent = FactorizedRNNAgent(872, _args())
     ckpt = tmp_path / "ckpt"
     ckpt.mkdir()

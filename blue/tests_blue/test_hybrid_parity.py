@@ -8,8 +8,8 @@ identical per-tick action traces (agent, action, host).
 Seeds here are a fast regression subset; the full >=8-seed parity manifest
 is recorded in docs/proposals/01-hybrid-priority.md.
 """
-from blue_baselines import RoundRobinBaseline, evaluate_policies
-from blue_hybrid import HybridBluePolicy
+from blue.core.baselines import RoundRobinBaseline, evaluate_policies
+from blue.policies.hybrid import HybridBluePolicy
 
 PARITY_SEEDS = (7629, 7640)
 STEPS = 400

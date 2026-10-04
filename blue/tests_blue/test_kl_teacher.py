@@ -4,21 +4,11 @@ Tests the module-level teacher_kl() in isolation: identity, known value,
 asymmetry, and mask exclusion. Learner wiring (frozen teacher construction,
 loss addition, logging) is proven by the KL training run + its manifest.
 """
-import os
-
 import pytest
 
 torch = pytest.importorskip("torch", reason="learner imports torch")
 pytest.importorskip("components.episode_buffer", reason="needs epymarl on path")
 
-
-def _sys_path():
-    src = "/home/sourav/Projects/cyberally/third_party/epymarl/src"
-    if src not in os.sys.path:
-        os.sys.path.insert(0, src)
-
-
-_sys_path()
 from learners.ppo_learner import teacher_kl  # noqa: E402
 
 

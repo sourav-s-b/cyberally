@@ -4,18 +4,13 @@ Expectile asymmetry math, Bellman-target construction on a synthetic
 chain, AWR weight clipping stats, and EPyMARL key compatibility of the
 extracted factorized policy (pool loads it via mappo_ckpt_factorized).
 """
-import os
-import sys
-
 import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch", reason="IQL needs torch")
 th = torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from blue_iql import awr_weights, build_mlp, expectile_loss
+from blue.training.iql import awr_weights, build_mlp, expectile_loss
 
 
 def test_expectile_asymmetry():
@@ -51,7 +46,7 @@ def test_awr_weights_clip_and_stats():
 
 def test_awr_alpha_blend_endpoints():
     # alpha=1.0 is pure AWR; alpha=0.0 reproduces the free-tick mask
-    # (uniform BC weighting). Blend line from blue_iql main loop.
+    # (uniform BC weighting). Blend line from blue.training.iql main loop.
     adv = th.tensor([0.0, 2.0, -1.0, 5.0])
     free = th.tensor([1.0, 1.0, 0.0, 1.0])
     w, _ = awr_weights(adv, beta=1.0)
@@ -77,7 +72,7 @@ def test_bellman_target_terminal_and_bootstrapped():
 
 def test_extracted_policy_key_compat():
     from types import SimpleNamespace as SN
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     args = SN(hidden_dim=16, n_actions=155, use_rnn=True, n_agents=5,
               attn_layers=0)
     policy = factorized.FactorizedRNNAgent(872, args)

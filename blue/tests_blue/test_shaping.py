@@ -7,8 +7,8 @@ state may inform REWARDS; only Blue-visible observations inform policies.
 import numpy as np
 import pytest
 
-import cc4_epymarl_wrapper as wrapper
-from cc4_epymarl_wrapper import shaping_event_bonus, SHAPING_DEFAULTS
+import blue.core.wrapper as wrapper
+from blue.core.wrapper import shaping_event_bonus, SHAPING_DEFAULTS
 
 
 def test_bonus_clear_confirm_vandalism():

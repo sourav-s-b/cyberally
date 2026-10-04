@@ -6,8 +6,8 @@ bounds 17/17/17/17/51 with identical host indexing.
 """
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-import blue_baselines as baselines
+import blue.core.wrapper as wrapper
+import blue.core.baselines as baselines
 from CybORG.Agents import SleepAgent
 
 

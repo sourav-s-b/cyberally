@@ -5,7 +5,6 @@ run_episode observe_step hook (no-op for heuristics), and eval
 determinism of the RvS checkpoint policy on a short episode.
 """
 import os
-import sys
 
 import numpy as np
 import pytest
@@ -13,10 +12,7 @@ import pytest
 torch = pytest.importorskip("torch", reason="RvS needs torch")
 th = torch
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
-
-from blue_rvs_pretrain import RTG_SCALE, compute_rtg
+from blue.training.rvs import RTG_SCALE, compute_rtg
 
 ENV_KW = {"temporal_features": ("ages", "belief"),
           "include_root_session": True}
@@ -41,7 +37,7 @@ def test_compute_rtg_respects_lengths():
 
 def test_rtg_dim_split_keeps_heads():
     from types import SimpleNamespace as SN
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     args = SN(hidden_dim=16, n_actions=155, use_rnn=True, n_agents=5,
               attn_layers=0, rtg_dim=1)
     agent = factorized.FactorizedRNNAgent(873, args)
@@ -63,7 +59,7 @@ def test_rtg_dim_split_keeps_heads():
 
 
 def test_observe_hook_noop_for_heuristics():
-    from blue_baselines import SleepBaseline, run_episode
+    from blue.core.baselines import SleepBaseline, run_episode
     assert not hasattr(SleepBaseline(), "observe_step")
     run = run_episode(SleepBaseline(), seed=7629, steps=10, **ENV_KW)
     assert isinstance(run["cumulative_return"], float)
@@ -75,9 +71,9 @@ def test_rvs_eval_deterministic_short_episode():
     pytest.importorskip("torch")
     if not os.path.exists(os.path.join(ckpt, "agent.th")):
         pytest.skip("rvs_14 ckpt not trained")
-    from blue_baselines import run_episode
-    from blue_eval_rvs import RvSCheckpointPolicy
-    import cc4_epymarl_wrapper as wrapper
+    from blue.core.baselines import run_episode
+    from blue.policies.eval_rvs import RvSCheckpointPolicy
+    import blue.core.wrapper as wrapper
     probe = wrapper.CC4MARLEnv(steps=30, **ENV_KW)
     env_info = probe.get_env_info()
     probe.close()

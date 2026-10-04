@@ -7,11 +7,11 @@ rewards (trace-invariance test). Uses Sleep red/green for speed.
 """
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-from blue_action_masking import BlueZoneTracker
-from blue_obs_features import host_to_temporal
-import blue_baselines as baselines
-from blue_eval_mappo import policy_dims
+import blue.core.wrapper as wrapper
+from blue.core.masking import BlueZoneTracker
+from blue.core.obs_features import host_to_temporal
+import blue.core.baselines as baselines
+from blue.policies.eval_mappo import policy_dims
 from CybORG.Agents import SleepAgent
 
 
@@ -143,7 +143,7 @@ def test_greedy_policy_loads_matching_checkpoint_and_selects(calm, tmp_path):
     agents_mod = pytest.importorskip("modules.agents")
     from types import SimpleNamespace as SN
 
-    from blue_eval_mappo import GreedyCheckpointPolicy
+    from blue.policies.eval_mappo import GreedyCheckpointPolicy
     env = wrapper.CC4MARLEnv(steps=30, temporal_features=("ages",))
     env.reset(seed=7629)
     info = env.get_env_info()
