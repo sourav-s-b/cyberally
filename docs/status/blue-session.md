@@ -1208,6 +1208,24 @@ for winner + teacher, the one official-comparable number. If intervals
 overlap the teacher, recipe is answered; next is host-ordering on the
 teacher's sweep.
 
+## Phase -1 done: housekeeping, full packaging (2026-10-04)
+Deleted dead scripts (iforest x2, compare, train_smoke; history keeps
+them). blue/ repackaged: core/ (wrapper, obs_features, baselines,
+masking, telemetry, collect_telemetry), policies/ (hybrid, factorized,
+registry, eval_mappo, eval_rvs, eval_parallel), training/ (bc, rvs,
+iql, mappo, risk, risk_data, collect_bc), analysis/ (fqe,
+compare_power), common/ (logutil, val_split); short names, absolute
+blue.* imports, entry via `python -m` from repo root (defaults now
+blue/results/...). Registry specs dotted; _CACHE_SOURCES repo-relative
+(one scheduled full invalidation); hardcoded home paths normalized to
+repo-relative; tests on conftest path bootstrap (cwd-independent).
+Gate passed: check_source 207 files; pytest 146 passed 1 skipped from
+repo root; pool smoke fork+spawn green; RR 8201 recomputed -120.0
+bit-exact vs historic manifest. Stack: fa2b6b8 deletions, 1a11b78 core,
+4e2a7bc policies, b9cf785 training, 172e67b analysis/common, 8af9bff
+tests, 1c3854d indent fix. Docs commands in history unchanged; new
+-m convention applies going forward.
+
 ## Powered comparison executed (2026-10-03/04)
 
 20 ckpts (BC s0-9 + IQL-auto s0-9, same logs) + round_robin +
