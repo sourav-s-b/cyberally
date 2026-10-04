@@ -56,9 +56,9 @@ from envs import REGISTRY as env_REGISTRY  # noqa: E402
 from run import run_sequential  # noqa: E402
 from utils.logging import Logger, get_logger  # noqa: E402
 
-import cc4_epymarl_wrapper as wrapper  # noqa: E402
+import blue.core.wrapper as wrapper  # noqa: E402
 
-import blue_factorized_agent as factorized  # noqa: E402 (tracked module, no vendor edit)
+from blue.policies import factorized  # noqa: E402 (tracked module, no vendor edit)
 from modules.agents import REGISTRY as agent_REGISTRY  # noqa: E402
 agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
 

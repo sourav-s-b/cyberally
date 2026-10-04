@@ -1,7 +1,7 @@
 """Train the risk scorer: L2 logistic regression (numpy-only, no sklearn).
 
 Predicts P(host compromised now | 17 Blue-visible features) from the
-dataset collected by blue_risk_data.py. Privileged labels are training
+dataset collected by blue.training.risk_data. Privileged labels are training
 targets only -- the scorer sees features at select time. Class-balanced
 via pos_weight; deterministic full-batch gradient descent (fixed seed).
 
@@ -56,8 +56,8 @@ def auc(y, s):
 
 def main():
     ap = argparse.ArgumentParser(description="Train risk scorer")
-    ap.add_argument("--data", default="results/risk_data_v1.npz")
-    ap.add_argument("--out", default="results/risk_model_v1.pkl")
+    ap.add_argument("--data", default="blue/results/risk_data_v1.npz")
+    ap.add_argument("--out", default="blue/results/risk_model_v1.pkl")
     ap.add_argument("--l2", type=float, default=1.0)
     ap.add_argument("--lr", type=float, default=0.5)
     ap.add_argument("--iters", type=int, default=500)

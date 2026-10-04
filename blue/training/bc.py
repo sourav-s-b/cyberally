@@ -16,7 +16,7 @@ import numpy as np
 
 def main():
     parser = argparse.ArgumentParser(description="BC pre-train MAPPO actor")
-    parser.add_argument("--demos", default="results/bc_demos_rr.npz")
+    parser.add_argument("--demos", default="blue/results/bc_demos_rr.npz")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--opt-lr", type=float, default=5e-5,
@@ -58,12 +58,15 @@ def main():
     np.random.seed(cli.seed)
 
     import sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import blue_val_split as valsplit
-    import blue_logutil as logutil
-    sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
+    _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+    from blue.common import val_split as valsplit
+    from blue.common import logutil
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "third_party", "epymarl", "src"))
     from modules.agents import REGISTRY as agent_REGISTRY
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
     data = np.load(cli.demos)
     obs = data["obs"]        # (E, A, T, D)
@@ -228,7 +231,7 @@ def main():
     stamp = th.__version__  # noqa: keep linters quiet about unused import shape
     del stamp
     import datetime
-    out = cli.out or ("results/models/bc_rr_"
+    out = cli.out or ("blue/results/models/bc_rr_"
                       + datetime.datetime.now(datetime.timezone.utc)
                       .strftime("%Y%m%dT%H%M%SZ"))
     ckpt_dir = os.path.join(out, "0")
@@ -237,9 +240,9 @@ def main():
     # Full resume quad: EPyMARL load_models also restores critic.th and
     # both Adam states, so save a fresh critic (matching training geometry)
     # plus initial optimiser states. Fine-tune re-learns the value head.
-    sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "third_party", "epymarl", "src"))
     from modules.critics import REGISTRY as critic_REGISTRY
-    import cc4_epymarl_wrapper as wrapper
+    import blue.core.wrapper as wrapper
     probe = wrapper.CC4MARLEnv(steps=10, temporal_features=("ages", "belief"),
                                include_root_session=True)
     state_shape = probe.get_env_info()["state_shape"]

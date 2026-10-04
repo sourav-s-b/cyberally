@@ -1,11 +1,11 @@
 """Return-conditioned supervised training (RvS rung 1, proposal 14).
 
-Same loop as blue_bc_pretrain.py on the factorized head, but the GRU also
+Same loop as blue.training.bc on the factorized head, but the GRU also
 sees returns-to-go (team RTG / RTG_SCALE appended to obs), trained with
-cross-entropy against the logged teacher action. At eval (blue_eval_rvs.py)
+cross-entropy against the logged teacher action. At eval (blue.policies.eval_rvs)
 the policy is conditioned on a HIGH target return instead of the true RTG.
 
-Data must carry per-tick team rewards (blue_collect_bc.py --mix logs).
+Data must carry per-tick team rewards (blue.training.collect_bc --mix logs).
 """
 
 import argparse
@@ -30,7 +30,7 @@ def compute_rtg(rewards, lengths):
 
 def main():
     parser = argparse.ArgumentParser(description="RvS pre-train factorized actor")
-    parser.add_argument("--demos", default="results/offline_logs_14.npz")
+    parser.add_argument("--demos", default="blue/results/offline_logs_14.npz")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--batch-seqs", type=int, default=16)
@@ -54,12 +54,15 @@ def main():
     np.random.seed(cli.seed)
 
     import sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import blue_val_split as valsplit
-    import blue_logutil as logutil
-    sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
+    _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+    from blue.common import val_split as valsplit
+    from blue.common import logutil
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "third_party", "epymarl", "src"))
     from modules.agents import REGISTRY as agent_REGISTRY
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
     data = np.load(cli.demos)
     obs = data["obs"]        # (E, A, T, D)
@@ -223,7 +226,7 @@ def main():
     stopper.restore(agent)
 
     import datetime
-    out = cli.out or ("results/models/rvs_"
+    out = cli.out or ("blue/results/models/rvs_"
                       + datetime.datetime.now(datetime.timezone.utc)
                       .strftime("%Y%m%dT%H%M%SZ"))
     ckpt_dir = os.path.join(out, "0")
@@ -231,7 +234,7 @@ def main():
     th.save(agent.state_dict(), os.path.join(ckpt_dir, "agent.th"))
     # NOTE: no critic quad — the (obs+RTG) input dim matches no EPyMARL
     # actor layout, so there is no fine-tune resume path yet (proposal 16
-    # would need an RvS-aware updater). Eval only via blue_eval_rvs.py.
+    # would need an RvS-aware updater). Eval only via blue.policies.eval_rvs.
     with open(os.path.join(out, "rvs_manifest.json"), "w") as f:
         json.dump({"demos": cli.demos, "epochs": cli.epochs, "lr": cli.lr,
                    "agent": cli.agent,

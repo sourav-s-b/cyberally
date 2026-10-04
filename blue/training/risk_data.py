@@ -15,9 +15,9 @@ import os
 
 import numpy as np
 
-import cc4_epymarl_wrapper as wrapper
-from blue_baselines import RoundRobinBaseline
-from blue_obs_features import host_to_vector, host_to_temporal
+import blue.core.wrapper as wrapper
+from blue.core.baselines import RoundRobinBaseline
+from blue.core.obs_features import host_to_vector, host_to_temporal
 
 GROUPS = ("ages", "belief")
 N_BASE = 10 + 2 + 5
@@ -88,7 +88,7 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+",
                     default=[7901, 7902, 7903, 7904, 7905, 7906, 7907, 7908])
     ap.add_argument("--steps", type=int, default=400)
-    ap.add_argument("--out", default="results/risk_data_v1.npz")
+    ap.add_argument("--out", default="blue/results/risk_data_v1.npz")
     cli = ap.parse_args()
     Xs, ys, tallies = [], [], {}
     for s in cli.seeds:

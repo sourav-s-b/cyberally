@@ -12,8 +12,8 @@ import os
 
 import numpy as np
 
-import cc4_epymarl_wrapper as wrapper
-from blue_baselines import MaskedRandomBaseline, RoundRobinBaseline
+import blue.core.wrapper as wrapper
+from blue.core.baselines import MaskedRandomBaseline, RoundRobinBaseline
 
 ENV_KW = {"temporal_features": ("ages", "belief"),
           "include_root_session": True}
@@ -23,7 +23,7 @@ def make_teacher(name, seed):
     if name == "rr":
         return RoundRobinBaseline()
     if name == "lancer_v2":
-        from blue_hybrid import HybridBluePolicy
+        from blue.policies.hybrid import HybridBluePolicy
         return HybridBluePolicy(
             priority_fn="lancer",
             priority_kwargs={"fruitless_decay": 0.5})
@@ -88,7 +88,7 @@ def main():
                         help="fork-parallel workers over seeds (Phase C; "
                              "heuristic teachers need no torch, env is "
                              "process-safe). 1 = serial (default).")
-    parser.add_argument("--out", default="results/bc_demos_rr.npz")
+    parser.add_argument("--out", default="blue/results/bc_demos_rr.npz")
     cli = parser.parse_args()
 
     teachers = cli.mix.split(",") if cli.mix else [cli.teacher]

@@ -83,7 +83,7 @@ def build_mlp(in_dim, out_dim, hidden=256, layernorm=False):
 
 def main():
     parser = argparse.ArgumentParser(description="IQL-discrete on offline logs")
-    parser.add_argument("--demos", default="results/offline_logs_14.npz")
+    parser.add_argument("--demos", default="blue/results/offline_logs_14.npz")
     parser.add_argument("--tau", type=float, default=0.7,
                         help="expectile for V (upper envelope)")
     parser.add_argument("--beta", type=float, default=1.0,
@@ -132,11 +132,14 @@ def main():
     np.random.seed(cli.seed)
 
     import sys
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import blue_logutil as logutil
-    sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
+    _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+    from blue.common import logutil
+    sys.path.insert(0, os.path.join(_REPO_ROOT, "third_party", "epymarl", "src"))
     from modules.agents import REGISTRY as agent_REGISTRY
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     agent_REGISTRY["rnn_factorized"] = factorized.FactorizedRNNAgent
 
     data = np.load(cli.demos)
@@ -339,7 +342,7 @@ def main():
               flush=True)
 
     import datetime
-    out = cli.out or ("results/models/iql_"
+    out = cli.out or ("blue/results/models/iql_"
                       + datetime.datetime.now(datetime.timezone.utc)
                       .strftime("%Y%m%dT%H%M%SZ"))
     ckpt_dir = os.path.join(out, "0")
