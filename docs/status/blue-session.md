@@ -1275,6 +1275,26 @@ ported into ordered.py. scorer rows: 3306 from 4 dev eps
 
 ## MAPPO smoke + throughput (2026-10-04)
 
+## Phase 4 pilot done: clean run, no improvement (2026-10-04)
+
+New `blue/training/residual.py` (residual MLP + value head, PPO-clip
+on masked categoricals, combined logits = base + M*tanh(r), Phase-3
+body init with zeroed head) + `blue/training/residual_pilot.py`
+(fresh on-policy rollouts, MC returns to end, coverage/agreement/KL
+HALT triggers, greedy eval vs lancer + scheduler control).
+`OrderedPolicy.hook` sampler hook added (guard-first; parity re-green).
+20 iters x 8 eps on dev 7706-7729 (~51 min): coverage 1.00 throughout,
+no halts, agreement 1.0 -> ~0.5, KL ~0 (tiny updates), train returns
+flat ~-81. CAUGHT contamination bug first pass: eval controls ran with
+the trained-residual hook active (-442/-657 phantom tails); bisect
+proved ordered.py clean (no divergence vs hybrid through tick 399),
+fixed with non-recording GreedyHook + hook=None controls. Clean eval
+(dev 7629-7705): learned -83.0 vs lancer -75.2 vs sched -90.2, paired
+-7.8 SD 43.2 (inside null band). Verdict: first pilot = safe null
+(coverage held, no catastrophe, no gain). Manifest
+`resid-pilot1-20261004.json`. Next: replication or design change (more
+signal per update: GAE/larger batches/lr) — decide before Phase 5.
+
 `python -m blue.training.mappo --steps 30 --t-max 120` completes
 end-to-end under the new packaging (rollout + PPO update + save,
 15.7 s wall for 120 env steps ≈ 8 env-steps/s incl. updates).

@@ -178,8 +178,14 @@ class SweepScheduler:
                 if last_an is not None:
                     self._visited.setdefault(agent, set()).add(host)
 
-    def pick(self, env, agent, cands, score_fn=None, order_fn=None):
-        """Return the chosen host from legal sweep candidates."""
+    def pick(self, env, agent, cands, score_fn=None, order_fn=None,
+             choose_fn=None):
+        """Return the chosen host from legal sweep candidates.
+
+        Guard filtering applies first (learner regime stays guarded);
+        then choose_fn(cands, scored) if given, else order_fn/score
+        argmax. choose_fn receives the GUARDED candidate list.
+        """
         self._fold(env, agent)
         hosts = env.hostnames[agent]
         if self.guard:
@@ -189,10 +195,13 @@ class SweepScheduler:
                 cands = fresh
             else:
                 self._visited[agent] = set()  # resweep
+        scored = ([(score_fn(env, agent, h), h) for h in cands]
+                  if score_fn is not None else None)
+        if choose_fn is not None:
+            return choose_fn(cands, scored)
         if order_fn is not None:
             ordered = order_fn(cands, hosts, agent)
             return ordered[0] if ordered else None
-        scored = [(score_fn(env, agent, h), h) for h in cands]
         return max(scored, key=lambda sh: (sh[0], sh[1]))[1]
 
 
@@ -211,6 +220,14 @@ class OrderedPolicy:
         self.scheduler = SweepScheduler(guard=guard)
         self._cursor = {}
         self._tick_seen = {}
+        # Phase 4 sampler hook: hook(env, agent, cands, scored) -> picked
+        # host, where scored = [(score, host)] on the GUARDED candidate
+        # list (coverage guard applies before the learner ever sees the
+        # choice). None = argmax (reference). Rules 1-3 never consult the
+        # hook: only sweep decisions are learner-visible, so PPO records
+        # probabilities solely for actions it actually sampled. Parity
+        # tests run hook=None (unaffected).
+        self.hook = None
 
     def reset(self):
         self.scheduler.reset()
@@ -282,7 +299,13 @@ class OrderedPolicy:
         else:
             score_fn = (self.scorer.score if hasattr(self.scorer, "score")
                         else self.scorer)
-            pick = self.scheduler.pick(env, agent, cands, score_fn=score_fn)
+            if self.hook is not None:
+                pick = self.scheduler.pick(
+                    env, agent, cands, score_fn=score_fn,
+                    choose_fn=lambda c, s: self.hook(env, agent, c, s))
+            else:
+                pick = self.scheduler.pick(env, agent, cands,
+                                           score_fn=score_fn)
         if pick is None:
             return 0
         return action_index(env, agent, pick, "Analyse")
