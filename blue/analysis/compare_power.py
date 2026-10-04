@@ -9,11 +9,11 @@ IQL-auto arm (10 train seeds), round_robin, lancer_v2 (1 run x 16 tasks).
 Also computes selector regret: for FQE rank and for random choice, the
 normalized regret of the best true-mean policy among the top-k ranked
 (regret = (best_true - best_of_topk) / range_true). FQE values come from
---fqe-jsonl (blue_fqe_select.py --out on the 20 fresh ckpts); without it,
+--fqe-jsonl (blue.analysis.fqe --out on the 20 fresh ckpts); without it,
 only the random baseline is reported.
 
 Usage:
-  ../.venv-train/bin/python blue/blue_powered_compare.py [--fqe-jsonl FILE]
+  ../.venv-train/bin/python -m blue.analysis.compare_power [--fqe-jsonl FILE]
 """
 
 import argparse
@@ -24,17 +24,22 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 FRESH_SEEDS = list(range(8201, 8217))
 N_BOOT = 2000
 
 
 def load_fresh(pattern="docs/proposals/manifests/*-fresh-20261003.json",
-               root="/home/sourav/Projects/cyberally"):
+               root=None):
     arms = {"bc": [], "iql": []}
     teachers = {}
     names = {}
+    if root is None:
+        root = _REPO_ROOT
     for f in sorted(glob.glob(os.path.join(root, pattern))):
         m = json.load(open(f))
         for pol, per in m["cells"].items():

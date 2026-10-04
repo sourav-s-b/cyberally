@@ -11,8 +11,8 @@ ICML 2019, Algorithm 3 faithfully:
   - discounted Monte-Carlo anchor for the logging policy (same gamma).
 
 Usage:
-  python blue_fqe_select.py --demos results/offline_logs_14.npz \
-      --ckpt results/models/iql_14a05 --label iql_14a05 --out /tmp/fqe.jsonl
+  python -m blue.analysis.fqe --demos blue/results/offline_logs_14.npz \
+      --ckpt blue/results/models/iql_14a05 --label iql_14a05 --out /tmp/fqe.jsonl
 """
 
 import argparse
@@ -22,8 +22,11 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import blue_logutil as logutil
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from blue.common import logutil
 
 
 def flatten_log(demos, gamma):
@@ -80,7 +83,7 @@ def load_policy(ckpt_dir, obs_dim, n_actions, n_agents, hidden_dim,
                 attn_layers, rtg_dim):
     import torch as th
     from types import SimpleNamespace as SN
-    import blue_factorized_agent as factorized
+    from blue.policies import factorized
     args = SN(hidden_dim=hidden_dim, n_actions=n_actions, use_rnn=True,
               n_agents=n_agents, attn_layers=attn_layers, rtg_dim=rtg_dim)
     policy = factorized.FactorizedRNNAgent(obs_dim, args)
@@ -132,7 +135,7 @@ def fit_fqe(flat, pi_NS, obs_dim, n_actions, gamma,
             q_iters, batch, lr, seed):
     """TRUE FQE: regress Q(s, a_logged); bootstrap Q(s', pi(s'))."""
     import torch as th
-    from blue_iql import build_mlp
+    from blue.training.iql import build_mlp
     th.manual_seed(seed)
     rng = np.random.RandomState(seed)
     S, A, R, NS, D = flat["S"], flat["A"], flat["R"], flat["NS"], flat["D"]
@@ -198,7 +201,7 @@ def score_candidate(flat, ckpt_dir, hidden_dim, attn_layers, rtg_dim,
 
 def main():
     ap = argparse.ArgumentParser(description="true-FQE V(s0) ckpt ranking")
-    ap.add_argument("--demos", default="results/offline_logs_14.npz")
+    ap.add_argument("--demos", default="blue/results/offline_logs_14.npz")
     ap.add_argument("--ckpt", action="append", default=[])
     ap.add_argument("--label", action="append", default=[])
     ap.add_argument("--gamma", type=float, default=0.99)
