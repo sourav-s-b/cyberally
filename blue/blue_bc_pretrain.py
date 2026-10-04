@@ -60,6 +60,7 @@ def main():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import blue_val_split as valsplit
+    import blue_logutil as logutil
     sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
     from modules.agents import REGISTRY as agent_REGISTRY
     import blue_factorized_agent as factorized
@@ -105,6 +106,8 @@ def main():
     loss_fn = th.nn.CrossEntropyLoss(weight=weight, reduction="none")
 
     torder = train_idx.copy()
+    prog = logutil.Progress(cli.epochs)
+    hist = []  # per-epoch curve rows -> train_log.jsonl
     tot_nonsleep_correct = tot_nonsleep = 0
     host_correct = host_toks = 0
     use_aux = cli.aux_host_weight > 0
@@ -203,9 +206,18 @@ def main():
                 v_loss += float(vl) * int(mask.sum())
                 v_toks += int(mask.sum())
             val_loss = v_loss / max(v_toks, 1)
+        hist.append({"epoch": epoch, "elapsed_s": round(prog.elapsed(), 1),
+                     "train_loss": tot_loss / tot_toks,
+                     "train_acc": tot_correct / tot_toks,
+                     "train_nonsleep_acc": (tot_nonsleep_correct
+                                            / max(tot_nonsleep, 1)),
+                     "val_loss": val_loss,
+                     "val_best": stopper.best,
+                     "val_best_epoch": stopper.best_epoch})
         print(f"epoch {epoch:3d} val-loss {val_loss:.4f} "
               f"(best {stopper.best if stopper.best is not None else float('nan'):.4f} "
-              f"@{stopper.best_epoch})", flush=True)
+              f"@{stopper.best_epoch}) "
+              f"{prog.line(epoch)}", flush=True)
         if stopper.update(epoch, val_loss, agent):
             print(f"early stop at epoch {epoch} "
                   f"(best val {stopper.best:.4f} @{stopper.best_epoch})",
@@ -260,6 +272,9 @@ def main():
                    "final_acc": tot_correct / tot_toks,
                    "final_nonsleep_acc": (tot_nonsleep_correct
                                           / max(tot_nonsleep, 1))}, f, indent=1)
+    with open(os.path.join(out, "train_log.jsonl"), "w") as f:
+        for row in hist:
+            f.write(json.dumps(row) + "\n")
     print("wrote", ckpt_dir + "/agent.th")
 
 

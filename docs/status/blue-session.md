@@ -1191,6 +1191,52 @@ Manifest `review-followup-20261003.json`. Standing: nothing demonstrates
 a reliable learned > heuristic; every positive is selection-seed and/or
 single-run.
 
+## Powered comparison plan (review#2, 2026-10-03; FROZEN)
+
+Stop comparing checkpoints. Two frozen recipes, 10 seeds each:
+- Arm IQL-auto: blue_iql.py tau .7 / alpha .5 / awr-mode auto / ESS .3,
+  q auto (~20k), pol 30 (seeds 0-4 exist, train 5-9).
+- Arm BC: blue_bc_pretrain.py --agent rnn_factorized on the SAME
+  offline_logs_14.npz, fixed 30 epochs, patience 0 (seeds 0-9 new).
+Eval: all 20 ckpts + round_robin + lancer_v2 on FRESH 8201-8216
+(16 seeds, paired; 8200-8420 verified unused as eval seeds).
+7801-7808 declared CONTAMINATED (3 ckpts viewed) -- no more decisions
+on it. Report: rliable IQM + 95% stratified-bootstrap CI + P(improve)
+vs teacher. Selector test: FQE vs random top-k normalized regret on the
+20 rolled-out ckpts. Closer: FiniteStateRed 100x500 (seeds 8301-8400)
+for winner + teacher, the one official-comparable number. If intervals
+overlap the teacher, recipe is answered; next is host-ordering on the
+teacher's sweep.
+
+## Powered comparison executed (2026-10-03/04)
+
+20 ckpts (BC s0-9 + IQL-auto s0-9, same logs) + round_robin +
+lancer_v2, all on fresh 8201-8216 (16 paired seeds). 21 pool manifests
+`*-fresh-20261003.json`. `blue/blue_powered_compare.py`: stratified
+bootstrap (resample runs, all tasks; rliable installed via uv but its
+arch-dependent bootstrap path is version-broken both directions, so
+estimators reimplemented per Agarwal et al. -- documented in-script).
+Fresh means: BC arm -115.6 [-133.8,-99.1] IQM -73.4; IQL-auto -97.9
+[-104.9,-92.0] IQM -88.7; RR -94.1/-82.2; lancer -83.6/-72.8.
+P(IQL>RR)=0.48 [0.41,0.56], P(IQL>lancer)=0.36 [0.30,0.41];
+P(BC>RR)=0.66, P(BC>lancer)=0.61 (pairwise wins most cells, loses means
+-- heavy-tail signature, not a beating claim). Verdict: IQL-auto ~= RR,
+lancer clearly ahead; recipe answered, no reliable beating. NOTE: an
+earlier script version negated returns (inverting the report); caught
+before any commit, fixed, rerun. Random top-k regret baselines recorded
+(top1 .363 / top3 .130 / top5 .078); FQE side pending (parked -- see
+delivery plan).
+
+## Richer logging installed (2026-10-04)
+
+New `blue/blue_logutil.py` (Progress: [done/total] t= ETA + fmt_dur;
+stdlib only). Wired: BC/RvS per-epoch ETA + train_log.jsonl curves;
+IQL q-loop it/s + pol-epoch ETA + phased train_log.jsonl; FQE fit iters
++ candidate progress; pool switched map->as_completed with per-cell
+`cell [i/N] t= eta=` lines. Standing convention: every long command
+runs `2>&1 | tee /tmp/<run>.log | tail`. Smoke-verified (BC 2-epoch,
+pool 2-cell); smoke manifest deleted.
+
 ## Phase C: local speedups landed (2026-10-02)
 
 No cloud needed. Four changes on blue/mappo-training: (1) `--q-epochs`

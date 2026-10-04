@@ -23,6 +23,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import blue_logutil as logutil
 
 
 def flatten_log(demos, gamma):
@@ -146,6 +147,7 @@ def fit_fqe(flat, pi_NS, obs_dim, n_actions, gamma,
     qt = build_mlp(obs_dim, n_actions)
     qt.load_state_dict(q.state_dict())
     opt = th.optim.Adam(q.parameters(), lr=lr)
+    prog = logutil.Progress(q_iters)
     for it in range(1, q_iters + 1):
         idx = th.from_numpy(rng.choice(n_tr, batch, replace=False))
         s, a, r, ns, d = (tS[idx], tA[idx], tR[idx], tNS[idx], tD[idx])
@@ -160,6 +162,9 @@ def fit_fqe(flat, pi_NS, obs_dim, n_actions, gamma,
         with th.no_grad():
             for p, pt in zip(q.parameters(), qt.parameters()):
                 pt.mul_(0.995).add_(p, alpha=0.005)
+        if it % 5000 == 0 or it == 1:
+            print(f"  fqe iter {it:6d} loss {float(loss.detach()):.4f} "
+                  f"{prog.line(it)}", flush=True)
     with th.no_grad():
         pred_all = q(tS).gather(1, tA.unsqueeze(1)).squeeze(1)
         tq_all = tR + gamma * (1.0 - tD) * qt(tNS).gather(
@@ -217,7 +222,9 @@ def main():
           f"(undisc {flat['mc_undisc']:.1f})")
 
     rows = []
-    for ckpt_dir, label in zip(cli.ckpt, labels):
+    cprog = logutil.Progress(len(cli.ckpt))
+    for n, (ckpt_dir, label) in enumerate(zip(cli.ckpt, labels), 1):
+        print(f"candidate {label} {cprog.line(n - 1)}", flush=True)
         v_s0, resids = score_candidate(
             flat, ckpt_dir, cli.hidden_dim, cli.attn_layers,
             cli.rtg_dim, cli.gamma, cli.q_iters, cli.batch, cli.lr,

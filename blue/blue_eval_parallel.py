@@ -200,10 +200,23 @@ def run_pool(cells, workers, start_method, use_cache=True):
             order.append(i)
             pending.append(cell)
     if pending:
+        import blue_logutil as logutil
         ctx = mp.get_context(start_method)
+        cprog = logutil.Progress(len(pending))
         with cf.ProcessPoolExecutor(max_workers=workers,
                                     mp_context=ctx) as pool:
-            fresh = list(pool.map(run_cell, pending))
+            futs = {pool.submit(run_cell, cell): pos
+                    for pos, cell in enumerate(pending)}
+            fresh = [None] * len(pending)
+            n_done = 0
+            for fut in cf.as_completed(futs):
+                pos = futs[fut]
+                fresh[pos] = fut.result()
+                n_done += 1
+                r = fresh[pos]
+                print(f"cell {cprog.line(n_done)} "
+                      f"{r['policy']} seed={r['seed']} "
+                      f"return={r['return']:.1f}", flush=True)
         for pos, (i, r) in enumerate(zip(order, fresh)):
             r["cached"] = False
             results[i] = r

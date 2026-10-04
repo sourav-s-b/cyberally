@@ -133,6 +133,7 @@ def main():
 
     import sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import blue_logutil as logutil
     sys.path.insert(0, "/home/sourav/Projects/cyberally/third_party/epymarl/src")
     from modules.agents import REGISTRY as agent_REGISTRY
     import blue_factorized_agent as factorized
@@ -202,6 +203,8 @@ def main():
     v = build_mlp(obs_dim, 1, layernorm=cli.layernorm)
     opt_q = th.optim.Adam(q.parameters(), lr=cli.lr)
     opt_v = th.optim.Adam(v.parameters(), lr=cli.lr)
+    qprog = logutil.Progress(q_iters)
+    qhist = []
 
     for it in range(1, q_iters + 1):
         idx = th.from_numpy(np.random.choice(n_tr, cli.batch, replace=False))
@@ -229,8 +232,15 @@ def main():
             for p, pt in zip(q.parameters(), qt.parameters()):
                 pt.mul_(0.995).add_(p, alpha=0.005)
         if it % 5000 == 0 or it == 1:
-            print(f"iter {it:6d} loss_v {float(loss_v):.4f} "
-                  f"loss_q {float(loss_q):.4f} v_mean {float(v_s.mean()):.2f}",
+            el = qprog.elapsed()
+            rate = it / max(el, 1e-9)
+            qhist.append({"iter": it, "elapsed_s": round(el, 1),
+                          "iters_per_s": round(rate, 1),
+                          "loss_v": float(loss_v), "loss_q": float(loss_q),
+                          "v_mean": float(v_s.mean())})
+            print(f"iter {it:6d} {rate:6.1f}it/s loss_v {float(loss_v):.4f} "
+                  f"loss_q {float(loss_q):.4f} v_mean {float(v_s.mean()):.2f} "
+                  f"{qprog.line(it)}",
                   flush=True)
 
     # Advantages on ALL transitions (frozen nets), then AWR weights.
@@ -289,6 +299,8 @@ def main():
     policy = factorized.FactorizedRNNAgent(obs_dim, args)
     opt_p = th.optim.Adam(policy.parameters(), lr=1e-3)
     order = np.arange(n_seqs)
+    pprog = logutil.Progress(cli.pol_epochs)
+    phist = []
     for epoch in range(1, cli.pol_epochs + 1):
         np.random.shuffle(order)
         tot_loss, tot_w = 0.0, 0.0
@@ -320,7 +332,10 @@ def main():
             opt_p.step()
             tot_loss += float(loss) * float(denom)
             tot_w += float(denom)
-        print(f"pol epoch {epoch:3d} wloss {tot_loss/max(tot_w,1e-9):.4f}",
+        phist.append({"epoch": epoch, "elapsed_s": round(pprog.elapsed(), 1),
+                      "wloss": tot_loss / max(tot_w, 1e-9)})
+        print(f"pol epoch {epoch:3d} wloss {tot_loss/max(tot_w,1e-9):.4f} "
+              f"{pprog.line(epoch)}",
               flush=True)
 
     import datetime
@@ -347,6 +362,11 @@ def main():
                    "adv_max": float(adv.max()),
                    "w_mean": float(w.mean()),
                    "frac_clipped": float(frac_clip)}, f, indent=1)
+    with open(os.path.join(out, "train_log.jsonl"), "w") as f:
+        for row in qhist:
+            f.write(json.dumps({"phase": "q", **row}) + "\n")
+        for row in phist:
+            f.write(json.dumps({"phase": "pol", **row}) + "\n")
     print("wrote", ckpt_dir + "/agent.th")
     return out
 
