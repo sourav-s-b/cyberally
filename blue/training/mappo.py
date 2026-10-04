@@ -80,7 +80,7 @@ def _make_train_env(**kw):
 env_REGISTRY["cc4"] = _make_train_env
 
 
-def build_config(steps=100, t_max=800, seed=7, results="results",
+def build_config(steps=100, t_max=800, seed=7, results="blue/results",
                  train_seeds=(7629, 7630, 7640), save_interval=2000,
                  lr=0.0003,
                  temporal_features=("ages", "belief", "freshness", "mission"),

@@ -1231,15 +1231,10 @@ tests, 1c3854d indent fix. Docs commands in history unchanged; new
 
 ## Phase 1 done: clean guided.py, bit-exact gate passes (2026-10-04)
 
-New `blue/policies/guided.py`: fresh rules 1-3 + scorer interface
-(`GuidedBluePolicy`) + reimplemented lancer dynamics (`GuidedPriority`,
-fruitless_decay 0.5 to match hybrid_lancer_v2) + `ResidualAnchor`
-Phase 4 contract stub (teacher bonus M, zero-residual == teacher under
-argmax). Gate `tests_blue/test_guided_parity.py`: canonical trace SHAs
-identical vs hybrid_lancer_v2 on 7629/7630/7702 (plus parity-None pair
-and per-call scorer equality) — passed first attempt, no fallback.
-Time-box barely touched. Next: Phase 3 imitation init with
-argmax-agreement rate.
+SUPERSEDED by the parallel-track merge below: independent
+reimplementation passed its own bit-exact gate, then was removed to
+keep ordered.py canonical; ResidualAnchor ported. Pre-merge
+verification stands as cross-evidence.
 
 `docs/research/lancer-audit-20261004.md`: decoys structurally absent
 (no Deploy action in wrapper space — environment gap, not impl gap);
@@ -1264,6 +1259,29 @@ Verdict: ordering matters (obsbump proves the downside; coverage drive
 mandatory), lancer captures most but not all — headroom ~16 pts, above
 the 10-pt regression margin. Pilot target: beat lancer by ~10+ at
 coverage 1.0. Manifest `ordering-phase2-20261004.json` (160 cells).
+
+## Parallel-track merge (2026-10-04)
+
+Commit 9aa89ec (other session) built the canonical track in parallel:
+`blue/policies/ordered.py` (rules + SweepScheduler guard OFF/ON +
+CursorSweep/LancerValues, trace-identical to HybridBluePolicy both
+configs) + `test_ordered_parity.py` (verified passing here) +
+`blue/training/scorer.py` Phase 3 imitation (44% top-1 agreement, val
+49%; stateless 18%; gap = carried dynamics, PPO's job). My parallel
+`guided.py` passed its own bit-exact gate first, then was removed to
+keep one source of truth; its `ResidualAnchor` Phase 4 contract was
+ported into ordered.py. scorer rows: 3306 from 4 dev eps
+(`scorer-phase3-20261004.json`).
+
+## MAPPO smoke + throughput (2026-10-04)
+
+`python -m blue.training.mappo --steps 30 --t-max 120` completes
+end-to-end under the new packaging (rollout + PPO update + save,
+15.7 s wall for 120 env steps ≈ 8 env-steps/s incl. updates).
+Implication: a few thousand 400-step episodes ≈ a day+ on this box —
+Phase 4 pilot must budget a few hundred episodes or justify more.
+Also fixed mappo results default to blue/results (smoke run wrote to
+repo-root results/, removed). Next: Phase 4 budgeted pilot design.
 
 ## Phase 1 done: clean rebuild, bit-exact first try (2026-10-04)
 

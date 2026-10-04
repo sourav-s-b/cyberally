@@ -286,3 +286,34 @@ class OrderedPolicy:
         if pick is None:
             return 0
         return action_index(env, agent, pick, "Analyse")
+
+
+class ResidualAnchor:
+    """Phase 4 contract: teacher-bonused residual scorer (no learner yet).
+
+    Wraps a frozen ``score_fn`` as ``score = base(...) + M*tanh(r(...))``
+    with fixed ``M > 0``: a zero residual reproduces the base policy
+    exactly under argmax, and ``M`` is the single dial bounding how far
+    training can drift from the heuristic. Deployment stays masked
+    argmax via the scheduler. Merged from the parallel guided.py track
+    (bit-exact parity verified there before the merge; canonical track
+    is this file + test_ordered_parity.py).
+    """
+
+    def __init__(self, base, bonus=1.0):
+        self.base = base
+        self.bonus = float(bonus)
+
+    def reset(self):
+        reset = getattr(self.base, "reset", None)
+        if callable(reset):
+            reset()
+
+    def score(self, env, agent, host):
+        import math
+        base = (self.base.score(env, agent, host)
+                if hasattr(self.base, "score")
+                else self.base(env, agent, host))
+        return base + self.bonus * math.tanh(0.0)
+
+    __call__ = score
