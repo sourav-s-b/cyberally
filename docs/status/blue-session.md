@@ -1253,6 +1253,28 @@ mandatory), lancer captures most but not all — headroom ~16 pts, above
 the 10-pt regression margin. Pilot target: beat lancer by ~10+ at
 coverage 1.0. Manifest `ordering-phase2-20261004.json` (160 cells).
 
+## Phase 1 done: clean rebuild, bit-exact first try (2026-10-04)
+
+New `blue/policies/ordered.py`: fresh rules 1-3 + explicit
+SweepScheduler (coverage guard OFF = reference argmax; ON = unvisited
+restriction with resweep for the learner regime) + fresh CursorSweep /
+LancerValues scorers sharing the priority_fn signature. Acceptance in
+`blue/tests_blue/test_ordered_parity.py`: both configs trace-identical
+to HybridBluePolicy on full episodes — PASSED first attempt (1 of 20
+verify cycles used). No fallback needed.
+
+## Phase 3 done: imitation init at 44% agreement (2026-10-04)
+
+New `blue/training/scorer.py` (collect/train/eval): reference-policy
+decision rows (candidates + pick, decision-time views) from 4 dev eps
+(3306 rows), shared MLP scorer, CE over candidates, blocked split.
+Stateless 10-dim: 18% agreement. +history (analysis/remediation age,
+CONFIRMED/VERIFY flags): 44% top-1 (val 49%). Remaining gap = carried
+fruitless/novelty dynamics, not statically reproducible — recorded as
+the PPO pilot's job, not a defect. Manifest
+`scorer-phase3-20261004.json`. Next: Phase 4 budgeted PPO pilot
+(throughput first, coverage/divergence as stop triggers).
+
 ## Powered comparison executed (2026-10-03/04)
 
 20 ckpts (BC s0-9 + IQL-auto s0-9, same logs) + round_robin +
