@@ -65,16 +65,38 @@ class OracleOnset:
 
     Reads privileged compromise state at select time. For measurement
     only; any policy shipping this would be cheating.
+
+    ``_compromised_set()`` is cached per tick. The pre-repair version
+    called it once per HOST per decision (435 calls/tick at 87 hosts x 5
+    agents), which dominated the oracle's runtime (82 s vs 22 s per
+    episode). Caching only the set -- not the per-agent onset bookkeeping --
+    leaves the scores bit-identical: every call still folds the whole set
+    into ``self._onset`` for the calling agent, exactly as before.
+    ``privileged_calls`` is reported so the saving is visible rather than
+    assumed.
     """
 
     def __init__(self):
         self._onset = {}
+        self._tick = None
+        self._comp = frozenset()
+        self.privileged_calls = 0
 
     def reset(self):
         self._onset = {}
+        self._tick = None
+        self._comp = frozenset()
+
+    def _compromised(self, env):
+        tick = env._tick
+        if self._tick != tick:
+            self._tick = tick
+            self._comp = frozenset(env._compromised_set())
+            self.privileged_calls += 1
+        return self._comp
 
     def __call__(self, env, agent, host):
-        comp = env._compromised_set()
+        comp = self._compromised(env)
         tick = env._tick
         for h in comp:
             self._onset.setdefault((agent, h), tick)
@@ -88,11 +110,31 @@ def _decode(env, agent, action_idx):
     return name, host
 
 
-def run_ordering_episode(policy, seed, steps=400, **env_kwargs):
+# Metric columns produced by this module are KNOWN INVALID (see the module
+# docstring and docs/status/blue-session.md 2026-10-04). ``return`` and
+# ``steps`` are still exact, which is why this entry point remains for
+# reproducing historical returns. The invalid columns are withheld unless a
+# caller explicitly opts in, so nobody can quietly publish them again.
+LEGACY_INVALID_METRICS = ("coverage", "max_age", "det_delay_median",
+                          "n_undetected")
+LEGACY_INVALID_REASON = (
+    "invalid: requested-vs-completed analyses, first-analysis-only, failed "
+    "requests counted, non-defendable hosts included, final-tick age reported "
+    "as max age. Use blue.analysis.compare + blue.analysis.metrics. "
+    "Manifest: docs/proposals/manifests/guard-maxage-20261004.json")
+
+
+def run_ordering_episode(policy, seed, steps=400, emit_invalid_metrics=False,
+                         **env_kwargs):
     """Mirror run_episode stepping + record privileged compromise timeline
     (eval-only) and per-host analyse ticks for delay/coverage metrics.
     Takes a CONSTRUCTED policy (fresh scorer per episode is the caller's
-    job; policy.reset() is called here)."""
+    job; policy.reset() is called here).
+
+    ``emit_invalid_metrics=False`` (default) returns ``None`` for the four
+    legacy metric fields and adds ``legacy_invalid_metrics`` to the result.
+    ``return``/``steps``/``n_compromised``/``n_remediations`` are unaffected.
+    """
     env = CC4MARLEnv(seed=seed, steps=steps, **env_kwargs)
     env.reset(seed=seed)
     policy.reset()
@@ -133,14 +175,20 @@ def run_ordering_episode(policy, seed, steps=400, **env_kwargs):
         for host in zone_hosts[agent]:
             last = analysed_at.get((agent, host))
             ages.append(tick - last if last is not None else tick)
-    return {"seed": seed, "steps": tick, "return": cumulative,
-            "n_compromised": len(onset),
+    out = {"seed": seed, "steps": tick, "return": cumulative,
+           "n_compromised": len(onset), "n_remediations": remediations}
+    if emit_invalid_metrics:
+        out.update({
             "coverage": len(analysed_hosts) / max(total_hosts, 1),
             "max_age": max(ages) if ages else tick,
             "det_delay_median": (delays[len(delays) // 2] if delays
                                  else None),
             "n_undetected": undetected,
-            "n_remediations": remediations}
+        })
+    else:
+        out.update({k: None for k in LEGACY_INVALID_METRICS})
+        out["legacy_invalid_metrics"] = LEGACY_INVALID_REASON
+    return out
 
 
 VARIANTS = {
@@ -162,9 +210,18 @@ def main():
                     help="use OrderedPolicy with coverage guard ON (learner "
                          "regime) instead of HybridBluePolicy; variants map "
                          "to guard-aware equivalents")
+    ap.add_argument("--emit-invalid-metrics", action="store_true",
+                    help="also emit the KNOWN INVALID legacy metric columns "
+                         "(coverage, max_age, det_delay_median, n_undetected). "
+                         "Withheld by default; use blue.analysis.compare "
+                         "instead.")
     ap.add_argument("--only", nargs="*", default=None,
                     help="run a subset of variants (default: all)")
     cli = ap.parse_args()
+    if not cli.emit_invalid_metrics:
+        print("note: legacy metric columns withheld as KNOWN INVALID; pass "
+              "--emit-invalid-metrics to reproduce them, or use "
+              "blue.analysis.compare for corrected metrics")
     env_kwargs = {"temporal_features": ("ages", "belief"),
                   "include_root_session": True, "red_agent": "discovery"}
     for name, spec in VARIANTS.items():
@@ -199,19 +256,24 @@ def main():
                                            guard=True)
                 elif name == "obsbump":
                     policy = OrderedPolicy(scorer=ObsBump(), guard=True)
-                r = run_ordering_episode(policy, seed, cli.steps,
-                                         **env_kwargs)
+                r = run_ordering_episode(
+                    policy, seed, cli.steps,
+                    emit_invalid_metrics=cli.emit_invalid_metrics,
+                    **env_kwargs)
             else:
                 policy = HybridBluePolicy(priority_fn=fn)
-                r = run_ordering_episode(policy, seed, cli.steps,
-                                         **env_kwargs)
+                r = run_ordering_episode(
+                    policy, seed, cli.steps,
+                    emit_invalid_metrics=cli.emit_invalid_metrics,
+                    **env_kwargs)
             r["variant"] = name
             r["guard"] = bool(cli.guard)
             line = (f"{name:8s} seed={seed} return={r['return']:+7.1f} "
-                    f"cov={r['coverage']:.2f} maxage={r['max_age']:3d} "
-                    f"detmed={r['det_delay_median']} "
-                    f"undet={r['n_undetected']}/{r['n_compromised']} "
-                    f"rem={r['n_remediations']}")
+                    f"comp={r['n_compromised']:3d} rem={r['n_remediations']:3d}")
+            if cli.emit_invalid_metrics:
+                line += (f" cov={r['coverage']:.2f} maxage={r['max_age']:3d} "
+                         f"detmed={r['det_delay_median']} "
+                         f"undet={r['n_undetected']}  [INVALID COLUMNS]")
             print(line, flush=True)
             if cli.out:
                 with open(cli.out, "a") as f:
