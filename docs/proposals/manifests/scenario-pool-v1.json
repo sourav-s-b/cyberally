@@ -1,0 +1,137 @@
+{
+ "pool_id": "blue-scenario-pool-v1",
+ "created": "2026-10-05",
+ "git_commit": "1424a638e83ad797f154db91fe5428f01ee8de30",
+ "wrapper_version": "foundation-v3",
+ "red_agents": {
+  "discovery": {
+   "class": "DiscoveryFSRed",
+   "wrapper_flag": "discovery",
+   "note": "default; matches all prior results"
+  },
+  "finite": {
+   "class": "FiniteStateRedAgent",
+   "wrapper_flag": "finite",
+   "note": "scripted, harsher (-139 vs -59 teacher)"
+  }
+ },
+ "regimes": [
+  {
+   "regime": "discovery-dev",
+   "red_agent": "discovery",
+   "seeds": [
+    7629,
+    7630,
+    7640,
+    7701,
+    7702,
+    7703,
+    7704,
+    7705,
+    7706,
+    7707,
+    7708,
+    7709,
+    7710,
+    7711,
+    7712,
+    7713,
+    7714,
+    7715,
+    7716,
+    7717,
+    7718,
+    7719,
+    7720,
+    7721,
+    7722,
+    7723,
+    7724,
+    7725,
+    7726,
+    7727,
+    7728,
+    7729
+   ],
+   "results": [
+    "guard-maxage-matrix-20261004(-cells)",
+    "heuristic_screen.json",
+    "deviation_discovery.json",
+    "mappo_guide1_eval.json",
+    "mappo_guide2 shield sweeps"
+   ]
+  },
+  {
+   "regime": "finite-dev",
+   "red_agent": "finite",
+   "seeds": [
+    7629,
+    7630,
+    7640,
+    7701,
+    7702,
+    7703,
+    7704,
+    7705,
+    7706,
+    7707,
+    7708,
+    7709,
+    7710,
+    7711,
+    7712,
+    7713,
+    7714,
+    7715,
+    7716,
+    7717,
+    7718,
+    7719,
+    7720,
+    7721,
+    7722,
+    7723,
+    7724,
+    7725,
+    7726,
+    7727,
+    7728,
+    7729
+   ],
+   "results": [
+    "deviation_finite.json",
+    "deviation_shield05_finite.json",
+    "deviation_shield02_finite.json"
+   ]
+  }
+ ],
+ "eval_block": {
+  "range": [
+   7809,
+   8200
+  ],
+  "granted": "2026-10-05",
+  "consumed_inside": {
+   "7801-7808": "guard-matrix spillover",
+   "8001-8008": "red-finite-20261002",
+   "8201-8216": "prior consumption"
+  },
+  "rule": "frozen evals consume a frozen prefix disjoint from consumed sub-ranges; prefix recorded in eval manifest; no training on block"
+ },
+ "held_out": "eval-block seeds x both regimes; untouched until frozen eval",
+ "belief_spec": {
+  "note": "deferred until a manager exists; signals must be Blue-visible only",
+  "candidate_signals": [
+   "rolling compromise rate (observed CONFIRMED/(analysed))",
+   "detection-delay trend (Step-2 definitions)",
+   "pending-lockout rate",
+   "never-investigated growth rate"
+  ],
+  "forbidden": [
+   "hidden Red labels",
+   "true compromise sets",
+   "live LLM endpoint state"
+  ]
+ },
+ "step4_status": "SKIPPED with reason: Steps 3 found no demonstrated headroom in ordering or detection; no alternative skill specified; no learned manager authorized"
+}

@@ -1794,6 +1794,37 @@ activity features and usually picks wrong — evidence for the Phase C
 fallback (override only on decisive margins) rather than more training of
 this recipe.
 
+## Steps 5-7 (review plan), 2026-10-05 — pool, finite top-up, gate
+
+Step 5: `scenario-pool-v1.json` committed — regimes {discovery, finite} x
+dev seeds with result pointers, wrapper foundation-v3, eval block
+7809–8200 with consumed sub-ranges (7801–7808, 8001–8008, 8201–8216)
+excluded from any frozen prefix, held-out rule, belief-signal spec
+(Blue-visible only; hidden labels and live LLM endpoints forbidden).
+Step 4 recorded SKIPPED in-pool: no headroom found, no alternative skill
+specified, no learned manager authorized.
+Step 6 cross-scenario table (smoke labels; discovery heuristics 32 seeds,
+everything else 8 dev seeds — seed sets differ, read columns separately):
+
+| arm | discovery mean (paired vs lancer) | finite mean (paired) |
+|---|---|---|
+| lancer | -79.4 / -75.2 | -144.4 |
+| roundrobin/stalest/suspicion (identical 32/32) | -84.6 (-5.2, W13/L18) | -151.8 (-7.4, sd 50, W6/L2) |
+| uniform_inv | -98.0 (-18.6, sd 84) | -259.5 (-115, W0/L8) |
+| zero_res sampling | -99.1 (-19.7) | -167.1 (-22.8, sd 80) |
+| learned greedy (guide2) | -197.6 (-122.4) | ≈-544 (-399.6) |
+| shield 0.2 / 0.5 / 1.0 | -4.6 / +0.0 / +0.0 | -5.0 / +0.0 / — |
+| sleep / masked-random | -2266 / -220 | — |
+
+Reading: under finite red the systematic-coverage triplet wins 6/8 seeds
+yet loses on average (one -127 tail) — variance dominates, no systematic
+edge. Uniform collapses everywhere (0/8 finite). Nothing deployable beats
+Lancer on either regime; shield 0.5+ ties it on both.
+Step 7: `docs/proposals/manager-gate-20261005.md` pre-registers the
+primary (learned manager vs deployed unguarded Lancer), per-scenario
+metrics, §4.2 decision rules, stop conditions, and a ban on
+retro-attaching old runs to the gate.
+
 ## Steps 2-3 (review plan), 2026-10-05 — metrics verified, no detection headroom
 
 Step 2a: the four onset cases already have tests and all pass
