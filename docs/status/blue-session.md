@@ -1427,3 +1427,272 @@ and "Next steps" with the latest state. Include branch and base commit, whether
 changes are staged/committed/pushed, exact commands and results, open contracts
 and the next task. Update `docs/status/blue.md` as the short index. Never report
 a run that did not actually complete.
+
+## Metric-semantics repair + max-age guard (2026-10-04, `blue/mappo-training`)
+
+Branch `blue/mappo-training`, base `2900711`. Uncommitted at the time of
+writing. **No training run was executed in this session**: everything below
+is measurement, code correctness and evidence repair.
+
+### 1. The evaluation metrics were measuring the wrong thing
+
+`blue/analysis/ordering.py` (Phase 2/5 harness) had five defects, all of
+which inflate apparent coverage and detection quality:
+
+| defect | effect |
+|---|---|
+| recorded the tick an Analyse was **requested**, not completed | investigation/detection delays were understated by the 2-tick Analyse latency at best, and by far more when the request never completed |
+| `setdefault` kept only the **first** analysis per host | every revisit was invisible, so the reported age never aged |
+| a **failed** request refreshed the age | failed work counted as coverage |
+| compromise counts taken network-wide | the 8 non-defendable `contractor_network` hosts entered the metric population although Blue can never act on them |
+| `max_age` was the **final-tick** age, reported as the maximum | constant 398 on every re-run: no host was ever counted as overdue |
+
+New implementation: `blue/analysis/metrics.py` (definitions, explicit
+censoring reasons, one record per compromise episode, per-agent coverage)
+and `blue/analysis/recorder.py` (builds the timeline from **execution
+outcomes**: `last_analysis` stamps, `last_result == ("Analyse","FALSE")`,
+`state` transitions into `CONFIRMED`, `last_remediation` stamps, and one
+privileged compromise read per tick). 23 deterministic tests in
+`blue/tests_blue/test_metric_semantics.py`; 7 live-episode cross-checks in
+`blue/tests_blue/test_recorder_live.py` assert the recorder against the
+wrapper's own tracker fields.
+
+Consequences that had to be reported rather than quietly fixed:
+
+- `investigations_unresolved_at_end` is ~1.97 per episode, i.e. **one pending
+  request per agent at the episode boundary** — expected from the
+  one-pending-action-per-agent design, now visible instead of hidden.
+- Analysis **failures are zero across all 32 seeds** (26,248 completions).
+  The failure path is therefore covered by synthetic tests only; there is no
+  live evidence about failed-Analyse behaviour.
+- The defendable universe is **66 hosts (5/12/14/9/26)**, not the 87 I
+  recorded earlier in this file's working notes. Coverage 1.00 refers to
+  those 66.
+
+### 2. Policy identity proven on the repaired harness
+
+`blue/analysis/compare.py` re-ran the unguarded lancer arm on the 32
+development seeds: **32/32 returns exactly equal** to
+`ordering-phase2-20261004.json` (variant `lancer`), and 3/3 for the oracle
+arm (7629/7630/7640 → -26/-24/-103). Bit-exactness is therefore a property
+of the repaired measurement path, not only of the old one.
+
+Cost fix: `OracleOnset` called `env._compromised_set()` once per host per
+decision (~435 calls/tick). Cached per tick it is 1 call/tick, and the
+per-agent onset bookkeeping is untouched, so scores stay bit-identical
+(verified above). The recorder reuses the same cached read.
+
+### 3. Max-age guard, pre-registered threshold
+
+`blue/policies/ordered.py`: explicit guard modes (`GUARD_OFF`,
+`GUARD_STRICT`, `GUARD_MAX_AGE`, mutually exclusive) plus `MaxAgeGuard`.
+Ages come from `last_analysis` (Blue-visible), never from privileged state —
+asserted by a spy on `_compromised_set` over a real episode. Urgent rules
+keep priority and are counted as **deferrals**, not interventions. 32 tests
+in `blue/tests_blue/test_max_age_guard.py`, including a synthetic scorer that
+names the opposite host so the guard test cannot pass vacuously.
+
+Threshold `A = 48` was fixed from the **baseline age profile only** (rule and
+evidence in `docs/proposals/manifests/guard-maxage-20261004.json`, written
+before any guarded return was computed): 2 x the baseline median
+end-of-episode age (22.05), chosen so the guard binds on the starved agent
+(`blue_agent_4`: median age 51.2, p90 124.3) and abstains on the four agents
+that are already well covered (p90 25-34). Sensitivity arms at 24 (expected
+to approach the strict guard) and 96 (expected to approach unguarded).
+
+`A` is an **intervention threshold, not a guaranteed maximum**: busy agents,
+the 2-tick Analyse latency, illegal-to-analyse hosts and the urgent rules all
+cause overshoot, and `MaxAgeGuard.stats` reports the observed overshoot.
+
+Also removed: building the full per-decision candidate/score trace on every
+sweep decision roughly doubled episode wall time; it is now opt-in via
+`record_decisions=True`, with counts/pick/branch/guard record always kept.
+
+### 4. Historical evidence now labelled
+
+Unchanged on disk, invalidated in the manifest and in this record:
+
+- `ordering-phase2-20261004.json`: `max_age`, `det_delay_median`,
+  `n_undetected`, `coverage` invalid. `return`, `steps`, `n_compromised`,
+  `n_remediations` kept (and independently re-verified).
+- `ordering-guard32-20261004.json`: paired CI and verdict invalid (built on
+  the defective metrics); returns kept.
+- `resid-pilot1-20261004.json` (-83.0): preserved as history, **not**
+  evidence for the repaired implementation; not re-run.
+
+### 5. Result: the max-age guard does not advance (32 seeds, 8 arms)
+
+`docs/proposals/manifests/guard-maxage-matrix-20261004.json`, raw cells in
+`blue/results/matrix-a/` (gitignored). Baseline `unguarded_lancer`
+-79.41 ± 34.38, and **32/32 returns identical** to the historical manifest
+(identity re-verified on the final harness).
+
+| arm | mean return | vs unguarded (paired, 95% CI) | verdict | max age during episode (mean of medians / mean of maxima) | coverage |
+|---|---|---|---|---|---|
+| unguarded_lancer | -79.41 | — | — | 96.8 / 274.3 (global worst 370) | 1.00 |
+| unguarded_oracle | -63.19 | +16.22 [+6.66, +25.56] | advance (diagnostic only) | 167.5 / 371.0 (global worst 397) | **0.28** |
+| strict_lancer | -82.53 | -3.12 [-10.25, +4.06] | stop | 88.5 / 179.1 (global worst 277) | 1.00 |
+| strict_oracle | -85.66 | -6.25 [-12.75, +0.28] | stop | 88.9 / 172.9 (global worst 324) | 1.00 |
+| maxage24_lancer | -83.25 | -3.84 [-11.88, +3.53] | stop | 88.4 / 144.1 (global worst 206) | 1.00 |
+| maxage48_lancer | -82.75 | -3.34 [-9.81, +3.00] | stop | 86.9 / 148.2 (global worst 217) | 1.00 |
+| maxage48_oracle | -84.72 | -5.31 [-16.19, +5.12] | inconclusive | 83.1 / 133.3 (global worst 186) | 1.00 |
+| maxage96_lancer | -80.69 | -1.28 [-6.66, +2.88] | stop | 98.3 / 159.8 (global worst 238) | 1.00 |
+
+(P0 correction 2026-10-05: the two age columns are means across seeds, not
+worst cases; global worst-case added in parentheses. "Stop" means no
+detectable benefit at this resolution — MDEs ~7–16 — not a proven zero.)
+
+Four things this actually shows:
+
+1. **The mechanism acts but does not pay.** Means of per-episode maxima fall
+   from 274.3 to 133.3-179.1 (global worst 370 to 186-324), coverage stays
+   1.00 and no host is ever abandoned — no coverage collapse. (P0: 274 was
+   a mean, not a worst case.) Return is 1.3 to 6.3 *worse* in every guarded
+   arm, and every upper bound sits below the pre-registered +5 — at a design
+   resolving only ~7-16, so this is no detectable benefit, not a proven
+   zero effect.
+2. **Monotone in how hard the guard binds** (24: -3.84, 48: -3.34, 96: -1.28),
+   which says the neglected-age tail is not where the return is lost.
+3. **`A` is provably not a maximum**: observed overshoot is 62.8-119.1 ticks
+   above threshold, with 42-198 urgent-rule deferrals per episode and one
+   pending action per agent. Reporting the overshoot was the right call;
+   claiming a bound would have been false.
+4. **The headline "ordering headroom" was a coverage artefact.** The privileged
+   scorer beats the unguarded lancer by +16.22 (26 wins / 6 losses) — but with
+   coverage 0.28, a mean 54.97 never-investigated hosts of a seed-dependent
+   57-96 (mean 76.3) defendable universe. That association with the return
+   gain is not a demonstrated cause, and the scorer is not an upper bound on
+   ordering choices (greedy onset scorer ignoring cost/timing; its own
+   mean-of-maxima age is worse, 371.0 vs 274.3). Inside a coverage-guarded
+   regime the same oracle is worth **-3.12 (strict) / -1.97 (max-age48)**
+   versus its own lancer, with upper bounds +6.00/+7.22 that do not exclude
+   a +5 effect. The Phase 2 ordering result and the Phase 5 guard result are
+   the same finding measured two ways.
+
+### 6. Consequence for the residual pilot: original gate blocked it (SUPERSEDED)
+
+Gate applied: the pilot may only start with measurable ordering headroom
+**inside** the regime the learner will be trained and evaluated in. The
+original write-up called the privileged oracle "the upper bound on ordering
+choices" and concluded the learner was "chasing a ceiling that does not
+exist". P0 correction 2026-10-05 (see `blue-handoff-20261004.md` §3): the
+scorer is not an upper bound, and the within-regime upper bounds
+(+6.00/+7.22) do not exclude a +5 effect — the guard result is "no
+detectable benefit", not "no headroom". The gate decision is therefore
+superseded: the bounded **unguarded** pilot proceeds (handoff P4; now the
+expert-guided MAPPO in `blue/training/mappo_guide.py`), starting from the
+unguarded baseline the guard would only have made 3.3 worse.
+
+Two ways the gate could legitimately be reopened, both requiring more than
+this run: (a) a within-regime headroom above +5, which needs either more seeds
+or a lower-variance contrast (common random numbers over identical compromise
+scenarios); (b) a change of objective — aiming the residual at
+post-compromise investigation delay (23.2 -> 3.4 under the unguarded regime
+when ordering is prioritised, at the cost of coverage) rather than at bounding
+investigation age.
+
+Power caveat, stated rather than buried: with n=32 and paired sd 14-28 the
+minimum detectable effect is ~7-16, at or above the +5 threshold for most
+contrasts. These arms can resolve large effects only, so "stop" means no
+detectable benefit, not a proven zero effect.
+
+### 7. Open items not resolved this session
+
+- Seed ledger conflict untouched: `docs/status/blue.md` still says
+  `8201+ reserved` although 8201-8216 are consumed; `blue-session.md` claims
+  8200-8420 are verified free while `8301-8400` belong to finite Red. Left
+  alone deliberately — `8301-8400`, `8401+` and `8501+` are untouched.
+- The residual/PPO audit is written and green (15 tests,
+  `blue/tests_blue/test_residual_audit.py`, torch-gated): returns-to-go index
+  the decision tick and clamp, do not leak across episodes; padded candidates
+  get zero probability and padded base scores stay zero so the rollout's
+  additive mask and the update's multiplicative mask agree; the rollout and
+  update log-probs are identical (the on-policy contract); the buffer is
+  rebuilt per iteration; train and eval seed blocks are disjoint; stop triggers
+  halt instead of logging.
+
+  **Defect found by the audit and now fixed:** `residual_pilot cmd_eval`
+  contrasted the learned arm (guard ON, hook ON) against `lancer` (guard OFF,
+  hook OFF), changing the guard and the learner at once, so no difference was
+  attributable. Arms now come from `eval_arms()`. (P0: `learned - lancer` is
+  the primary deployment comparison — replacing the incumbent is a
+  total-system question; `learned - sched_control`, identical guard, is the
+  secondary attribution contrast. "Confounded" describes attribution, not
+  validity.) No eval was re-run, so nothing new is claimed; the -83.0 pilot
+  remains invalidated.
+- Seed ledger conflict between `blue.md` and `blue-session.md` still needs a
+  coordination proposal; both files now state the discrepancy instead of
+  quietly disagreeing.
+- Not attempted, and deliberately so: no training, no held-out seeds, no
+  residual pilot, no external or deployment action.
+
+**Legacy harness fenced off, not rewritten.** `blue/analysis/ordering.py`
+keeps its own privileged tick loop, so it is superseded by
+`blue/analysis/compare.py` (corrected metrics, paired stats, streaming cells).
+Rather than leave a foot-gun, the four invalid columns are now *withheld by
+default*: `run_ordering_episode` returns `None` for `coverage`, `max_age`,
+`det_delay_median`, `n_undetected` and attaches `legacy_invalid_metrics`
+with the reason; `--emit-invalid-metrics` reproduces the old numbers for
+audit, and the CLI prints those columns tagged `[INVALID COLUMNS]`.
+`return`/`steps`/`n_compromised`/`n_remediations` are identical either way, so
+historical returns stay reproducible
+(`blue/tests_blue/test_legacy_ordering_gate.py`, 4 passed). A 60-step smoke
+run shows why the columns cannot be trusted: `parity` reports `cov=0.80`
+alongside `undet=18/22`.
+
+**Validation.** Sim venv, `.venv/bin/python -m pytest blue/tests_blue`:
+**178 passed, 11 skipped** in 579 s (baseline on this branch before the
+refactor: 149 passed, 1 skipped; the extra skips are torch-gated modules,
+which `--collect-only` confirms are skipped as whole files). Targeted runs:
+23 metric-semantics, 30 recorder/metric live, 32 max-age guard, 17 ordering
+parity, 4 legacy gate. Train venv, `.venv-train/bin/python -m pytest
+blue/tests_blue`: **227 passed, 1 skipped** in 653 s, which additionally runs
+the 16 residual-audit tests and the torch-gated modules the sim venv skips;
+the single skip is the pre-existing `test_rvs.py:73` "rvs_14 ckpt not
+trained". No `pyflakes`/`ruff` exists in either venv, so unused imports were
+cleaned by hand (an `ast` scan) and every touched file passes `py_compile`.
+
+## Session boundary, 2026-10-04 (evening)
+
+Stopping here by request. The next session must start from
+`docs/status/blue-handoff-20261004.md`, not from this file: the handoff
+corrects the max-age guard conclusion recorded above (the oracle is not an
+upper bound; the guard result is "no detectable benefit", not "no headroom";
+host counts are seed-dependent 57-96; 274 was a mean of episode maxima, not a
+worst case) and carries the agreed P0-P7 plan, statistical design and resume
+prompt. At that point no agent implementation, training run or checkpoint
+existed (see next section for what has since run).
+
+## MAPPO-guide pilot 1 (smoke), 2026-10-05 — implementation done, no improvement
+
+`blue/training/mappo_guide.py`: expert-guided shared-actor MAPPO for
+investigation scheduling (frozen lancer rules + base scorer, guard OFF;
+shared residual actor over local 14-dim host rows; NEW central-V critic over
+joint Blue-visible context; fresh joint rollouts; PPO-clip; explicit
+`torch.Generator` sampling). 9 torch-gated tests pass (logprob-rebuild
+identity on live rollouts, exact returns math, both-nets-update, generator
+repeatability, save/reload + resume continuation); `test_residual_audit.py`
+still green (24 passed total).
+
+Bounded pilot (detached): 6 iters x 4 eps x 400 steps, dev seeds 7706-7709,
+temp 0.5, ~7 min. Train returns stayed lancer-level (-90 to -75, cov 1.00)
+while argmax agreement decayed 1.00 -> 0.46 and critic vf loss fell 494 ->
+80. Artifacts: `blue/results/mappo_guide1/` (actor/critic/opt/rng .th +
+manifest + train_log.jsonl).
+
+Eval smoke (8 dev seeds, point estimates only, NOT a decision-rule call):
+learned -197.6 vs lancer -75.2 (paired -122.4), vs Sleep +2068.9, vs masked
+random +22.9; coverage 1.00 throughout. The zero-head hook reproduces lancer
+bit-for-bit (verified -52.0/-54.0 on 2 seeds), so the gap is real learning
+damage, not a hook bug — directionally a regression signal, consistent with
+high-variance MC returns + sampling(temp 0.5)/greedy mismatch. The
+implementation milestone (verified training run + reloadable Blue-team
+checkpoint) is complete; the improvement claim is not.
+
+Code landed after this pilot (untested on a full run so far): forced-action
+split (lockout_sleep/urgent/verification/idle via `env._awaiting`), per-row
+sampling entropy + `--temp-end` anneal, per-episode random-arm seeding,
+resume-from-state, `weights_only=False` on own-local loads, dirty-tree hash
+in the manifest. P0 manifest/status repairs are on this branch
+(`blue/metric-repair-maxage`), uncommitted. Next: longer annealed run, then
+P1 seed-block request before any frozen evaluation.

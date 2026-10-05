@@ -1,0 +1,187 @@
+{
+ "run_id": "guard-maxage-20261004",
+ "created": "2026-10-04",
+ "role": "blue",
+ "purpose": "Pre-registered choice of the max-age intervention threshold A, from measured baseline timing/capacity only. Written BEFORE any guarded-arm return was computed.",
+ "pre_registration": {
+  "rule": "A = 2 x (baseline median per-host end-of-episode investigation age), rounded to a multiple of 8 ticks. The 2x factor keeps the guard a tail intervention on the starved agent instead of a disguised strict coverage guard; the multiple of 8 keeps it a round simulator-aligned number.",
+  "capability_argument": "A threshold the busiest agent cannot meet is not a bound, it is a starvation loop: the guard would re-pick the same oldest host every time it was consulted. The factor is chosen so that the guard binds on the tail and abstains elsewhere.",
+  "sensitivity_arms_planned": [
+   24.0,
+   48.0,
+   96.0
+  ],
+  "sensitivity_rationale": {
+   "24": "near the well-covered agents' p90 (25-34): likely to bind broadly, i.e. approach the strict guard. Reported as the over-constraining case.",
+   "48": "headline threshold.",
+   "96": "near the starved agent's end-of-episode p90 (124): expected to bind rarely, i.e. approach the unguarded arm. Reported as the under-constraining case."
+  }
+ },
+ "decision": {
+  "A": 48.0,
+  "rounding": "nearest multiple of 8 to 44"
+ },
+ "baseline_evidence": {
+  "arm": "unguarded_lancer",
+  "source": "blue/results/base32/cells.jsonl (32 cells, corrected metrics)",
+  "seeds": [
+   7629,
+   7630,
+   7640,
+   7701,
+   7702,
+   7703,
+   7704,
+   7705,
+   7706,
+   7707,
+   7708,
+   7709,
+   7710,
+   7711,
+   7712,
+   7713,
+   7714,
+   7715,
+   7716,
+   7717,
+   7718,
+   7719,
+   7720,
+   7721,
+   7722,
+   7723,
+   7724,
+   7725,
+   7726,
+   7727,
+   7728,
+   7729
+  ],
+  "n_defendable_hosts": {
+   "note": "seed-dependent; fixed denominators are wrong",
+   "min": 57,
+   "max": 96,
+   "mean": 76.3,
+   "seed_7701_example": 66
+  },
+  "hosts_per_agent": {
+   "note": "one seed layout (sums to 66); per-seed 57-96",
+   "blue_agent_0": 5,
+   "blue_agent_1": 12,
+   "blue_agent_2": 14,
+   "blue_agent_3": 9,
+   "blue_agent_4": 26
+  },
+  "end_of_episode_age": {
+   "mean_of_medians": 22.05,
+   "mean_of_means": 36.84,
+   "mean_of_p90s": 91.84,
+   "mean_of_maxes": 178.72
+  },
+  "max_age_during_episode": {
+   "mean_of_medians": 96.78,
+   "mean_of_means": 119.41,
+   "mean_of_p90s": 216.03,
+   "mean_of_maxes": 274.28
+  },
+  "per_agent_end_age_median": {
+   "blue_agent_0": 20.0,
+   "blue_agent_1": 19.2,
+   "blue_agent_2": 13.9,
+   "blue_agent_3": 20.0,
+   "blue_agent_4": 51.2
+  },
+  "per_agent_end_age_p90": {
+   "blue_agent_0": 32.2,
+   "blue_agent_1": 32.5,
+   "blue_agent_2": 25.2,
+   "blue_agent_3": 34.2,
+   "blue_agent_4": 124.3
+  },
+  "analyse_latency_ticks": 2,
+  "service_capacity": "one pending action per agent; agent 4 needs 26x2 = 52 ticks for one clean sweep of its 26 hosts out of a 400-tick episode, before any rule-1 remediation or rule-2 verification decision.",
+  "investigations_per_episode_mean": 822.22,
+  "investigations_failed_total_over_32_seeds": 0,
+  "investigations_unresolved_at_episode_end_mean": 1.97,
+  "post_compromise_investigation_delay": {
+   "median_of_medians": 23.2,
+   "mean_of_p90s": 88.63,
+   "max_of_maxes": 365
+  },
+  "detection_delay": {
+   "median_of_medians": 25.08,
+   "mean_of_p90s": 96.38,
+   "n_censored_mean": 30.88
+  },
+  "coverage_design_finding": "unguarded lancer coverage was already 1.000 (0 never-investigated in 32/32 seeds); the guard bought freshness, not coverage"
+ },
+ "policy_identity": {
+  "claim": "The repaired harness reproduces the historical heuristic arm exactly, so a difference between arms can only come from the arm.",
+  "check": "return per seed vs docs/proposals/manifests/ordering-phase2-20261004.json variant 'lancer'",
+  "n_seeds_compared": 32,
+  "n_exact_matches": 32,
+  "mismatches": [],
+  "also_checked": {
+   "arm": "unguarded_oracle",
+   "seeds": [
+    7629,
+    7630,
+    7640
+   ],
+   "returns": {
+    "7629": -26.0,
+    "7630": -24.0,
+    "7640": -103.0
+   },
+   "match": true
+  }
+ },
+ "historical_evidence_invalidated": [
+  {
+   "manifest": "docs/proposals/manifests/ordering-phase2-20261004.json",
+   "invalid_columns": [
+    "max_age",
+    "det_delay_median",
+    "n_undetected",
+    "coverage"
+   ],
+   "reason": "max_age is final-tick age conflated with max age during the episode and was constant 398 for the 32-seed re-runs; det_delay_median measured the tick an analysis was REQUESTED, kept only the first per host and counted failed requests; coverage used the requested-host set. n_undetected and the per-host compromise set included the 8 non-defendable contractor_network hosts.",
+   "kept": [
+    "return per seed",
+    "steps",
+    "n_compromised",
+    "n_remediations",
+    "variant/guard labels"
+   ]
+  },
+  {
+   "manifest": "docs/proposals/manifests/ordering-guard32-20261004.json",
+   "invalid_columns": [
+    "paired_mean",
+    "paired_sd",
+    "verdict",
+    "lancer_guarded_mean",
+    "oracle_mean"
+   ],
+   "reason": "returns are valid but every supporting metric was computed with the defective recorder, so the paired CI and verdict describe an artefact. Re-run with corrected metrics before any guard claim.",
+   "kept": [
+    "return per seed",
+    "seed list",
+    "guard flag"
+   ]
+  },
+  {
+   "manifest": "docs/proposals/manifests/resid-pilot1-20261004.json",
+   "value": -83.0,
+   "status": "preserved as a historical result, NOT evidence for the repaired implementation",
+   "reason": "recorded with the defective metric code path; no re-run of that pilot has been performed."
+  }
+ ],
+ "seed_block": {
+  "list": "development seeds already consumed by earlier phases (7629, 7630, 7640, 7701-7729)",
+  "held_out_block_touched": false,
+  "red_finite_block_touched": false,
+  "note": "8301-8400 (finite Red), 8401+ (ledger conflict) and 8501+ (reserved) are left untouched. Seed-cycle conflicts in docs/status/blue.md remain unresolved and are reported, not silently reconciled."
+ }
+}
