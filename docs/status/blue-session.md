@@ -1891,3 +1891,20 @@ capacity starvation, not a tunable ordering — and it is the specified
 weakness: an alternative action exists (prioritize agent-4's sweep by
 suspicion instead of lancer order, lancer everywhere else), testable as a
 fixed skill. Proceeding to Phase D gate on this variant.
+
+## Agent-4 suspicion skill gate, 2026-10-05 — exploratory positive, mechanism unconfirmed
+
+Correction: the skill is agent-4 investigation reprioritization
+(never/stalest-first sweep for agent_4, Lancer elsewhere), not preemptive
+containment — Remove stays gated on CONFIRMED/VERIFY. Labeled as the
+narrower experiment.
+Reward (16 paired episodes, exploratory): discovery +3.4 (sd 41.5, W3/L5,
+noise); finite +23.75 (sd 29.3, W5/L3, 95% CI ≈ [-0.8, +48.3] includes
+zero — not a gate pass).
+Detection review (corrected onset-aware metrics, finite 8 seeds): lancer
+a4-miss 0.585 / other 0.323 / delay-median 19 vs a4susp 0.582 / 0.293 /
+delay-median 26. Miss rate unchanged, delay slightly worse — the reward
+gain does NOT come from detecting more. Note a4susp faced fewer compromise
+episodes overall (484 vs 552), so red-schedule coupling may explain part
+of the gap. Mechanism unconfirmed; keep exploratory until a larger paired
+eval with CIs. No training launched; no RL gain demonstrated.
