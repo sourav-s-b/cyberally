@@ -337,6 +337,39 @@ def ppo_central_update(actor, critic, opt, buf, bonus=1.0, epochs=4,
     return {k: (v / max(tot["nb"], 1)) for k, v in tot.items() if k != "nb"}
 
 
+class ShieldHook:
+    """Post-shield fallback (Alshiekh et al. post-posed style): the actor
+    pick is used only when its combined-score margin (top1 - top2) reaches
+    ``min_margin``; otherwise Lancer's argmax pick is used. Lancer is the
+    default safe policy; the actor must be decisive to override it.
+    Counts actor vs shielded decisions for the override-rate metric."""
+
+    def __init__(self, greedy, min_margin):
+        self.greedy = greedy
+        self.min_margin = float(min_margin)
+        self.n_actor = 0
+        self.n_shield = 0
+
+    def __call__(self, env, agent, cands, scored):
+        import torch as th
+        from blue.policies.ordered import argmax_pick
+        from blue.training.scorer import host_rows
+        F = th.from_numpy(np.asarray(
+            host_rows(env, agent, cands), dtype=np.float32))
+        with th.no_grad():
+            combined = (th.tensor([s for s, _ in scored])
+                        + self.greedy.bonus
+                        * th.tanh(self.greedy.residual(F)))
+        vals = sorted((float(combined[i]) for i in range(len(cands))),
+                      reverse=True)
+        margin = vals[0] - vals[1] if len(vals) > 1 else float("inf")
+        if margin >= self.min_margin:
+            self.n_actor += 1
+            return self.greedy(env, agent, cands, scored)
+        self.n_shield += 1
+        return argmax_pick([(s, h) for s, h in scored])
+
+
 def cmd_train(args):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy

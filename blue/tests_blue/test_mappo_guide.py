@@ -229,3 +229,42 @@ def test_resume_continues_from_saved_state(tmp_path):
     sb = th.load(str(tmp_path / "b" / "actor.th"), map_location="cpu",
                  weights_only=False)
     assert any(not torch.equal(sa[k], sb[k]) for k in sa)
+
+
+def test_shield_margin_inf_reproduces_lancer():
+    """Infinite margin shields every decision: return must equal Lancer
+    exactly on the same seed."""
+    from blue.policies.ordered import LancerValues, OrderedPolicy
+    from blue.training.mappo_guide import ShieldHook
+    from blue.training.residual import build_nets
+    from blue.training.residual_pilot import GreedyHook
+    actor, _ = build_nets(hidden=8)
+    base = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                         guard=False)
+    sh = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                       guard=False)
+    rb = mg.run_team_episode(base, 7630, 30, **ENV_KW)
+    hook = ShieldHook(GreedyHook(actor, 1.0), float("inf"))
+    rs = mg.run_team_episode(sh, 7630, 30, hook=hook, **ENV_KW)
+    assert hook.n_actor == 0
+    assert hook.n_shield > 0
+    assert rs["return"] == rb["return"]
+
+
+def test_shield_margin_zero_equals_greedy():
+    """Zero margin shields nothing: return must equal the greedy hook,
+    and counters must partition the hook calls."""
+    from blue.policies.ordered import LancerValues, OrderedPolicy
+    from blue.training.mappo_guide import ShieldHook
+    from blue.training.residual import build_nets
+    from blue.training.residual_pilot import GreedyHook
+    actor, _ = build_nets(hidden=8)
+    mk = lambda: OrderedPolicy(  # noqa: E731
+        scorer=LancerValues(fruitless_decay=0.5), guard=False)
+    rg = mg.run_team_episode(mk(), 7630, 30,
+                             hook=GreedyHook(actor, 1.0), **ENV_KW)
+    hook = ShieldHook(GreedyHook(actor, 1.0), 0.0)
+    rs = mg.run_team_episode(mk(), 7630, 30, hook=hook, **ENV_KW)
+    assert hook.n_shield == 0
+    assert hook.n_actor > 0
+    assert rs["return"] == rg["return"]

@@ -64,10 +64,19 @@ class TracingHook:
         return pick
 
 
+class TracingShield(TracingHook):
+    """TracingHook around a ShieldHook; also reports override counts."""
+
+    def counters(self):
+        sh = self.greedy
+        return {"n_actor": int(sh.n_actor), "n_shield": int(sh.n_shield)}
+
+
 def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus,
-            partial_out=None):
+            partial_out=None, hook_name="greedy", shield_margin=0.5):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
+    from blue.training.mappo_guide import ShieldHook
     from blue.training.residual import build_nets
     from blue.training.residual_pilot import GreedyHook
     actor, _ = build_nets(hidden=hidden)
@@ -93,7 +102,11 @@ def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus,
                                guard=False)
         rl = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
                            guard=False)
-        hook = TracingHook(GreedyHook(actor, bonus))
+        greedy = GreedyHook(actor, bonus)
+        if hook_name == "shield":
+            hook = TracingShield(ShieldHook(greedy, shield_margin))
+        else:
+            hook = TracingHook(greedy)
         r_lancer = mg.run_team_episode(lancer, seed, steps, **env_kw)
         r_learned = mg.run_team_episode(rl, seed, steps, hook=hook,
                                         **env_kw)
@@ -102,10 +115,17 @@ def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus,
                      "paired_diff": (r_learned["return"]
                                      - r_lancer["return"]),
                      "trace": hook.trace}
+        n_dev = sum(t["deviation"] for t in hook.trace)
+        extra = ""
+        if isinstance(hook, TracingShield):
+            c = hook.counters()
+            out[seed]["shield"] = c
+            tot = max(c["n_actor"] + c["n_shield"], 1)
+            extra = (f" shielded={c['n_shield']}/{tot} "
+                     f"({c['n_shield']/tot:.2f})")
         print(f"seed={seed} lancer={r_lancer['return']:+7.1f} "
               f"learned={r_learned['return']:+7.1f} "
-              f"deviations={sum(t['deviation'] for t in hook.trace)}/"
-              f"{len(hook.trace)}", flush=True)
+              f"deviations={n_dev}/{len(hook.trace)}{extra}", flush=True)
         if partial_out:
             with open(partial_out, "w") as f:
                 json.dump({"partial": True, "per_seed": out}, f)
@@ -143,6 +163,12 @@ def summarize(per_seed):
     summary["paired_mean"] = float(sum(pd) / len(pd))
     summary["paired_per_seed"] = {str(s): per_seed[s]["paired_diff"]
                                   for s in per_seed}
+    sh_a = sum(s.get("shield", {}).get("n_actor", 0)
+               for s in per_seed.values())
+    sh_s = sum(s.get("shield", {}).get("n_shield", 0)
+               for s in per_seed.values())
+    summary["shield"] = {"n_actor": sh_a, "n_shield": sh_s,
+                         "override_rate": (sh_s / max(sh_a + sh_s, 1))}
     return summary
 
 
@@ -155,13 +181,22 @@ def main():
     ap.add_argument("--red-agent", default="discovery")
     ap.add_argument("--hidden", type=int, default=64)
     ap.add_argument("--bonus", type=float, default=1.0)
+    ap.add_argument("--hook", default="greedy",
+                    choices=("greedy", "shield"))
+    ap.add_argument("--shield-margin", type=float, default=0.5)
     ap.add_argument("--out",
                     default="blue/results/deviation_discovery.json")
     cli = ap.parse_args()
     partial = cli.out + ".partial"
     per_seed = run_arm(cli.model_dir, cli.seeds, cli.steps,
                        cli.red_agent, cli.hidden, cli.bonus,
-                       partial_out=partial)
+                       partial_out=partial, hook_name=cli.hook,
+                       shield_margin=cli.shield_margin)
+    per_seed = {int(s): v for s, v in per_seed.items()}
+    report = {"model_dir": cli.model_dir, "red_agent": cli.red_agent,
+              "hook": cli.hook, "shield_margin": cli.shield_margin,
+              "seeds": list(cli.seeds), "steps": cli.steps,
+              "per_seed": per_seed, "summary": summarize(per_seed)}
     per_seed = {int(s): v for s, v in per_seed.items()}
     report = {"model_dir": cli.model_dir, "red_agent": cli.red_agent,
               "seeds": list(cli.seeds), "steps": cli.steps,

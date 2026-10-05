@@ -1714,6 +1714,30 @@ variance reduction or a much better policy; the provisional s_Δ = 18.7
 (guard-vs-guard contrast) does not transfer to learned-vs-lancer. The
 improvement claim remains unmet; no decision-rule call on a smoke.
 
+## Phase B finite-Red variation, 2026-10-05 — actor collapses under harsher attack
+
+Same attribution script (`--red-agent finite`, 8 dev seeds; script now
+writes resumable per-seed partials after a shutdown killed the first
+attempt). Lancer confirms the harsher baseline (-89 to -208 per seed).
+Learned loses all 8: paired **-399.6** (worst 7703: -1113 vs -126).
+Override rate 0.827 (higher than discovery's 0.75), margin still 0.092.
+Reading: near-tie flips that merely hurt under discovery become
+catastrophic under finite red — the actor has no regime sense. This is the
+case for Phase C (margin-gated Lancer fallback), not for more training.
+
+## Phase C shield fallback, 2026-10-05 — worst case bounded at Lancer
+
+`ShieldHook` (`mappo_guide.py`): actor pick used only when its
+combined-score margin (top1-top2) reaches `--shield-margin`, else Lancer's
+argmax; override counters recorded. Tests: margin=inf reproduces Lancer
+exactly, margin=0 reproduces greedy (10 guide tests pass). Eval smoke
+(`deviation_shield05.json`, discovery, 8 dev seeds, margin 0.5): learned ==
+Lancer on all 8 seeds (paired +0.00), 96% of decisions shielded. The 4%
+decisive overrides changed nothing here. Success criterion met: worst case
+bounded at Lancer. Shield margin is now the single knob trading Lancer
+parity against actor autonomy; lowering it re-admits the Phase A damage,
+so any lower-margin claim needs the frozen-eval interval, not a smoke.
+
 ## Phase A decision attribution, 2026-10-05 — overrides are near-tie flips
 
 `blue/analysis/deviation.py` vs `mappo_guide2/actor.th` on the 8 dev seeds
