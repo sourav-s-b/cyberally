@@ -202,6 +202,38 @@ class RiskShieldHook:
         return argmax_pick([(s, h) for s, h in scored])
 
 
+class RiskConfidentGate:
+    """Trust the risk feature only when it is confident: deviate from
+    Lancer's argmax only when the actor's pick has P(compromised) >= thresh.
+    Diagnosis 2026-10-05: the collapse on seed 7703 is NOT a coverage
+    collapse (coverage stays 1.000); the actor overrides 79% of decisions
+    because risk proba outranks lancer value, so it spends effort on
+    plausible-but-clean hosts (mean proba 0.45). Gating on proba
+    confidence keeps the high-confidence wins and drops the churn."""
+
+    def __init__(self, greedy, thresh):
+        self.greedy = greedy
+        self.thresh = float(thresh)
+        self.n_actor = 0
+        self.n_shield = 0
+
+    def __call__(self, env, agent, cands, scored):
+        import torch as th
+        from blue.policies.ordered import argmax_pick
+        F = th.from_numpy(host_rows_15(env, agent, cands, self.greedy.risk))
+        with th.no_grad():
+            comb = (th.tensor([s for s, _ in scored], dtype=th.float32)
+                    + self.greedy.bonus * th.tanh(self.greedy.actor(F)))
+        vals = [(float(comb[i]), cands[i], float(F[i, 14]))
+                for i in range(len(cands))]
+        pick = max(vals, key=lambda t: t[0])
+        if pick[2] >= self.thresh:
+            self.n_actor += 1
+            return pick[1]
+        self.n_shield += 1
+        return argmax_pick([(s, h) for s, h in scored])
+
+
 def cmd_eval(args):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
@@ -211,24 +243,24 @@ def cmd_eval(args):
     actor.eval()
     risk = _risk()
     out = {}
-    for name in ("lancer", "shield", "greedy"):
+    gates = [("conf%s" % t, RiskConfidentGate(
+        RiskGreedyHook(actor, args.bonus, risk), t))
+        for t in args.gate_thresholds]
+    for name, ghook in [("lancer", None), ("greedy", None)] + gates:
         for seed in args.eval_seeds:
             pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
                                 guard=False)
-            hook = None
+            hook = ghook
             if name == "greedy":
                 hook = RiskGreedyHook(actor, args.bonus, risk)
-            elif name == "shield":
-                hook = RiskShieldHook(
-                    RiskGreedyHook(actor, args.bonus, risk),
-                    args.shield_margin)
             r = mg.run_team_episode(pol, seed, args.steps, hook=hook,
                                     **mg.ENV_KW)
             out.setdefault(name, {})[seed] = r["return"]
             print(f"{name:6s} seed={seed} {r['return']:+.0f}", flush=True)
     base = out["lancer"]
     summ = {}
-    for name in ("shield", "greedy"):
+    for name in ["greedy"] + ["conf%s" % t
+                              for t in args.gate_thresholds]:
         d = [out[name][s] - base[s] for s in args.eval_seeds]
         m = sum(d) / len(d)
         se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5
@@ -259,6 +291,8 @@ def main():
     ap.add_argument("--eval-seeds", type=int, nargs="*",
                     default=list(DEFAULT_EVAL_SEEDS))
     ap.add_argument("--shield-margin", type=float, default=0.5)
+    ap.add_argument("--gate-thresholds", type=float, nargs="*",
+                    default=[0.5, 0.7])
     ap.add_argument("--model-dir", default=None)
     ap.add_argument("--out", default="blue/results/risk_actor1_eval.json")
     cli = ap.parse_args()

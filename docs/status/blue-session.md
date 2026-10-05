@@ -1972,3 +1972,38 @@ recipe. Read: the risk feature genuinely helps on most seeds; one collapse
 destroys the mean. Not deployable as-is; a per-episode safety switch on the
 risk column's own confidence is the obvious next probe. Recorded as
 exploratory, no gate pass, RL gain still not demonstrated.
+
+## Risk-actor confidence gate, 2026-10-05 — gate removes the tail, still net negative
+
+Two corrections to the 7703 diagnostic (reviewer-caught, both mine):
+(1) the "809/809 decisions disagree" line was a bug - the Counter compared
+the AGENT ID to Lancer's host string, so it was always False; only the
+636/809 = 0.79 pick-disagreement figure was valid. (2) the "mean risk
+0.453" averaged proba over ALL candidates, not the chosen hosts, so it did
+NOT show the actor selected false positives. Both claims withdrawn.
+
+Calibration of the risk model on seed 7703 (1560 host-ticks, base rate
+0.283, mean proba 0.454) - answers whether 0.5/0.7 are meaningful:
+
+| proba bucket | n | actually compromised |
+|---|---:|---:|
+| 0.0-0.2 | 27 | 0.074 |
+| 0.2-0.4 | 664 | 0.131 |
+| 0.4-0.6 | 585 | 0.301 |
+| 0.6-0.8 | 192 | 0.521 |
+| 0.8-1.0 | 92 | 0.826 |
+
+Monotone and usable: 0.8+ is 83% precise, 0.6-0.8 is 52%. The 0.4-0.6
+mass (585 rows) is ~30% real - mostly noise, which is the band the actor
+churns in.
+
+Gate sweep (8 dev seeds, per-action gate on the pick's proba):
+greedy -15.75 CI[-76.1,+44.6] 5/8 wins; **conf0.5 -2.50 CI[-12.9,+7.9]
+4/8**; conf0.7 +0.00 CI[0,0] (never fires - the actor's pick is rarely
+>=0.7, i.e. the residual is not simply following proba). The gate DOES
+remove the catastrophe (7703: -245 -> -47, better than Lancer's -57) but
+pays for it elsewhere (7640 -63 -> -85). Against the frozen +5 gate all
+three variants FAIL. No fresh-seed confirmation is warranted because no
+threshold passed on dev. Status: promising RL lead under test, NOT an RL
+gain. Next probe if pursued: gate on the top-two proba GAP (precision of
+the decision) rather than the absolute pick proba.
