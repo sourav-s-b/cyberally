@@ -47,10 +47,11 @@ class TracingHook:
         rows = np.asarray(host_rows(env, agent, cands),
                           dtype=np.float32)
         F = th.from_numpy(rows)
+        inner = getattr(self.greedy, "greedy", self.greedy)
         with th.no_grad():
             combined = (th.tensor([s for s, _ in scored])
-                        + self.greedy.bonus
-                        * th.tanh(self.greedy.residual(F)))
+                        + inner.bonus
+                        * th.tanh(inner.residual(F)))
         base_scores = [float(s) for s, _ in scored]
         comb_scores = [float(combined[i]) for i in range(len(cands))]
         lancer_pick = argmax_pick([(s, h) for s, h in scored])
