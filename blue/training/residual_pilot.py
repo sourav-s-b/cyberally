@@ -39,6 +39,11 @@ from blue.common import logutil
 
 GAMMA = 0.99
 MAX_CANDS = 51
+# Training and evaluation seeds are separate blocks by contract. They live in
+# module constants so a test can assert the separation instead of trusting a
+# duplicated list in a docstring.
+DEFAULT_TRAIN_SEEDS = [7706, 7707, 7708, 7709]
+DEFAULT_EVAL_SEEDS = [7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705]
 ENV_KW = {"temporal_features": ("ages", "belief"),
           "include_root_session": True, "red_agent": "discovery"}
 
@@ -246,33 +251,82 @@ def cmd_train(args):
     print("wrote", out)
 
 
+def eval_arms():
+    """Arm table for ``--mode eval``.
+
+    ``learned`` and ``sched_control`` share the guard (the learner's regime),
+    so their contrast isolates the hook. ``learned`` vs ``lancer`` changes the
+    guard AND the hook at once and is therefore confounded: it is reported for
+    continuity with the earlier manifest but is NOT the headline number.
+    """
+    from blue.policies.ordered import LancerValues, OrderedPolicy
+    return (
+        ("learned", OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                                  guard=True), "HOOK"),
+        ("sched_control", OrderedPolicy(scorer=LancerValues(
+            fruitless_decay=0.5), guard=True), None),
+        ("lancer", OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                                 guard=False), None),
+    )
+
+
+def paired_mean(results, a, b):
+    """Paired per-seed mean difference a-b over the shared seeds only."""
+    sa, sb = set(results[a]), set(results[b])
+    shared = sorted(sa & sb)
+    if not shared:
+        return None, 0
+    d = [results[a][s]["return"] - results[b][s]["return"] for s in shared]
+    return float(sum(d) / len(d)), len(shared)
+
+
 def cmd_eval(args):
     import numpy as np
     import torch as th
-    from blue.policies.ordered import LancerValues, OrderedPolicy
     from blue.training.residual import build_nets
     residual, _ = build_nets(hidden=args.hidden)
-    residual.load_state_dict(th.load(args.model, map_location="cpu"))
+    # Own local file only (see residual.load_phase3_init note).
+    residual.load_state_dict(th.load(args.model, map_location="cpu",
+                                     weights_only=False))
     residual.eval()
 
     results = {}
     greedy = GreedyHook(residual, args.bonus)
-    for name, pol, hook in (
-            ("learned", OrderedPolicy(scorer=LancerValues(
-                fruitless_decay=0.5), guard=True), greedy),
-            ("lancer", OrderedPolicy(
-                scorer=LancerValues(fruitless_decay=0.5),
-                guard=False), None),
-            ("sched_control", OrderedPolicy(
-                scorer=LancerValues(fruitless_decay=0.5),
-                guard=True), None)):
+    for name, pol, hook in eval_arms():
+        if hook == "HOOK":
+            hook = greedy
         for seed in args.eval_seeds:
             r = run_episode(pol, seed, args.steps, hook=hook, **ENV_KW)
             results.setdefault(name, {})[seed] = r
             print(f"{name:13s} seed={seed} return={r['return']:+7.1f} "
                   f"cov={r['coverage']:.2f}", flush=True)
+    headline, n_head = paired_mean(results, "learned", "sched_control")
+    confounded, n_conf = paired_mean(results, "learned", "lancer")
+    summary = {
+        "headline": {
+            "contrast": "learned - sched_control",
+            "paired_mean": headline, "n_matched": n_head,
+            "why": "identical guard and policy; the only difference is the "
+                   "learned hook, so the difference is attributable to the "
+                   "learner",
+        },
+        "confounded": {
+            "contrast": "learned - lancer",
+            "paired_mean": confounded, "n_matched": n_conf,
+            "why": "NOT attributable: this contrast also switches the guard "
+                   "OFF, so a difference mixes learner effect with coverage-"
+                   "guard effect. Kept only for continuity with "
+                   "resid-pilot1-20261004.json",
+        },
+        "eval_seeds": list(args.eval_seeds),
+        "note": "single-arm means with no interval; this CLI does not compute "
+                "confidence intervals, so the paired means above are point "
+                "estimates only. Use blue.analysis.compare for intervals.",
+    }
     with open(args.out, "w") as f:
-        json.dump(results, f, indent=1)
+        json.dump({"results": results, "summary": summary}, f, indent=1)
+    print(f"learned - sched_control (headline): {headline} over {n_head} seeds")
+    print(f"learned - lancer (confounded):      {confounded} over {n_conf} seeds")
     print("wrote", args.out)
 
 
@@ -280,9 +334,9 @@ def main():
     ap = argparse.ArgumentParser(description="Phase 4 residual PPO pilot")
     ap.add_argument("--mode", required=True, choices=("train", "eval"))
     ap.add_argument("--train-seeds", type=int, nargs="*",
-                    default=[7706, 7707, 7708, 7709])
+                    default=list(DEFAULT_TRAIN_SEEDS))
     ap.add_argument("--eval-seeds", type=int, nargs="*",
-                    default=[7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705])
+                    default=list(DEFAULT_EVAL_SEEDS))
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--iters", type=int, default=20)
     ap.add_argument("--eps-per-iter", type=int, default=8)

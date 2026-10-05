@@ -49,7 +49,9 @@ def load_phase3_init(residual, path, hidden=64):
     """Copy Phase-3 imitation body into the residual; zero the head so
     argmax still reproduces the teacher exactly at pilot start."""
     import torch as th
-    state = th.load(path, map_location="cpu")
+    # Own local file only: state dicts saved by th.save in this repo.
+    # weights_only=False is acceptable here and nowhere else.
+    state = th.load(path, map_location="cpu", weights_only=False)
     body = residual.body
     body[0].weight.data.copy_(state["0.weight"])
     body[0].bias.data.copy_(state["0.bias"])
@@ -61,13 +63,20 @@ def load_phase3_init(residual, path, hidden=64):
 
 def masked_choice(logits, mask, sample=True, seed_rng=None):
     """Sample (or argmax) from a masked categorical. Returns
-    (index_into_cands, logprob, entropy)."""
+    (index_into_cands, logprob, entropy). When ``seed_rng`` (a
+    ``torch.Generator``) is given, sampling consumes it instead of the
+    global torch RNG, so rollouts are repeatable from an explicit state.
+    ``None`` preserves the historical global-RNG path exactly."""
     import torch as th
     m = th.from_numpy(np.asarray(mask, dtype=np.float32))
     l = logits + (1.0 - m) * -1e9
     probs = th.softmax(l, dim=0)
     if sample:
-        idx = int(th.multinomial(probs, 1).item())
+        if seed_rng is None:
+            idx = int(th.multinomial(probs, 1).item())
+        else:
+            idx = int(th.multinomial(probs, 1,
+                                     generator=seed_rng).item())
     else:
         idx = int(probs.argmax().item())
     logp = float(th.log_softmax(l, dim=0)[idx])
