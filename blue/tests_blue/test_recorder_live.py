@@ -140,3 +140,50 @@ def test_events_are_sorted_and_deduplicated():
         ticks = [e["tick"] for e in tl.events]
         assert ticks == sorted(ticks), "timeline must stay chronological"
         assert tl.duplicate_events >= 0
+
+
+def test_max_age_varies_on_real_sim():
+    """The pre-repair bug: max_age was the CONSTANT episode-end tick (398)
+    in every cell. Assert real episodes produce varying, non-constant
+    maxima that are never equal to the episode-end tick."""
+    from blue.analysis.metrics import max_age_during_episode
+    maxima, end_ticks = [], []
+    for seed in SEEDS:
+        pol, res = _episode(seed=seed, steps=200)
+        tl = res["timeline"]
+        per_host = [max_age_during_episode(tl, h)[0]
+                    for h in tl.hosts()]
+        per_host = [m for m in per_host if m is not None]
+        assert per_host, "no uncensored host ages on a real episode"
+        maxima.append(max(per_host))
+        end_ticks.append(tl.end_tick)
+    assert len(set(maxima)) == len(maxima), (
+        f"max_age identical across seeds {maxima}: the constant-398 bug")
+    for m, end in zip(maxima, end_ticks):
+        assert m < end, f"max_age {m} == episode end {end}: suspicious"
+
+
+def test_onset_aware_detection_delay_is_recomputable():
+    """Each episode record's delays must equal tick differences of real
+    recorded events, so the numbers are auditable by hand."""
+    from blue.analysis.metrics import (DETECTION, COMPROMISE_ONSET,
+                                       detection_delay)
+    pol, res = _episode(seed=7629, steps=200)
+    tl = res["timeline"]
+    eps = tl.compromise_episodes()
+    checked = 0
+    for host, episodes in eps.items():
+        dets = sorted(e["tick"] for e in tl._of_kind(DETECTION)
+                      if e["host"] == host)
+        for ep in episodes:
+            got, reason = detection_delay(tl, host, ep)
+            window = [t for t in dets
+                      if ep["onset"] <= t < (ep["close"] if ep["close"]
+                                             is not None else tl.end_tick)]
+            if got is None:
+                assert not window, "censored but a detection exists"
+                assert reason, "censored without a stated reason"
+            else:
+                assert got == window[0] - ep["onset"]
+                checked += 1
+    assert checked, "no detected episode to verify on a real episode"

@@ -16,7 +16,10 @@ traces; full-trace equality stays in pytest.
 
 import argparse
 import concurrent.futures as cf
-import hashlibb
+import hashlib
+import json
+import os
+import sys
 import time
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
