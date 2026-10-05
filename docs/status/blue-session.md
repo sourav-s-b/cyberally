@@ -1713,3 +1713,17 @@ n ≈ (2.8·116/5)² ≈ 4200 for lower-bound > +5, i.e. infeasible without
 variance reduction or a much better policy; the provisional s_Δ = 18.7
 (guard-vs-guard contrast) does not transfer to learned-vs-lancer. The
 improvement claim remains unmet; no decision-rule call on a smoke.
+
+## Phase A decision attribution, 2026-10-05 — overrides are near-tie flips
+
+`blue/analysis/deviation.py` vs `mappo_guide2/actor.th` on the 8 dev seeds
+(discovery red): override rate **0.75**, spread across all agents and rising
+over the episode (q1 752 -> q4 1067). Mean override margin only **0.094** —
+the actor flips picks where combined scores are nearly tied. Picked vs
+lancer rows differ mostly in `n_processes` (idx 1) and `n_connections`
+(idx 8); history flags barely differ. Episode outcomes: helped 2/8 (7702
++12, 7705 +45), hurt 6/8 (worst 7629 -310); paired -81.4, reproducing the
+eval smoke exactly. Reading: the actor re-ranks near-tied hosts on noisy
+activity features and usually picks wrong — evidence for the Phase C
+fallback (override only on decisive margins) rather than more training of
+this recipe.
