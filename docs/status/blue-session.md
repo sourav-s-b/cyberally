@@ -1908,3 +1908,15 @@ gain does NOT come from detecting more. Note a4susp faced fewer compromise
 episodes overall (484 vs 552), so red-schedule coupling may explain part
 of the gap. Mechanism unconfirmed; keep exploratory until a larger paired
 eval with CIs. No training launched; no RL gain demonstrated.
+
+## 32-seed confirmation: skill gate FAILS, 2026-10-05
+
+`blue/analysis/a4susp_confirm.py`, finite Red, all 32 dev seeds, measured
+episodes (reward + compromise burden + onset-aware detection per seed),
+mechanical gate (mean >= +5 AND 95% CI excludes zero, t_31 = 2.04):
+paired **+0.44** (sd 72.5, CI [-25.7, +26.6]), W19/L13 — FAIL on both
+criteria. The 8-seed +23.75 was noise. Detection on 32 seeds: skill
+a4-miss 0.649 vs lancer 0.617, delay-median 26 vs 19 — reprioritization
+does not fix the starvation it was built for. Per the plan: no manager
+training authorized. The agent-4 suspicion skill joins the frozen list;
+Lancer + shield stands.
