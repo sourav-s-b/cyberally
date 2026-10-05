@@ -1920,3 +1920,17 @@ a4-miss 0.649 vs lancer 0.617, delay-median 26 vs 19 — reprioritization
 does not fix the starvation it was built for. Per the plan: no manager
 training authorized. The agent-4 suspicion skill joins the frozen list;
 Lancer + shield stands.
+
+## Mode-vs-regime matrix, 2026-10-05 — no mode clears the gate, stop before training
+
+Frozen manifest first (`mode-regime-matrix-20261005.json`, committed
+before results): lancer / a4susp / strict x discovery / finite, 8 dev
+seeds, 48 cells. Mid-episode Red switching confirmed impossible (Red fixed
+at `wrapper.py` construction); regimes vary per episode only.
+Result: discovery/a4susp +3.4 CI[-31,+38]; discovery/strict -15.0;
+finite/a4susp +23.8 CI[-0.7,+48.2]; finite/strict -0.2. Gate required
+mean >= +5 with CI excluding zero in some regime — nothing clears it
+(finite/a4susp closest, still crosses zero). Per the review plan: a
+context router has nothing reliably worth selecting, so NO belief manager
+and NO training. Regime-adaptation line ends here absent new regimes or
+simulator support for within-episode switching.
