@@ -1878,3 +1878,16 @@ delay-4 test (two episodes); repeats keep earliest post-onset =
 reinfection-distinct case6; never-detected censored never proxied =
 case3/3b/3c. Chronology authority is `docs/status/blue-timeline.md`;
 this log is concatenated where order is unrecoverable.
+
+## Phase B weakness found, 2026-10-05 — agent-4 zones starved in every regime
+
+Mined matrix-a episode records (2714 lancer episodes): detection-miss rate
+by zone: admin 0.59, office 0.60, public_access 0.50 vs operational/
+restricted zones 0.26-0.31. The three bad zones are all blue_agent_4's
+(the 21-39-host overloaded agent). Crucially the pattern is invariant:
+a4-miss ≈ 0.56-0.60 under EVERY deployable arm, guard, and scorer (only
+the coverage-abandoning oracle differs, worse at 0.81). This is structural
+capacity starvation, not a tunable ordering — and it is the specified
+weakness: an alternative action exists (prioritize agent-4's sweep by
+suspicion instead of lancer order, lancer everywhere else), testable as a
+fixed skill. Proceeding to Phase D gate on this variant.
