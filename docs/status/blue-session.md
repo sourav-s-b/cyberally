@@ -2007,3 +2007,28 @@ three variants FAIL. No fresh-seed confirmation is warranted because no
 threshold passed on dev. Status: promising RL lead under test, NOT an RL
 gain. Next probe if pursued: gate on the top-two proba GAP (precision of
 the decision) rather than the absolute pick proba.
+
+## Risk as TRAINING signal, 2026-10-05 — best result so far, still fails gate
+
+Question: the risk model is useless as the decision rule and unsafe
+ungated at eval - can it help during TRAINING instead? Yes. Filtering the
+PPO buffer to informative decisions (`--train-min-proba 0.5`: execute
+every decision, record for gradient only when the pick's proba >= 0.5)
+concentrates gradient away from the 30%-real band. Trained rows 749-862 of
+~2700 per iteration; KL rose 10x (0.015-0.020 vs 0.001-0.003), i.e. the
+updates are now real.
+
+Eval (8 dev seeds, paired vs Lancer):
+
+| variant | mean |95% CI | wins | worst seed |
+|---|---:|---|---:|---:|
+| risk feature, unfiltered training | -15.75 | [-76.1, +44.6] | 5/8 | -188 |
+| **risk feature, filtered training** | **+4.50** | [-22.9, +31.9] | 5/8 | **-44** |
+| filtered training + proba-0.5 eval gate | -1.88 | [-14.4, +10.7] | 4/8 | -37 |
+
+Training-time filtering moved the mean by +20.2 and shrank the worst seed
+from -188 to -44: the catastrophe is gone and the actor is now slightly
+ahead of Lancer on average. It still MISSES the pre-registered +5 gate
+(+4.50, CI crosses zero), so no fresh-seed confirmation is due. This is the
+strongest candidate so far and the answer to "can the featurizer help RL":
+as a training signal yes, as a decision rule no.

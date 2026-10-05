@@ -52,11 +52,21 @@ def host_rows_15(env, agent, cands, risk):
 
 
 class RiskRecorder(mg.JointRecorder):
-    """JointRecorder whose features carry the learned risk column."""
+    """JointRecorder whose features carry the learned risk column.
 
-    def __init__(self, *a, risk=None, **kw):
+    ``min_proba`` changes WHAT IS LEARNED FROM, not what is executed: every
+    decision still runs, but a decision is written to the PPO buffer only
+    when the actor's pick has P(compromised) >= min_proba. Motivation
+    (calibration measured 2026-10-05): the 0.4-0.6 proba band holds 585
+    host-ticks at 30% real, so most buffer rows teach noise. Filtering
+    keeps the on-policy contract (recorded logp is the taken action) while
+    concentrating gradient on informative decisions."""
+
+    def __init__(self, *a, risk=None, min_proba=0.0, **kw):
         super().__init__(*a, **kw)
         self.risk = risk
+        self.min_proba = float(min_proba)
+        self.n_skipped = 0
 
     def __call__(self, env, agent, cands, scored):
         from blue.policies.ordered import argmax_pick
@@ -75,6 +85,9 @@ class RiskRecorder(mg.JointRecorder):
                                 for i in range(len(cands))])
         self.agree += int(arg_comb == arg_base)
         self.total += 1
+        if float(F[idx, 14]) < self.min_proba:
+            self.n_skipped += 1
+            return cands[idx]          # executed, not trained on
         row = {"feats": F.numpy(), "joint": mg.joint_context(
             env, self._policy_ref, self._jcache), "k": len(cands),
             "mask": mask, "base": base.numpy(), "choice": idx, "logp": logp,
@@ -125,7 +138,8 @@ def cmd_train(args):
     cycle = list(args.train_seeds)
     for it in range(1, args.iters + 1):
         gen = th.Generator().manual_seed(args.seed * 100003 + it)
-        rec = RiskRecorder(actor, args.bonus, gen, temp=args.temp, risk=risk)
+        rec = RiskRecorder(actor, args.bonus, gen, temp=args.temp,
+                            risk=risk, min_proba=args.train_min_proba)
         pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
                             guard=False)
         rets = []
@@ -138,9 +152,11 @@ def cmd_train(args):
                                    bonus=args.bonus)
         row = {"iter": it, "mean_return": float(np.mean(rets)),
                "n_decisions": len(rec.rows),
+               "n_skipped": rec.n_skipped,
                "agree": rec.agree / max(rec.total, 1), **st}
         hist.append(row)
         print(f"iter {it} ret {row['mean_return']:+.1f} "
+              f"trained {len(rec.rows)}/{rec.total} "
               f"agree {row['agree']:.2f} kl {st['kl']:.4f}", flush=True)
     th.save(actor.state_dict(), os.path.join(args.out, "actor.th"))
     th.save(critic.state_dict(), os.path.join(args.out, "critic.th"))
@@ -148,6 +164,7 @@ def cmd_train(args):
         json.dump({"algo": "risk-as-feature residual PPO (14+1 cols)",
                    "iters_done": len(hist), "feat_dim": FEAT_DIM,
                    "risk_model": RISK_MODEL, "temp": args.temp,
+                   "train_min_proba": args.train_min_proba,
                    "train_seeds": args.train_seeds, "hist": hist}, f,
                   indent=1)
     print("wrote", args.out)
@@ -285,6 +302,9 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--bonus", type=float, default=1.0)
     ap.add_argument("--temp", type=float, default=0.5)
+    ap.add_argument("--train-min-proba", type=float, default=0.0,
+                    help="record a decision for PPO only if the pick's "
+                         "risk proba >= this (0 = train on all)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--train-seeds", type=int, nargs="*",
                     default=list(DEFAULT_TRAIN_SEEDS))
