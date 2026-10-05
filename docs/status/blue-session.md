@@ -1738,6 +1738,31 @@ bounded at Lancer. Shield margin is now the single knob trading Lancer
 parity against actor autonomy; lowering it re-admits the Phase A damage,
 so any lower-margin claim needs the frozen-eval interval, not a smoke.
 
+## Headroom hunt (GPT review), 2026-10-05 — no deployable ordering beats Lancer
+
+Question: one concrete scenario where Lancer chooses poorly and another
+available Blue action improves the outcome. Method: paired screen
+(`blue/analysis/heuristic_screen.py`, 4 parallel shards) of 5 alternative
+investigation orderings vs Lancer on all 32 dev seeds, plus per-seed mining
+of the committed guard-matrix cells.
+
+Result (32 seeds): roundrobin/stalest/suspicion return **identical** numbers
+32/32 (paired -5.2, W13/L18) — same remediation core, and systematic
+coverage orders are return-equivalent. uniform_inv -18.6 (sd 83.7),
+zero_res -19.7. Lancer is the best deployable ordering overall. Its
+worst-8 seeds show +20 to +31 for the alternatives, but with sd ~84 the
+post-hoc slice SE is ~30 — noise, not a scenario. Same for the guard
+cells' per-seed wins (e.g. strict +46 on 7706): max over 4 arms x 32 seeds
+= 128 draws at sd ~20, whose expected max (≈+47) matches the observed
++46 exactly. Selection noise, not opportunity. The only large gaps anywhere
+are the privileged oracle's (coverage abandonment, not deployable).
+
+Verdict: **no headroom in investigation ordering.** `mappo_guide2` frozen
+as a failed learning experiment; no further training on this recipe.
+Untested direction left standing (needs its own headroom test first):
+response prioritization/coordination under finite red — every baseline
+shares the same urgent rules, so that decision space was never compared.
+
 ## Shield margin sweep (4 parallel evals), 2026-10-05 — autonomy costs, bounded
 
 Margin curve, 8 dev seeds each (point estimates, smoke labels):
