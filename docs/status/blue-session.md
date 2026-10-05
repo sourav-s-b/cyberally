@@ -1934,3 +1934,22 @@ mean >= +5 with CI excluding zero in some regime — nothing clears it
 context router has nothing reliably worth selecting, so NO belief manager
 and NO training. Regime-adaptation line ends here absent new regimes or
 simulator support for within-episode switching.
+
+## Deck Stage-2 featurizer check, 2026-10-05 — anomaly score as input was already tested
+
+Deck Stage 2 ("Telemetry Featurizer -> Isolation Forest scoring -> POMDP
+zone observation", role: encodes logs for MARL) already exists here as
+`blue/core/obs_features.py` (10 Blue-visible features, shared contract for
+risk model AND MAPPO input) + `blue/training/risk.py` (L2 logistic,
+numpy-only, AUC 0.68 on 245k rows; sklearn absent so no literal IF).
+Evidence `riskx*-20261002.json`, already evaluated 2026-10-02:
+lancer_v2 -75.2 regression / -91.2 held-out vs rx_bonus (Lancer base +
+risk*w) -186.2 / -251.1, rx_decay (risk only) -203.4 / -104.5. Adding a
+learned per-host risk signal to the ordering is NOT untested — it collapses
+return roughly as badly as every other suspicion-priority attempt
+(oracle, a4susp). Consistent mechanism across all five attempts: chasing
+"risky" hosts starves coverage, and coverage is what the native reward
+pays for. NOT yet tested: risk score as an input FEATURE to the learned
+actor (deck's actual Stage-2->Stage-3 wiring) under the margin-0.5 shield,
+which is the only variant where chasing risky hosts cannot collapse
+coverage. That remains the one untried combination.
