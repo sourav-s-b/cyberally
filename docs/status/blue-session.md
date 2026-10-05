@@ -1866,3 +1866,15 @@ in any Blue decision space tested.** Full stop on headroom hunting and on
 training. Defended result stands: Lancer + margin-0.5 shield (ties Lancer,
 never worse). Any future manager proposal must first name a concrete
 failing decision with a better available action — none is currently known.
+
+## Coordinator plan + Phase A close-out, 2026-10-05
+
+Detailed plan committed at `docs/plans/coordinator-scripted-pool.md`:
+MARL coordinator over a scripted scenario pool, Lancer fallback, gates
+before every training step. Phase A re-verified just now:
+`test_metric_semantics.py` 23/23 green (sim venv). Onset-case mapping:
+pre-onset analysis ignored = case5b; post-onset first detection exact =
+delay-4 test (two episodes); repeats keep earliest post-onset =
+reinfection-distinct case6; never-detected censored never proxied =
+case3/3b/3c. Chronology authority is `docs/status/blue-timeline.md`;
+this log is concatenated where order is unrecoverable.
