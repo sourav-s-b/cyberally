@@ -238,7 +238,8 @@ class OrderedPolicy:
     """
 
     def __init__(self, scorer=None, order_fn=None, guard=False, max_age=None,
-                 guard_log_limit=200000, record_decisions=False):
+                 guard_log_limit=200000, record_decisions=False,
+                 no_restore_escalation=False, no_verify=False):
         self.scorer = scorer
         self.order_fn = order_fn
         if max_age is not None and guard:
@@ -250,6 +251,13 @@ class OrderedPolicy:
         self.age_guard = (MaxAgeGuard(max_age, log_limit=guard_log_limit)
                           if self.guard_mode == GUARD_MAX_AGE else None)
         self.record_decisions = bool(record_decisions)
+        # Response-rule variants for headroom probes. Both default off,
+        # which preserves historical behavior exactly (parity tests cover
+        # the defaults). no_restore_escalation: CONFIRMED hosts always get
+        # Remove when legal, never the Restore escalation. no_verify:
+        # rule-2 VERIFY re-analysis is skipped, falling through to sweep.
+        self.no_restore_escalation = bool(no_restore_escalation)
+        self.no_verify = bool(no_verify)
         self._cursor = {}
         self._tick_seen = {}
         # Phase 4 sampler hook: hook(env, agent, cands, scored) -> picked
@@ -347,8 +355,9 @@ class OrderedPolicy:
             last_an = tracker.last_analysis.get(host)
             last_re = tracker.last_remediation.get(host)
             re_detected = (last_an is not None and last_re is not None
-                           and last_an > last_re)
-            if re_detected and _legal(mask, env, agent, host, "Restore"):
+                            and last_an > last_re)
+            if (re_detected and not self.no_restore_escalation
+                    and _legal(mask, env, agent, host, "Restore")):
                 self._defer(env, agent, mask)
                 return action_index(env, agent, host, "Restore")
             if _legal(mask, env, agent, host, "Remove"):
@@ -358,8 +367,8 @@ class OrderedPolicy:
                 self._defer(env, agent, mask)
                 return action_index(env, agent, host, "Restore")
 
-        # Rule 2: verify oldest-remediated first.
-        verify = [h for h in hosts
+        # Rule 2: verify oldest-remediated first (skipped by no_verify).
+        verify = [] if self.no_verify else [h for h in hosts
                   if tracker.state.get(h) == "VERIFY"
                   and _legal(mask, env, agent, h, "Analyse")]
         if verify:

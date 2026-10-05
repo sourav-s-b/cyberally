@@ -1844,3 +1844,25 @@ with the ordering hunt: **no demonstrated headroom in either dimension.**
 Response prioritization under finite red remains untested (all baselines
 share the urgent rules) — flagged as untested, not promised. No training
 authorized by this result.
+
+## Response-rule probe, 2026-10-05 — urgent rules are load-bearing, full stop
+
+Last untested decision space: every baseline shares Lancer's urgent rules,
+so two single-knob ablations were added as `OrderedPolicy` flags (defaults
+preserve behavior exactly; parity tested in `test_response_variants.py`):
+`no_restore_escalation` (always Remove, never Restore) and `no_verify`
+(skip VERIFY re-analysis). Eval on finite-red 8 dev seeds, paired vs
+Lancer (-144.4 mean):
+
+- no_restore: catastrophic all 8 seeds (-1879 to -5032, mean ~-3570).
+  The Restore escalation is load-bearing — Remove alone cannot clear
+  privileged attackers and the defense collapses without it.
+- no_verify: -168.8 mean, paired -24.4 (W2/L6, best +11). Verification
+  pays; removing it costs ~24 points.
+
+Verdict: response rules are essential as-is, not optional overhead.
+Combined with the ordering and detection hunts: **no demonstrated headroom
+in any Blue decision space tested.** Full stop on headroom hunting and on
+training. Defended result stands: Lancer + margin-0.5 shield (ties Lancer,
+never worse). Any future manager proposal must first name a concrete
+failing decision with a better available action — none is currently known.
