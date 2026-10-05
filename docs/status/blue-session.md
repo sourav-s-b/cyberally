@@ -1739,7 +1739,6 @@ parity against actor autonomy; lowering it re-admits the Phase A damage,
 so any lower-margin claim needs the frozen-eval interval, not a smoke.
 
 ## Headroom hunt (GPT review), 2026-10-05 — no deployable ordering beats Lancer
-
 Question: one concrete scenario where Lancer chooses poorly and another
 available Blue action improves the outcome. Method: paired screen
 (`blue/analysis/heuristic_screen.py`, 4 parallel shards) of 5 alternative
@@ -1794,3 +1793,23 @@ eval smoke exactly. Reading: the actor re-ranks near-tied hosts on noisy
 activity features and usually picks wrong — evidence for the Phase C
 fallback (override only on decisive margins) rather than more training of
 this recipe.
+
+## Steps 2-3 (review plan), 2026-10-05 — metrics verified, no detection headroom
+
+Step 2a: the four onset cases already have tests and all pass
+(`test_metric_semantics.py`, 23 passed, sim venv): pre-onset analysis
+ignored (case5b), post-onset first detection exact (delay == 4, two
+episodes), repeats keep earliest post-onset (reinfection distinct, case6),
+never-detected censored never proxied (case3/3b/3c). No code change needed;
+`ordering.py`'s setdefault columns stay fenced as legacy-invalid.
+Step 2b: `docs/status/blue-timeline.md` reconstructs event order from git
+timestamps + manifest dates; this log is labeled concatenated where order
+is unrecoverable.
+Step 3: mined matrix-a episode records (2714 lancer episodes): Lancer
+misses observable detection in 988 (36%), but every deployable arm misses
+~35% identically (guards 0.34-0.37; only the coverage-abandoning oracle
+differs at 0.53). Misses are structural, not ordering-fixable. Combined
+with the ordering hunt: **no demonstrated headroom in either dimension.**
+Response prioritization under finite red remains untested (all baselines
+share the urgent rules) — flagged as untested, not promised. No training
+authorized by this result.
