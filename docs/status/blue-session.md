@@ -2032,3 +2032,17 @@ ahead of Lancer on average. It still MISSES the pre-registered +5 gate
 (+4.50, CI crosses zero), so no fresh-seed confirmation is due. This is the
 strongest candidate so far and the answer to "can the featurizer help RL":
 as a training signal yes, as a decision rule no.
+
+## Premise check for the training filter, 2026-10-05 — holds, weaker than claimed
+
+Reviewer-caught caveat: the "30% real / mostly noise" figure was measured
+over ALL candidate hosts, not over the hosts the actor chose and PPO
+learned from. Measured directly (privileged, diagnostic only) on 4 dev
+seeds: precision of the actor's chosen hosts is 61%/36%/45%/31% at
+proba>=0.5 versus 13%/7%/18%/15% below it. So the filter does concentrate
+signal ~3-4x, but the kept set is still majority noise on 3 of 4 seeds,
+which bounds what it can buy and explains +4.50 rather than more. Also
+recorded: the filter biases the gradient (selected-experience update, not
+standard PPO over the full buffer) and thresholds were chosen after
+inspecting a collapse seed, so +4.50 stays exploratory. Plan for the
+improvement path: `docs/plans/risk-actor-next.md`.
