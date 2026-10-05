@@ -1738,6 +1738,24 @@ bounded at Lancer. Shield margin is now the single knob trading Lancer
 parity against actor autonomy; lowering it re-admits the Phase A damage,
 so any lower-margin claim needs the frozen-eval interval, not a smoke.
 
+## Shield margin sweep (4 parallel evals), 2026-10-05 — autonomy costs, bounded
+
+Margin curve, 8 dev seeds each (point estimates, smoke labels):
+
+| attacker | greedy (no shield) | margin 0.2 | margin 0.5 | margin 1.0 |
+|---|---|---|---|---|
+| discovery | -81.4 (75% overrides) | -4.6 (0.2% dev, 94% shielded) | +0.0 (96%) | +0.0 (98%) |
+| finite | -399.6 (83% overrides) | -5.0 (0.1% dev, ~95%) | +0.0 (97%) | — |
+
+Even a handful of this actor's overrides (2-4 per episode at margin 0.2)
+cost ~5 points on both attackers — its judgment is bad even when its
+margin is decisive, including the single -40 flip on finite 7701. Margin
+0.5+ fully bounds at Lancer on both attackers. Conclusion: the shield
+works as a safety net, but there is no margin setting where this actor
+helps. Next improvement attempt must change what the actor learns (richer
+critic input, value normalization, or reward shaping), not how much it is
+trusted.
+
 ## Phase A decision attribution, 2026-10-05 — overrides are near-tie flips
 
 `blue/analysis/deviation.py` vs `mappo_guide2/actor.th` on the 8 dev seeds
