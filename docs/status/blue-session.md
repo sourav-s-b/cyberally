@@ -1953,3 +1953,22 @@ pays for. NOT yet tested: risk score as an input FEATURE to the learned
 actor (deck's actual Stage-2->Stage-3 wiring) under the margin-0.5 shield,
 which is the only variant where chasing risky hosts cannot collapse
 coverage. That remains the one untried combination.
+
+## Risk-as-feature test (deck Stage2->3), 2026-10-05 — 5/8 seeds better, mean negative
+
+`blue/training/risk_actor.py`: learned P(compromised) appended as a 15th
+input column to the residual actor (NOT as the ordering - that already
+failed). Teacher-at-init preserved by zeroing the new column; verified the
+zero-head actor reproduces Lancer exactly before training. Pilot 4x4,
+temp 0.5, dev seeds (returns tracked mappo_guide2 closely: -90.2/-79.2/-78.5
+/-70.8, agree 1.00->0.54).
+
+Eval (8 dev seeds, discovery, point estimates): shield-0.5 **+0.00**
+CI[0,0] (identical to Lancer on all 8 - the fallback works). Greedy actor
+-15.75 mean, CI[-76.1, +44.6] - but per-seed is bimodal: +25/+11/+8/+14/+37
+on five seeds vs -25/-8/-188 on three (7703 collapses to -245). Net FAIL
+against the +5 gate, and the variance is far worse than either previous
+recipe. Read: the risk feature genuinely helps on most seeds; one collapse
+destroys the mean. Not deployable as-is; a per-episode safety switch on the
+risk column's own confidence is the obvious next probe. Recorded as
+exploratory, no gate pass, RL gain still not demonstrated.
