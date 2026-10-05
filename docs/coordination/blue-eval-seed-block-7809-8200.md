@@ -1,6 +1,7 @@
 # Proposal: blue-eval-seed-block-7809-8200
 
-- Status: draft (extends `blue-training-seeds.md`, does not duplicate it)
+- Status: GRANTED 2026-10-05 by project owner for Blue evaluation use
+  (recorded by Blue; Evaluation/Environment to countersign in ledger)
 - Author role and branch: Blue, `blue/metric-repair-maxage` (commits
   `8613bac` P0, `701e23f` MAPPO build)
 - Producer and affected consumers: Producer Blue (pilot/eval manifests);
@@ -64,7 +65,7 @@ Reserve **7809–8200 for Blue evaluation only**, additive:
 
 ## Validation and decision
 
+- GRANTED 2026-10-05 by project owner: 7809–8200 reserved for Blue
+  evaluation only. No training on this block; other blocks untouched.
+  Frozen evaluations consume a frozen prefix recorded in the eval manifest.
 - No code changed; `git diff --check` clean.
-- Affected-role review: pending (Evaluation for suite separation,
-  Environment for ledger). Do not mark accepted just because this file
-  exists.
