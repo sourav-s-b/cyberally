@@ -1693,6 +1693,23 @@ Code landed after this pilot (untested on a full run so far): forced-action
 split (lockout_sleep/urgent/verification/idle via `env._awaiting`), per-row
 sampling entropy + `--temp-end` anneal, per-episode random-arm seeding,
 resume-from-state, `weights_only=False` on own-local loads, dirty-tree hash
-in the manifest. P0 manifest/status repairs are on this branch
-(`blue/metric-repair-maxage`), uncommitted. Next: longer annealed run, then
-P1 seed-block request before any frozen evaluation.
+in the manifest. P0 manifest/status repairs were committed on this branch
+(`blue/metric-repair-maxage`, `8613bac`); P1 proposals committed (`e97e173`).
+
+## MAPPO-guide pilot 2 (annealed, 10x6), 2026-10-05 — still regressing
+
+The detached run finished all 10 iters before a machine shutdown (only the
+`/tmp` log was lost; `blue/results/mappo_guide2/` is intact). Temp annealed
+1.0 -> 0.3 over iters 1-10, 6 eps x 400 steps, dev seeds 7706-7709. Train
+returns noisy (-68 to -125), agreement decayed to 0.37, sampling entropy
+stuck ~2.27-2.44 (the anneal did not sharpen much).
+
+Eval smoke (`mappo_guide2_eval.json`, 8 dev seeds, point estimates only):
+learned -156.6 (sd 92.4) vs lancer -75.2 (sd 31.5): paired -81.4, paired SD
+116.2, coverage 1.00. Better than pilot 1's -122.4 but still a regression
+with very high variance — the learned policy is erratic, not just shifted.
+Sizing warning for P5: at s_Δ ≈ 116 the §4.3 formula gives
+n ≈ (2.8·116/5)² ≈ 4200 for lower-bound > +5, i.e. infeasible without
+variance reduction or a much better policy; the provisional s_Δ = 18.7
+(guard-vs-guard contrast) does not transfer to learned-vs-lancer. The
+improvement claim remains unmet; no decision-rule call on a smoke.
