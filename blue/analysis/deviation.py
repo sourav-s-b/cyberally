@@ -64,7 +64,8 @@ class TracingHook:
         return pick
 
 
-def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus):
+def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus,
+            partial_out=None):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
     from blue.training.residual import build_nets
@@ -76,7 +77,18 @@ def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus):
     env_kw = dict(mg.ENV_KW)
     env_kw["red_agent"] = red_agent
     out = {}
+    if partial_out and os.path.exists(partial_out):
+        try:
+            with open(partial_out) as f:
+                old = json.load(f)
+            out = dict(old.get("per_seed", {}))
+            print(f"resumed {len(out)} seeds from {partial_out}",
+                  flush=True)
+        except Exception as e:
+            print(f"partial unreadable ({e}); starting over", flush=True)
     for seed in seeds:
+        if seed in out or str(seed) in out:
+            continue
         lancer = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
                                guard=False)
         rl = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
@@ -94,6 +106,9 @@ def run_arm(model_dir, seeds, steps, red_agent, hidden, bonus):
               f"learned={r_learned['return']:+7.1f} "
               f"deviations={sum(t['deviation'] for t in hook.trace)}/"
               f"{len(hook.trace)}", flush=True)
+        if partial_out:
+            with open(partial_out, "w") as f:
+                json.dump({"partial": True, "per_seed": out}, f)
     return out
 
 
@@ -143,13 +158,20 @@ def main():
     ap.add_argument("--out",
                     default="blue/results/deviation_discovery.json")
     cli = ap.parse_args()
+    partial = cli.out + ".partial"
     per_seed = run_arm(cli.model_dir, cli.seeds, cli.steps,
-                       cli.red_agent, cli.hidden, cli.bonus)
+                       cli.red_agent, cli.hidden, cli.bonus,
+                       partial_out=partial)
+    per_seed = {int(s): v for s, v in per_seed.items()}
     report = {"model_dir": cli.model_dir, "red_agent": cli.red_agent,
               "seeds": list(cli.seeds), "steps": cli.steps,
               "per_seed": per_seed, "summary": summarize(per_seed)}
     with open(cli.out, "w") as f:
         json.dump(report, f)
+    try:
+        os.remove(partial)
+    except OSError:
+        pass
     s = report["summary"]
     print(f"deviation_rate={s['deviation_rate']:.3f} "
           f"paired_mean={s['paired_mean']:+.2f}")
