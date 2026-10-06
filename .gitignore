@@ -47,3 +47,7 @@ frames/
 /worktrees/
 .DS_Store
 Thumbs.db
+
+# Symlinked ignored runtime/artifact storage in isolated worktrees.
+/.venv-train
+/blue/results
