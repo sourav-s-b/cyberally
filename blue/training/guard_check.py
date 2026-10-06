@@ -36,7 +36,8 @@ from blue.training import risk_actor as ra  # noqa: E402
 AGENTS = ["blue_agent_%d" % i for i in range(5)]
 
 
-def run_arm(model_dir, seed, steps, guard, ablation="real", bonus=1.0):
+def run_arm(model_dir, seed, steps, guard="strict", ablation="real",
+            bonus=1.0):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
 
@@ -69,22 +70,28 @@ def run_arm(model_dir, seed, steps, guard, ablation="real", bonus=1.0):
                 acts[a] = int(pol.select(env, a))
                 from blue.core.baselines import decode_index
                 name, host = decode_index(env, a, acts[a])
-                if arm == "actor" and name == "Analyse" and host:
+                if name == "Analyse" and host:
                     picks[host] += 1
-                if arm != "actor":
-                    continue
+                # Count behaviour for BOTH arms. An earlier version gated
+                # this on the actor, which reported Lancer remediation as 0
+                # and made the mechanism table unreadable.
                 if name == "Analyse":
                     analyse[a] += 1
                 elif name in ("Remove", "Restore"):
                     rem[a] += 1
             _, rew, term, trunc, _ = env.step(acts)
             rewards.append(float(rew[0]))
+            # Count hosts CONFIRMED at any point during the episode. Reading
+            # FINAL state instead reports ~0, because a remediated host
+            # moves CONFIRMED -> VERIFY -> UNKNOWN once its re-analysis is
+            # clean, so the end-of-episode snapshot misses every discovery.
+            for a in AGENTS:
+                tr = env.trackers[a]
+                for h, st in tr.state.items():
+                    if st == "CONFIRMED":
+                        conf.add(h)
             if term or trunc:
                 break
-        for a in AGENTS:
-            for h, st in env.trackers[a].state.items():
-                if st in ("CONFIRMED", "VERIFY"):
-                    conf.add(h)
         out[arm] = {"return": float(sum(rewards)),
                     "remediation": dict(rem),
                     "analyse": dict(analyse),
@@ -101,36 +108,36 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model-dir", required=True)
     ap.add_argument("--seeds", type=int, nargs="+", required=True)
+    ap.add_argument("--guard", choices=("off", "strict"), default="strict",
+                    help="which learner regime to measure; the Lancer arm "
+                         "is always unguarded (reference behaviour)")
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--ablation", default="real")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     res = {}
-    print("model %s  seeds %s" % (args.model_dir, args.seeds))
-    print("%-6s %-8s | %9s %9s %8s | %9s %9s %8s | %s"
-          % ("seed", "arm", "L_ret", "A_ret", "A-L",
-             "L_rem", "A_rem", "A_conf", "A_top1%"))
+    print("model %s  seeds %s  guard %s"
+          % (args.model_dir, args.seeds, args.guard))
+    hdr = ("seed", "arm", "return", "L_ret", "delta", "L_rem", "A_rem",
+           "L_conf", "A_conf", "A_top1%")
+    print("%-6s %-8s | %9s %9s %8s | %6s %6s | %6s %6s | %s" % hdr)
     for seed in args.seeds:
-        row = run_arm(args.model_dir, seed, args.steps, "strict",
+        row = run_arm(args.model_dir, seed, args.steps, args.guard,
                       args.ablation)
         res[str(seed)] = row
+        L, A = row["lancer"], row["actor"]
         for arm in ("lancer", "actor"):
             d = row[arm]
-            tag = "Lancer" if arm == "lancer" else "actor"
-            delta = "" if arm == "lancer" else \
-                "%+8.0f" % (d["return"] - row["lancer"]["return"])
-            print("%-6d %-8s | %9.0f %9s %8s | %9s %9s %8s | %s"
-                  % (seed, tag,
-                     d["return"] if arm == "lancer" else
-                     row["lancer"]["return"],
-                     "%.0f" % d["return"] if arm == "actor" else "",
-                     delta if arm == "actor" else "",
-                     sum(row["lancer"]["remediation"].values())
-                     if arm == "lancer" else "",
-                     d["total_remediation"] if arm == "actor" else "",
-                     d["confirmed_hosts"] if arm == "actor" else "",
-                     d["top_pick_share"] if arm == "actor" else ""))
+            other = A if arm == "lancer" else L
+            print("%-6d %-8s | %9.0f %9.0f %8s | %6d %6d | %6d %6d | %s"
+                  % (seed, arm, d["return"], other["return"],
+                     ("%+8.0f" % (d["return"] - L["return"]))
+                     if arm == "actor" else "",
+                     sum(L["remediation"].values()),
+                     A["total_remediation"],
+                     L["confirmed_hosts"], A["confirmed_hosts"],
+                     A["top_pick_share"] if arm == "actor" else ""))
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(res, f, indent=1)
