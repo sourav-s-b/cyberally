@@ -19,6 +19,7 @@ Usage (train venv, repo root):
 import argparse
 import json
 import os
+import random
 import sys
 
 import numpy as np
@@ -36,9 +37,33 @@ DEFAULT_TRAIN_SEEDS = [7706, 7707, 7708, 7709]
 DEFAULT_EVAL_SEEDS = [7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705]
 
 
-def _risk():
+def _risk(ablation="real"):
+    """The risk model used as RL input.
+
+    ``ablation="zero"`` substitutes a stub that reports P(compromised)=0 for
+    every host. This is the control arm for "does the ML risk score help?":
+    feature width stays 15, the Phase-3 body still loads, and the actor is
+    identical in every other respect. Only the VALUES in column 15 change.
+    """
+    if ablation == "zero":
+        return ZeroRisk()
     from blue.policies.hybrid import RiskPriority
     return RiskPriority(model_path=RISK_MODEL)
+
+
+class ZeroRisk(object):
+    """Stand-in for RiskPriority that reports no compromise evidence.
+
+    Implements only what `host_rows_15` calls. Deliberately does NOT reuse
+    the real model: the point is that the RL agent receives no risk
+    information at all, not that it receives a well-informed score of zero.
+    """
+
+    def _predict_all(self, env, agent):
+        return {h: 0.0 for h in env.hostnames[agent]}
+
+    def __call__(self, env, agent, host):
+        return 0.0
 
 
 def host_rows_15(env, agent, cands, risk):
@@ -133,6 +158,15 @@ def build_actor(hidden=64):
 def cmd_train(args):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
+    # Seed BEFORE constructing any model. Previously these calls sat after
+    # build_actor/build_central_critic, so the initial weights of both nets
+    # were drawn from whatever state the RNG happened to be in and only the
+    # *subsequent* randomness was controlled. That makes an "init" claim
+    # unreproducible: rerunning with --seed 0 gave different starting
+    # weights (observed 2026-10-06 while auditing the +4.50 run).
+    th.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     actor = build_actor(hidden=args.hidden)
     # Central critic over the joint Blue-visible context (5 pooled 14-dim
     # means + tick) - unchanged dimension, so the tested
@@ -140,9 +174,7 @@ def cmd_train(args):
     critic = mg.build_central_critic(hidden=args.hidden)
     opt = th.optim.Adam(list(actor.parameters())
                         + list(critic.parameters()), lr=args.lr)
-    th.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    risk = _risk()
+    risk = _risk(args.risk_ablation)
     os.makedirs(args.out, exist_ok=True)
     hist = []
     cycle = list(args.train_seeds)
@@ -173,7 +205,10 @@ def cmd_train(args):
     with open(os.path.join(args.out, "pilot_manifest.json"), "w") as f:
         json.dump({"algo": "risk-as-feature residual PPO (14+1 cols)",
                    "iters_done": len(hist), "feat_dim": FEAT_DIM,
-                   "risk_model": RISK_MODEL, "temp": args.temp,
+                   "risk_model": (RISK_MODEL if args.risk_ablation == "real"
+                                  else "ZERO (ablation: no risk input)"),
+                   "risk_ablation": args.risk_ablation,
+                   "temp": args.temp,
                    "train_min_proba": args.train_min_proba,
                    "train_seeds": args.train_seeds, "hist": hist}, f,
                   indent=1)
@@ -268,13 +303,16 @@ def cmd_eval(args):
     actor.load_state_dict(th.load(os.path.join(args.model_dir, "actor.th"),
                                   map_location="cpu", weights_only=False))
     actor.eval()
-    risk = _risk()
+    # Evaluation MUST use the same ablation the checkpoint was trained with,
+    # otherwise the "no risk information" arm is scored with risk injected.
+    risk = _risk(args.risk_ablation)
     out = {}
     gates = [("conf%s" % t, RiskConfidentGate(
         RiskGreedyHook(actor, args.bonus, risk), t))
         for t in args.gate_thresholds]
     for name, ghook in [("lancer", None), ("greedy", None)] + gates:
         for seed in args.eval_seeds:
+            # fresh policy per arm/seed: the policy carries per-episode state
             pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
                                 guard=False)
             hook = ghook
@@ -288,14 +326,19 @@ def cmd_eval(args):
     summ = {}
     for name in ["greedy"] + ["conf%s" % t
                               for t in args.gate_thresholds]:
-        d = [out[name][s] - base[s] for s in args.eval_seeds]
-        m = sum(d) / len(d)
-        se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5
-        summ[f"{name}_minus_lancer"] = {"mean": m,
-                                        "ci95": [m - 2.365 * se,
-                                                 m + 2.365 * se]}
+        from blue.training.remote_train import ci95_of
+        c = ci95_of([out[name][s] - base[s] for s in args.eval_seeds])
+        summ[f"{name}_minus_lancer"] = {"mean": c["paired_mean"],
+                                        "sd": c["sd"], "n": c["n"],
+                                        "t_crit95": c["t_crit95"],
+                                        "ci95": c["ci95"]}
     with open(args.out, "w") as f:
-        json.dump({"cells": out, "summary": summ}, f, indent=1)
+        json.dump({"cells": out, "summary": summ,
+                   "risk_ablation": args.risk_ablation,
+                   "risk_model": (RISK_MODEL if args.risk_ablation == "real"
+                                  else "ZERO (ablation: no risk input)"),
+                   "eval_seeds": list(args.eval_seeds),
+                   "steps": args.steps}, f, indent=1)
     for k, v in summ.items():
         print(f"{k}: {v['mean']:+.2f} CI[{v['ci95'][0]:+.1f},"
               f"{v['ci95'][1]:+.1f}]")
@@ -316,6 +359,10 @@ def main():
                     help="record a decision for PPO only if the pick's "
                          "risk proba >= this (0 = train on all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--risk-ablation", choices=("real", "zero"),
+                    default="real",
+                    help="real = use the learned risk score as RL input; "
+                         "zero = hold column 15 at 0.0 (control arm)")
     ap.add_argument("--train-seeds", type=int, nargs="*",
                     default=list(DEFAULT_TRAIN_SEEDS))
     ap.add_argument("--eval-seeds", type=int, nargs="*",
