@@ -26,10 +26,8 @@ if actual != cfg['source_commit']:
 subprocess.run([sys.executable, '-m', 'pip', 'install', 'uv==0.12.15'], check=True)
 subprocess.run([sys.executable, '-m', 'uv', 'venv', '--python', '3.12', '/kaggle/working/harness-env'], check=True)
 python = '/kaggle/working/harness-env/bin/python'
-subprocess.run([sys.executable, '-m', 'uv', 'pip', 'install', '--python', python, '--torch-backend', 'cpu',
-                'numpy==2.5.3', 'scipy==1.18.1', 'scikit-learn==1.7.2', 'torch==2.14.1',
-                'joblib==1.5.2', 'threadpoolctl==3.6.0', 'gym==0.26.2', 'PyYAML==6.0.1',
-                'pygame==2.5.2', 'networkx==3.2.1', 'prettytable==3.9.0', 'setuptools<81'], check=True)
+subprocess.run([sys.executable, '-m', 'uv', 'pip', 'install', '--python', python,
+                '--torch-backend', 'cpu', '-r', str(root / 'ops/kaggle/harness/requirements.txt')], check=True)
 os.chdir(root)
 sys.path.insert(0, str(root))
 # Validate golden model predictions and a live simulator episode before training.

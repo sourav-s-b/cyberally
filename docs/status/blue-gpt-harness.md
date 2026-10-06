@@ -153,3 +153,23 @@ weights and history exactly. Golden scorer and simulator preflight passed both
 in the worktree and extracted source snapshot. User requested GitHub code
 transport: runner now checks out an exact commit; weights stay in private
 Kaggle input. Remote runtime preflight remains mandatory before training.
+
+Kaggle submission (2026-10-06): user approved GitHub source transport. Harness
+published on gpt-blue at a5c91393497beaccee38ff8e196f5181da1aa736.
+Private dataset: souravsreekumar02/gpt-blue-harness-pilot-20261006 contains only
+scorer.pkl, golden.npz and pilot.json. Separate private kernel
+souravsreekumar02/gpt-blue-harness-pilot version 1 accepted; API reports RUNNING.
+Startup preflight checks pinned Python/runtime, ML reference outputs and native
+simulator episode before training. RUNNING is not evidence that training or
+preflight completed. Six final models: zero/risk/both x RNG seeds 0/1, 8x4x400;
+common reused dev episodes 8221–8228, baselines Lancer/coverage-only. All models
+reported, no significance claim with two training seeds. Final 7809–8200 unused.
+Next: retrieve startup/output logs, verify preflight and all six completion
+manifests, then inspect pilot/report.json before authorizing a larger experiment.
+
+Runtime repair: Kaggle version 1 failed before training because the isolated
+runtime omitted gymnasium, imported by upstream RandomAgent. Added pinned
+Gymnasium 0.28.1 and moved runtime dependencies into a single requirements.txt.
+Fresh /tmp/gpt-blue-clean-runtime (no inherited site packages) passed golden
+scorer + native simulator preflight and evaluation imports. Experiment/model/
+seed/budget/reward settings unchanged; relaunch uses a new source commit only.
