@@ -80,9 +80,12 @@ CMD = [
     "--train-min-proba", "0.5",
     "--temp", "0.5",
     "--gate", "5",
-    "--patience", "5",
-    "--min-gain", "1.0",
+    "--patience", "4",
+    # Must exceed the eval noise (observed swings of ~40 on the 4-seed
+    # subset) or the plateau stop fires on noise and the run never plateaus.
+    "--min-gain", "5.0",
     "--max-hours", "10",
+    "--log-every", "60",
     "--resume",
 ]
 env = dict(os.environ)
