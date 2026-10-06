@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import cc4_epymarl_wrapper as wrapper
 from blue_action_masking import BlueZoneTracker
+from blue_iforest_anomaly import IsolationForestAnomalyScorer
 from CybORG.Agents import SleepAgent
 from CybORG.Shared.Session import Session
 
@@ -47,13 +48,85 @@ def test_single_reset_seed_and_same_world():
 def test_full_hq_coverage_and_padding(quiet):
     env = quiet
     assert len(env.hostnames["blue_agent_4"]) > 16
-    assert env.obs_size == 510 and env.n_actions == 155
+    assert env.obs_size == 561 and env.n_actions == 155
     for i, agent in enumerate(wrapper.BLUE_AGENTS):
         count = len(env.hostnames[agent])
         assert env.get_host_presence(i).sum() == count
-        assert np.all(env.get_obs_agent(i)[count*10:] == 0)
+        assert np.all(env.get_obs_agent(i)[count*11:] == 0)
         assert np.all(env.get_avail_agent_actions(i)[2+3*count:] == 0)
         assert env.get_avail_agent_actions(i)[2+3*(count-1):2+3*count].all()
+
+
+def test_anomaly_scorer_shapes_and_bounds():
+    clean = np.array([
+        [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.1, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0],
+        [0.2, 1.4, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0],
+        [0.3, 1.6, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0],
+    ], dtype=np.float32)
+    candidate = np.array([
+        [10.0, 12.0, 7.0, 5.0, 4.0, 1.0, 4.0, 0.9, 8.0, 5.0],
+        [0.4, 1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0],
+    ], dtype=np.float32)
+    scorer = IsolationForestAnomalyScorer(random_state=0)
+    scorer.fit(clean)
+    out = scorer.score_batch(candidate)
+    assert out.shape == (2,)
+    assert np.all(np.isfinite(out))
+    assert np.all((out >= 0.0) & (out <= 1.0))
+    assert out[0] > out[1]
+
+
+def test_anomaly_scorer_fit_and_pre_fit_contract():
+    clean = np.array([
+        [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [0.1, 1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0],
+        [0.2, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0],
+        [0.3, 1.3, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0],
+    ], dtype=np.float32)
+    pre = IsolationForestAnomalyScorer()
+    batch = pre.score_batch(np.zeros((2, 10), dtype=np.float32))
+    assert np.all(batch == 0.5)
+    assert pre.score_vector(np.zeros(10, dtype=np.float32)) == 0.5
+
+    scorer = IsolationForestAnomalyScorer(random_state=0)
+    scorer.fit(clean)
+    assert scorer.is_fitted
+    assert scorer._feature_dim == 10
+    vector_score = scorer.score_vector(clean[0])
+    assert np.isfinite(vector_score)
+    assert 0.0 <= vector_score <= 1.0
+
+    batch_scores = scorer.score_batch(clean)
+    assert batch_scores.shape == (clean.shape[0],)
+    assert np.all(np.isfinite(batch_scores))
+    assert np.all((batch_scores >= 0.0) & (batch_scores <= 1.0))
+
+    with pytest.raises(ValueError):
+        scorer.fit(np.ones((4, 9), dtype=np.float32))
+
+
+def test_anomaly_score_is_appended_per_host(quiet):
+    env = quiet
+    obs = env.get_obs_agent(0)
+    host_rows = obs.reshape(env.max_hosts_per_agent[0], 11)
+    assert obs.shape == (env.max_hosts_per_agent[0] * 11,)
+    for row in host_rows:
+        assert np.isfinite(row[-1])
+        assert 0.0 <= row[-1] <= 1.0
+
+
+def test_collect_benign_clean_matrix_is_diverse_and_valid():
+    X_clean, stats = IsolationForestAnomalyScorer.collect_benign_matrix(
+        seeds=range(3), steps=12, monitor_every=2
+    )
+    assert X_clean.shape[1] == 10
+    assert X_clean.shape[0] > 200
+    assert np.all(np.isfinite(X_clean))
+    assert stats["n_samples"] == X_clean.shape[0]
+    assert stats["n_unique_vectors"] == np.unique(X_clean, axis=0).shape[0]
+    assert stats["n_unique_vectors"] > 3
+    assert stats["dominant_vector_pct"] < 95.0
 
 
 def test_small_capacity_rejected():

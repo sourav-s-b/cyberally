@@ -55,6 +55,7 @@ from blue_obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
                                host_to_temporal, temporal_len, TEMPORAL_GROUPS,
                                ROOT_SESSION_INDEX)
 from blue_action_masking import BlueZoneTracker
+from blue_iforest_anomaly import IsolationForestAnomalyScorer
 
 BLUE_AGENTS = [f"blue_agent_{i}" for i in range(5)]
 ACTION_TEMPLATES = ("Analyse", "Remove", "Restore")
@@ -163,6 +164,7 @@ class CC4MARLEnv:
         self.base_len = (VECTOR_LEN if self.include_root_session
                          else VECTOR_LEN - 1)
         self.host_vector_len = self.base_len + self.temporal_len
+        self.host_observation_len = self.host_vector_len + 1
         self.common_reward = bool(common_reward)
         self.shaping = shaping
         self.reward_scalarisation = reward_scalarisation
@@ -172,7 +174,7 @@ class CC4MARLEnv:
         else:
             self.max_hosts_per_agent = [max_hosts] * len(BLUE_AGENTS)
         self.n_actions_per_agent = [2 + 3 * h for h in self.max_hosts_per_agent]
-        self.obs_size_per_agent = [h * self.host_vector_len
+        self.obs_size_per_agent = [h * self.host_observation_len
                                    for h in self.max_hosts_per_agent]
         # Scalar widths are the max across agents. In default (global) mode all
         # agents share them; in per-agent mode they are allocation upper bounds
@@ -195,6 +197,7 @@ class CC4MARLEnv:
         self._awaiting = {}
         self._has_reset = False
         self._finished = True
+        self.anomaly_scorer = IsolationForestAnomalyScorer()
 
     def reset(self, seed=None, options=None):
         if options:
@@ -270,7 +273,7 @@ class CC4MARLEnv:
 
     def _obs_agent(self, agent):
         ai = BLUE_AGENTS.index(agent)
-        obs = np.zeros((self.max_hosts_per_agent[ai], self.host_vector_len),
+        obs = np.zeros((self.max_hosts_per_agent[ai], self.host_observation_len),
                        dtype=np.float32)
         busy = agent in self._awaiting
         tracker = self.trackers[agent]
@@ -283,7 +286,9 @@ class CC4MARLEnv:
                                     self.observed_at[agent][host],
                                     self._tick, self.episode_limit, busy,
                                     self.temporal_features)
-            obs[i] = row
+            row = np.asarray(row, dtype=np.float32)
+            anomaly_score = self.anomaly_scorer.score_vector(row)
+            obs[i] = np.concatenate([row, np.asarray([anomaly_score], dtype=np.float32)])
         return obs.flatten()
 
     def get_host_presence(self, agent_id):
@@ -335,6 +340,7 @@ class CC4MARLEnv:
                 "per_agent_bounds": self.per_agent_bounds,
                 "temporal_features": list(self.temporal_features),
                 "host_vector_len": self.host_vector_len,
+                "host_observation_len": self.host_observation_len,
                 "include_root_session": self.include_root_session,
                 "shaping": dict(self.shaping) if self.shaping else None,
                 "red_agent": self.red_agent,
@@ -480,6 +486,10 @@ class CC4MARLEnv:
 
     def save_replay(self):
         raise NotImplementedError("CC4MARLEnv has no replay recording")
+
+    def fit_anomaly_scorer(self, clean_vectors):
+        self.anomaly_scorer.fit(clean_vectors)
+        return self.anomaly_scorer
 
     def get_stats(self):
         return {}
