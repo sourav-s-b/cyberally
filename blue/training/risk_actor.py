@@ -313,8 +313,11 @@ def cmd_eval(args):
     for name, ghook in [("lancer", None), ("greedy", None)] + gates:
         for seed in args.eval_seeds:
             # fresh policy per arm/seed: the policy carries per-episode state
+            # Lancer arm is always unguarded: it is the reference behaviour
+            # and its own cursor provides the coverage discipline.
             pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
-                                guard=False)
+                                guard=(args.sweep_guard == "strict"
+                                       and name != "lancer"))
             hook = ghook
             if name == "greedy":
                 hook = RiskGreedyHook(actor, args.bonus, risk)
@@ -335,6 +338,7 @@ def cmd_eval(args):
     with open(args.out, "w") as f:
         json.dump({"cells": out, "summary": summ,
                    "risk_ablation": args.risk_ablation,
+                   "sweep_guard": args.sweep_guard,
                    "risk_model": (RISK_MODEL if args.risk_ablation == "real"
                                   else "ZERO (ablation: no risk input)"),
                    "eval_seeds": list(args.eval_seeds),
@@ -359,6 +363,13 @@ def main():
                     help="record a decision for PPO only if the pick's "
                          "risk proba >= this (0 = train on all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--sweep-guard", choices=("off", "strict"),
+                    default="off",
+                    help="coverage guard on the learner sweep. off = the "
+                         "actor may re-pick the same host every tick (the "
+                         "regime that produced the agent-3 trap); strict = "
+                         "rank only among hosts unvisited this sweep, which "
+                         "is the mechanism Lancer uses to escape it")
     ap.add_argument("--risk-ablation", choices=("real", "zero"),
                     default="real",
                     help="real = use the learned risk score as RL input; "
