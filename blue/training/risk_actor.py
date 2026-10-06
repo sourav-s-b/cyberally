@@ -42,12 +42,22 @@ def _risk():
 
 
 def host_rows_15(env, agent, cands, risk):
-    """The usual 14 Blue-visible rows + learned P(compromised) per host."""
+    """The usual 14 Blue-visible rows + learned P(compromised) per host.
+
+    The probability column is sanitised: the risk model standardises with
+    the dataset std, so an all-constant observation early in an episode
+    divides by zero and yields inf/nan, which poisons the PPO softmax
+    (observed: "probability tensor contains inf/nan"). Degenerate states
+    are rare but real, so they collapse to 0.0 (no evidence) rather than
+    propagating.
+    """
     from blue.training.scorer import host_rows
     base = np.asarray(host_rows(env, agent, cands), dtype=np.float32)
     proba = risk._predict_all(env, agent)
     extra = np.asarray([[proba.get(h, 0.0)] for h in cands],
                        dtype=np.float32)
+    extra = np.nan_to_num(extra, nan=0.0, posinf=1.0, neginf=0.0)
+    np.clip(extra, 0.0, 1.0, out=extra)
     return np.concatenate([base, extra], axis=1)
 
 

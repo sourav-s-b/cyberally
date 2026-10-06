@@ -299,7 +299,16 @@ def ppo_central_update(actor, critic, opt, buf, bonus=1.0, epochs=4,
                          .astype(np.float32))
     with th.no_grad():
         adv = RET - critic(J).squeeze(-1)
-        adv = (adv - adv.mean()) / (adv.std().clamp(min=1e-6))
+        # Degenerate-batch guard: with a single row (or constant returns)
+        # the std is 0 and normalising divides by ~0, which produced a NaN
+        # KL and poisoned the actor weights on the first iteration when the
+        # filter left only one usable row. Zero advantage is the correct
+        # answer here: there is nothing to learn from.
+        std = adv.std()
+        if adv.numel() < 2 or not bool(th.isfinite(std)) or std < 1e-6:
+            adv = th.zeros_like(adv)
+        else:
+            adv = (adv - adv.mean()) / std
     n = len(buf)
     tot = {"pol": 0.0, "vf": 0.0, "ent": 0.0, "kl": 0.0, "nb": 0}
     idx = np.arange(n)
