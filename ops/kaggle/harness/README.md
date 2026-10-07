@@ -37,3 +37,11 @@ The future runner's `runtime_profile=legacy-candidate` selects Python 3.11 and
 The shorter candidate requirements file documents intentional top-level pins.
 `diagnostics=true` enables requested-action hashes and fixed-state input checks.
 Neither option retroactively changes the completed pilot.
+
+Main32 preparation is frozen in `main32-plan.json`; actual uploaded `pilot.json`
+pins the published source commit. Five kernels share one private dataset; each
+bootstrap sets GPT_BLUE_SHARD_SEED to one authorized cohort seed. Shared master
+configuration is hashed into each shard. The evaluator reports its actual n=1
+locally; aggregate all FIVE final shard outputs with harness_experiment for n=5
+training-seed intervals. Primary BOTH must clear both Lancer and guard; all other
+comparisons descriptive. Include Sleep/random controls and preserve all tails.

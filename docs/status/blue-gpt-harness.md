@@ -184,3 +184,11 @@ after separately rebuilding the scorer; stochastic training differs between
 stacks, so no runtime equivalence claim. Actual local pilot stack already
 matched Kaggle. See the audit for all tables, tests and limitations. Larger
 training remains unlaunched; next is a frozen, sharded configuration review.
+
+Main32 preparation (2026-10-07): user authorized the next frozen/sharded run.
+Design and measured submission state in [blue-gpt-main32.md](blue-gpt-main32.md).
+Five independent training RNG seeds, three arms each, 32x4x400, common 32 reused
+development episodes, four baselines. All runs new under one older frozen stack.
+Primary BOTH must clear Lancer AND guard; other comparisons descriptive. New
+cohort aggregation rejects incomplete or mixed shards and uses n=5, df=4, never
+160 model replicas. Clean full-lock runtime preflight and 18 tests passed.

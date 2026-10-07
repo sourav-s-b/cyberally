@@ -3,6 +3,8 @@ import argparse
 import json
 from pathlib import Path
 import numpy as np
+import platform
+from importlib.metadata import version
 from blue.harness.scoring import MLScorer
 from blue.harness.policy import HarnessPolicy
 from blue.training import mappo_guide as mg
@@ -19,6 +21,14 @@ def preflight(folder):
     np.testing.assert_allclose(p, golden['risk'], rtol=1e-6, atol=1e-7)
     np.testing.assert_allclose(novelty, golden['novelty'], rtol=1e-6, atol=1e-7)
     cfg = json.loads((folder / 'pilot.json').read_text())
+    if 'runtime_versions' in cfg:
+        actual = {k: platform.python_version() if k == 'python' else version(k)
+                  for k in cfg['runtime_versions']}
+        if actual != cfg['runtime_versions']:
+            raise ValueError(f'runtime pin mismatch: {actual}')
+    if cfg.get('experiment') == 'main32':
+        from blue.training.harness_experiment import validate
+        validate(cfg)
     result = mg.run_team_episode(HarnessPolicy(max_age=cfg['max_age']), 7706, 40, **mg.ENV_KW)
     expected = cfg['preflight_episode']
     for k in ('return', 'ticks', 'coverage'):

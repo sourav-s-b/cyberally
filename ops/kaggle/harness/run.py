@@ -32,6 +32,10 @@ profiles = {'pilot': ('3.12', 'requirements.txt'),
 if profile not in profiles:
     raise RuntimeError('unknown frozen runtime profile')
 python_version, requirements = profiles[profile]
+python_version = cfg.get('python_version', python_version)
+requirements_path = root / 'ops/kaggle/harness' / requirements
+if cfg.get('runtime_requirements_sha256') and hashlib.sha256(requirements_path.read_bytes()).hexdigest() != cfg['runtime_requirements_sha256']:
+    raise RuntimeError('runtime requirements hash mismatch')
 subprocess.run([sys.executable, '-m', 'uv', 'venv', '--python', python_version, '/tmp/gpt-blue-env'], check=True)
 python = '/tmp/gpt-blue-env/bin/python'
 subprocess.run([sys.executable, '-m', 'uv', 'pip', 'install', '--python', python,
@@ -42,9 +46,20 @@ sys.path.insert(0, str(root))
 subprocess.run([python, '-m', 'blue.training.harness_preflight', '--input', str(data)], check=True)
 output = Path('/kaggle/working/pilot')
 output.mkdir(exist_ok=True)
+if cfg.get('experiment') == 'main32':
+    # Keep parent bootstrap independent of simulator/ML dependencies in child venv.
+    seed = int(os.environ['GPT_BLUE_SHARD_SEED'])
+    if seed not in cfg['training_rng_seeds']:
+        raise RuntimeError('unknown frozen training shard')
+    cohort_hash = hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()
+    cfg = {**cfg, 'cohort_training_rng_seeds': cfg['training_rng_seeds'],
+           'training_rng_seeds': [seed], 'cohort_sha256': cohort_hash}
 (output / 'pilot.json').write_text(json.dumps(cfg, indent=2))
+print(f"EXPERIMENT START source={cfg['source_commit']} runtime={profile} "
+      f"training_seeds={cfg['training_rng_seeds']} cohort={cfg.get('cohort_sha256', 'pilot')}", flush=True)
 for seed in cfg['training_rng_seeds']:
     for arm in cfg['arms']:
+        print(f"TRAIN START arm={arm} seed={seed} iterations={cfg['iters']}", flush=True)
         dest = output / f'{arm}_s{seed}'
         cmd = [python, '-m', 'blue.training.harness_rl', '--scorer', str(data/'scorer.pkl'),
                '--out', str(dest), '--seed', str(seed), '--ml-inputs', arm,
@@ -58,5 +73,5 @@ for seed in cfg['training_rng_seeds']:
         if cfg.get('diagnostics', False):
             cmd.append('--diagnostics')
         subprocess.run(cmd, check=True)
-subprocess.run([python, '-m', 'blue.training.harness_pilot', '--config', str(data/'pilot.json'), '--output', str(output), '--scorer', str(data/'scorer.pkl')], check=True)
-print('PILOT COMPLETE: all six models evaluated; see pilot/report.json', flush=True)
+subprocess.run([python, '-m', 'blue.training.harness_pilot', '--config', str(output/'pilot.json'), '--output', str(output), '--scorer', str(data/'scorer.pkl')], check=True)
+print(f"SHARD COMPLETE: {len(cfg['arms'])*len(cfg['training_rng_seeds'])} final models evaluated; see pilot/report.json", flush=True)

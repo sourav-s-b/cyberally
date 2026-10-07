@@ -26,12 +26,21 @@ def evaluate(config, output, scorer):
             raise ValueError('baseline configuration drift')
     else:
         cache = {'configuration_sha256': key, 'cells': {}}
-    for name in ('lancer', 'guard'):
+    for name in cfg.get('baselines', ['lancer', 'guard']):
         cells = cache['cells'].setdefault(name, {})
         for seed in seeds:
             if str(seed) not in cells:
-                policy = (OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5)) if name == 'lancer'
-                          else HarnessPolicy(max_age=cfg['max_age']))
+                from blue.core.baselines import SleepBaseline, MaskedRandomBaseline
+                if name == 'lancer':
+                    policy = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5))
+                elif name == 'guard':
+                    policy = HarnessPolicy(max_age=cfg['max_age'])
+                elif name == 'sleep':
+                    policy = SleepBaseline()
+                elif name == 'random':
+                    policy = MaskedRandomBaseline(seed=seed)
+                else:
+                    raise ValueError('unknown baseline')
                 cells[str(seed)] = mg.run_team_episode(policy, seed, cfg['steps'], **mg.ENV_KW)
                 cache_path.write_text(json.dumps(cache, indent=2))
                 print(f'eval {name} seed={seed} return={cells[str(seed)]["return"]}', flush=True)
