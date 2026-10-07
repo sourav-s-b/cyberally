@@ -112,3 +112,27 @@ Inspect saved models without training with `python -m
 blue.training.harness_model_audit --model-dir <run> --scorer <scorer.pkl>
 --seeds 8226 8228 --out <diagnostic.json>`. Use the artifact's validated runtime.
 These reused episodes are mechanism diagnostics, not new performance evidence.
+
+## Opt-in v2 investigation scheduler
+
+See `docs/research/blue-harness-redesign-20261007.md` for the design audit,
+limitations and experiment gates. `blue.training.harness_redesign` exposes
+`--algorithm mappo|a2c`, uses persistent observable evidence and candidate-set
+context, independent actor/critic optimization, and an exact teacher-mixture
+sampling policy. Existing checkpoints and runners are unchanged.
+
+```bash
+python -m blue.training.harness_redesign train --out blue/results/v2_smoke --algorithm a2c --scorer PATH_TO_TRUSTED_SCORER
+python -m blue.training.harness_redesign eval --model-dir blue/results/v2_smoke --out blue/results/v2_eval --scorer PATH_TO_TRUSTED_SCORER --eval-seeds 8241 8229
+```
+
+Default training is a short two-iteration smoke check, not long training.
+Use the pinned runtime and the exact scorer used to train. Resume with
+`--resume` and an unchanged configuration. Source/artifact/runtime drift
+is rejected. Primary evaluation samples the trained marginal distribution;
+`greedy-diagnostic` is a separate policy. The untrained-mixture control
+uses the same sampler without learned residuals. Policy RNG repetitions
+are nested within episodes and training seeds, never extra trained models.
+
+The older remote checkpoint replay mismatch must be resolved before a new
+Kaggle comparison. No defense improvement is claimed for v2.

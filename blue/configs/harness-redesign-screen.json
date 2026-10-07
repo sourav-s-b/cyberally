@@ -1,0 +1,21 @@
+{
+  "status": "draft_not_launchable_until_policy_reproduction_passes",
+  "feature_version": "blue-harness-redesign-v2",
+  "algorithms": ["mappo", "a2c"],
+  "training_rng_seeds": [0, 1, 2, 3, 4],
+  "training_episode_seeds": [7706, 7707, 7708, 7709],
+  "evaluation_episode_seeds": [8221, 8222, 8223, 8224, 8225, 8226, 8227, 8228],
+  "evaluation_usage": "reused development screen, no final or fresh claim",
+  "iterations": 8,
+  "episodes_per_iteration": 4,
+  "steps": 400,
+  "policy_rng_replicas": 3,
+  "ml_inputs": "risk",
+  "explore": 0.2,
+  "max_age": 80,
+  "controls": ["lancer", "guard", "sleep", "random", "untrained-mixture"],
+  "reserved_excluded": [7809, 8200],
+  "required_before_launch": ["source commit and file hashes", "scorer hash", "locked runtime", "actor golden predictions", "matching full-episode request hashes", "matched sampler configuration"],
+  "independent_unit": "training RNG seed; policy replicas and shared evaluation episodes are not extra trained models",
+  "interpretation": "feasibility and matched algorithm screen, not algorithm superiority or held-out deployment validation"
+}

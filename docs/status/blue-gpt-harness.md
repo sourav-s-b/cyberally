@@ -197,3 +197,41 @@ Main32 cohort submitted: five private kernel version 1 jobs, actual IDs
 `gpt-blue-harness-main-seed-0` through `-4`, all checked RUNNING.
 Experiment source pin `6942d584f15231a7f19add0a510a04f7ff3ad229`;
 see blue-gpt-main32.md for cohort hash, controls and next retrieval steps.
+
+## 2026-10-07: design audit and opt-in v2
+
+Branch gpt-blue, isolated worktree. Research and component audit:
+`docs/research/blue-harness-redesign-20261007.md`. Draft interface review:
+`docs/coordination/gpt-blue-harness-v2.md`. No shared contract, simulator,
+reward or existing checkpoint migration changed.
+
+Implemented persistent Blue-visible event memory, masked candidate-set
+actor context, all-host centralized critic summaries, separate optimizers,
+decision-time GAE/MC, exact teacher-mixture behavior, explicit MAPPO and
+A2C paths, nested stochastic evaluation and an untrained-mixture control.
+Weighted HGB/sigmoid detector candidate retains per-episode validation;
+its defensive value remains unproven. Novelty defaults off.
+
+Validation: both learners completed two full-horizon training iterations
+with two episodes each. MAPPO full-horizon evaluation completed on reused
+8241. Short-horizon resume produced exactly matching actor weights against
+uninterrupted training; all evaluation/control paths completed. Focused
+harness tests run under Python3.11.16/NumPy1.26.4/Torch2.2.0 CPU lock.
+These are smoke/mechanism checks, not performance claims.
+
+Blocker for scaling: downloaded main32 risk_s1 reproduces -97 locally on
+8236 versus remote -225; guard matches -81. Plain runner agrees with trace,
+so logging alone is not the explanation. risk_s2 also differs on 8233.
+Trace audit now marks remote reproduction failures explicitly. Next task:
+resolve full policy/request replay, then isolated optimization ablation and
+matched MAPPO/A2C screen. Draft screen is not launchable; no Kaggle run
+started. Reserved 7809–8200 preserved. Origin main advanced to 01140fe,
+inspected but not merged; no external Red LLM experiment introduced.
+
+Follow-up: established local numerical ranking sensitivity. Same risk_s1
+on8236 gives -136/thread1 versus -97/thread2. At tick2, identical inputs
+have a score difference7.45e-9 that changes the host tie-break. Explicit
+1e-6 resolution yields -152 and identical request hashes for threads1/2:
+a stability mechanism check, not a performance fix. V2 pins one thread;
+frozen v1 untouched. Preparing a bounded private remote replay with frozen
+weights, no training, to resolve cross-machine behavior.
