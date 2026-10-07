@@ -1,8 +1,7 @@
-from .env import OWASPEnvironment
-from .actions import RedAction, BlueAction
+from .adapters.red_adapter import adapt_red_action
+from .adapters.blue_adapter import adapt_blue_action
 
 __all__ = [
-    "OWASPEnvironment",
-    "RedAction",
-    "BlueAction",
+    "adapt_red_action",
+    "adapt_blue_action",
 ]
