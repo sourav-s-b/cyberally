@@ -136,3 +136,9 @@ are nested within episodes and training seeds, never extra trained models.
 
 The older remote checkpoint replay mismatch must be resolved before a new
 Kaggle comparison. No defense improvement is claimed for v2.
+
+V2 pins one Torch thread by default (`--threads 1`) and records the setting.
+Its greedy diagnostic declares a 1e-6 near-tie resolution; sampled primary
+execution remains the exact trained marginal. Numerical ranking intervention
+in v1 is available only through `harness_numerical_audit`, preserving frozen
+checkpoint and original evaluation semantics.

@@ -75,3 +75,47 @@ No new training comparison is launched by this redesign. A separate bounded priv
 ### Follow-up execution contract
 
 V2 now pins one Torch thread and records it in the runtime manifest. Greedy-diagnostic selection uses explicit 1e-6 near-tie resolution; primary sampled execution is unchanged. The frozen v1 policy is unchanged. `blue.training.harness_numerical_audit` records threads, tolerance, model hashes, complete request digest and decision margins, and correctly counts hook choices via a read-only recorder. `ops/kaggle/harness/replay_audit.py` runs only declared diagnostic replays. No training and no reserved episodes are included.
+
+## Completed local numerical cohort
+
+All runs use unchanged frozen weights and the locked runtime. Rows below
+are reused diagnostic episodes, not new performance measurements.
+
+| Model/episode | Exact ranking thread1 | Exact ranking thread2 | Near-tie rule thread1 | Near-tie rule thread2 |
+|---|---:|---:|---:|---:|
+| risk_s1 /8236 | -136 | -97 | -152 | -152 |
+| risk_s2 /8233 | -205 | -100 | -205 | -205 |
+
+Full action-request hashes match across threads under the explicit rule
+on each episode. Defense does not improve; 8233 retains its failure.
+Eight corresponding private Kaggle replays are running after explicit
+user approval of the frozen checkpoint/scorer upload. They compare returns
+and request hashes, not just numerical averages. Primary v2 execution is
+stochastic and still needs its own post-training cross-machine golden check.
+
+Follow-up evaluation counting uses `ExecutionAudit` so real learned hook
+choices are not mislabeled as forced actions. Checkpoint-boundary resume
+again reproduced exact actor weights after the WSL restart.
+
+## Completed Kaggle numerical replay
+
+Private kernel `souravsreekumar02/gpt-blue-frozen-numerical-replay-audit`
+completed all eight jobs with source cdd17647fc6f72cd374801ccf3a05ea379e63749.
+All frozen model/scorer/config checks passed. Under the near-tie rule,
+every local/remote return and complete request hash matches on both
+episodes and both thread settings. Original exact ranking differs across
+machines:8236/thread2 reproduces remote -225 but local -97;8233/thread2
+returns -205 remotely but local -100.8233/thread1 matches at -205.
+Even equal returns on8233 with two remote thread settings mask differing
+action hashes. These checks establish numerical ranking sensitivity and
+the effectiveness of the declared intervention on this bounded suite.
+The intervention does not cure defensive failure or prove universal
+cross-platform determinism.
+
+Next is a four-model full-horizon v2 pipeline smoke:MAPPO/A2C, RNG0/1,
+two iterations with two episodes each, risk input held fixed using the
+approved original scorer. Evaluate reused8233 with two nested policy RNG
+replicas and all controls. This is not the eight-iteration/five-seed
+comparison, and will not select an algorithm. Download the generated
+checkpoints and replay each locally to validate the v2 execution contract
+before proposing longer training.

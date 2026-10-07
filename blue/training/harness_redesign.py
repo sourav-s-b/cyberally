@@ -142,6 +142,42 @@ def load(model_dir,scorer_path,policy_seed,execution='sample'):
     return HarnessPolicy(hook,c['max_age'],record_requests=True),m
 
 
+
+class ExecutionAudit:
+    """Count actual learned choices during evaluation without training rows."""
+    def __init__(self, hook):
+        self.hook = hook
+        self.rows = []
+        self.per_agent = {}
+
+    def reset(self):
+        self.hook.reset()
+        self.mark_episode()
+
+    def mark_episode(self):
+        self.rows = []
+        self.per_agent = {}
+
+    def observe(self, env, agent):
+        self.hook.observe(env, agent)
+
+    def __call__(self, env, agent, cands, scored):
+        host = self.hook(env, agent, cands, scored)
+        self.rows.append({'tick': env._tick, 'agent': agent, 'host': host})
+        self.per_agent[agent] = self.per_agent.get(agent, 0) + 1
+        return host
+
+    def close_episode(self, rewards):
+        pass
+
+
+def evaluation_episode(policy, seed, steps):
+    # Without a recorder the legacy runner labels every choice "forced".
+    audit = ExecutionAudit(policy.hook) if policy.hook is not None else None
+    policy.hook = audit
+    return mg.run_team_episode(policy, seed, steps, hook=audit, recorder=audit, **mg.ENV_KW)
+
+
 def evaluate(args):
     torch.set_num_threads(args.threads)
     check_seeds(args.eval_seeds)
@@ -169,13 +205,13 @@ def evaluate(args):
             # Exactly zero residual: same sampling and feature path, no learned correction.
             with torch.no_grad():
                 for parameter in policy.hook.actor.parameters():parameter.zero_()
-            mixture.append(mg.run_team_episode(policy,seed,args.steps,hook=policy.hook,**mg.ENV_KW))
+            mixture.append(evaluation_episode(policy,seed,args.steps))
         results['baselines'].setdefault('untrained-mixture',{})[str(seed)]=mixture
         for execution in ('sample','greedy-diagnostic'):
             cells=[]
             for replica in range(args.policy_replicas if execution=='sample' else 1):
                 policy,m=load(args.model_dir,args.scorer,seed*997+replica,execution)
-                cell=mg.run_team_episode(policy,seed,args.steps,hook=policy.hook,**mg.ENV_KW)
+                cell=evaluation_episode(policy,seed,args.steps)
                 cells.append({**cell,'policy_seed':seed*997+replica,'requests':policy.request_digest.result(),'guard':policy.guard_stats()})
             results['cells'].setdefault(execution,{})[str(seed)]=cells
         (d/'report.json').write_text(json.dumps(results,indent=2)+'\n')

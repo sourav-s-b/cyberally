@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -29,9 +30,15 @@ os.chdir(root)
 out=Path('/kaggle/working/replay')
 out.mkdir()
 (out/'replay.json').write_text(json.dumps(cfg,indent=2))
+models=Path('/tmp/gpt-blue-replay-models')
+for model in {job['model'] for job in cfg['jobs']}:
+    dest=models/model
+    dest.mkdir(parents=True)
+    for name in ('actor.th','manifest.json'):
+        shutil.copyfile(data/(model+'_'+name),dest/name)
 for job in cfg['jobs']:
     command=[python,'-m','blue.training.harness_numerical_audit',
-             '--model-dir',str(data/job['model']), '--scorer',str(data/'scorer.pkl'),
+             '--model-dir',str(models/job['model']), '--scorer',str(data/'scorer.pkl'),
              '--seed',str(job['seed']),'--threads',str(job['threads']),
              '--tolerance',str(job['tolerance']),'--out',str(out/(job['tag']+'.json'))]
     print('REPLAY START '+job['tag'],flush=True)

@@ -235,3 +235,31 @@ have a score difference7.45e-9 that changes the host tie-break. Explicit
 a stability mechanism check, not a performance fix. V2 pins one thread;
 frozen v1 untouched. Preparing a bounded private remote replay with frozen
 weights, no training, to resolve cross-machine behavior.
+
+Private replay submitted after explicit user approval of checkpoint/scorer
+upload: Kaggle `souravsreekumar02/gpt-blue-frozen-numerical-replay-audit`,
+source cdd17647fc6f72cd374801ccf3a05ea379e63749, private dataset
+`souravsreekumar02/gpt-blue-replay-audit-20261007` version2. Eight
+frozen-checkpoint episodes (8233/8236, thread1/2, exact/1e-6 near-tie
+ranking), no training, no reserved block. Dataset uploader initially
+skipped nested checkpoint folders; fixed by flat filenames and bootstrap
+reconstruction before launch. WSL shutdown interrupted local references;
+completed artifacts preserved and missing local episodes resumed.
+
+Evaluation counting now uses a read-only hook recorder so learned choices
+are not mislabeled as forced by the legacy runner. Focused tests:28passed
+under locked legacy runtime. Source remains isolated on gpt-blue.
+
+Numerical replay completed:all eight remote jobs retrieved and validated.
+Near-tie policy matches local return and full request digest across both
+thread counts on8233/8236. Original exact ranking remains platform-sensitive;
+Kaggle thread2 reproduces old -225 on8236. Stability intervention preserves
+-205 on8233 and gives -152 on8236, not a defense improvement.30focused
+tests passed; resume exact and real hook counts verified after restart.
+Preparing four-model full-horizon MAPPO/A2C pipeline check, two iterations,
+RNG0/1, original approved scorer, reused8233. No algorithm ranking claim.
+
+User steering:run small training locally, Kaggle reserved for long runs.
+The four-model pipeline is moved to `harness_redesign_smoke` on the local
+locked runtime. No v2 Kaggle training kernel was launched; the remote
+smoke bootstrap is a future template only.

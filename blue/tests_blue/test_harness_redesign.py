@@ -134,3 +134,19 @@ def test_ranking_resolution_handles_numerical_ties_without_hiding_real_gaps():
     assert stable_pick([(1.1106417179107666,'host_1'),(1.1106417179107666,'host_3')]) == 'host_3'
     assert stable_pick([(1.1,'host_1'),(1.09999,'host_3')]) == 'host_1'
     with pytest.raises(ValueError):stable_pick([(float('nan'),'host_1')])
+
+
+def test_execution_audit_counts_real_hook_calls_and_resets():
+    from blue.training.harness_redesign import ExecutionAudit
+    class Hook:
+        def reset(self):pass
+        def observe(self,env,agent):pass
+        def __call__(self,env,agent,cands,scored):return cands[0]
+    class Env:
+        _tick=7
+    audit=ExecutionAudit(Hook())
+    assert audit(Env(),'blue_agent_0',['h'],[(1.,'h')])=='h'
+    assert audit.per_agent=={'blue_agent_0':1}
+    assert audit.rows==[{'tick':7,'agent':'blue_agent_0','host':'h'}]
+    audit.reset()
+    assert not audit.rows and not audit.per_agent
