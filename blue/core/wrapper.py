@@ -111,7 +111,7 @@ class CC4MARLEnv:
                  reward_scalarisation="sum", per_agent_bounds=False,
                  seed_cycle=None, temporal_features=(),
                  include_root_session=True, shaping=None,
-                 red_agent="discovery"):
+                 red_agent="discovery", red_agent_class=None):
         if not isinstance(max_hosts, int) or max_hosts < 1:
             raise ValueError("max_hosts must be a positive integer")
         if not isinstance(steps, int) or steps < 3:
@@ -125,7 +125,9 @@ class CC4MARLEnv:
                 raise ValueError(f"unknown shaping keys: {sorted(unknown)}")
         if reward_scalarisation not in ("sum", "mean"):
             raise ValueError("reward_scalarisation must be sum or mean")
-        if red_agent not in RED_AGENTS:
+        if red_agent_class is not None and not isinstance(red_agent_class, type):
+            raise TypeError("red_agent_class must be a native agent class")
+        if red_agent_class is None and red_agent not in RED_AGENTS:
             raise ValueError(f"unknown red_agent {red_agent!r}; known: "
                              f"{sorted(RED_AGENTS)}")
         self.red_agent = red_agent
@@ -187,7 +189,7 @@ class CC4MARLEnv:
         self.obs_size = max(self.obs_size_per_agent)
         sg = EnterpriseScenarioGenerator(blue_agent_class=SleepAgent,
             green_agent_class=EnterpriseGreenAgent,
-            red_agent_class=RED_AGENTS[self.red_agent],
+            red_agent_class=red_agent_class or RED_AGENTS[self.red_agent],
             steps=steps)
         self.cyborg = CybORG(scenario_generator=sg, seed=seed)
         self.env = self.cyborg.environment_controller
