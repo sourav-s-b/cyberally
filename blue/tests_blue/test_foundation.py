@@ -3,8 +3,8 @@ from copy import deepcopy
 from unittest.mock import patch
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-from blue_action_masking import BlueZoneTracker
+import blue.core.wrapper as wrapper
+from blue.core.masking import BlueZoneTracker
 from CybORG.Agents import SleepAgent
 from CybORG.Shared.Session import Session
 

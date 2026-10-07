@@ -7,7 +7,7 @@ lifecycle. Uses Sleep red/green for speed; reward *values* are not asserted.
 """
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
+import blue.core.wrapper as wrapper
 from CybORG.Agents import SleepAgent
 
 

@@ -1,5 +1,7 @@
 # Local environments and downloaded tools
+third_party/
 .venv/
+.venv-train/
 venv/
 env/
 .tools/
@@ -7,6 +9,7 @@ third_party/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.cache/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/

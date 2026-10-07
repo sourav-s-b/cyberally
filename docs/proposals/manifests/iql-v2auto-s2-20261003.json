@@ -1,0 +1,169 @@
+{
+ "run_id": "iql-v2auto-s2-20261003",
+ "created": "2026-10-03T19:35:19",
+ "git_commit": "22f38d3b0c3a38c14c6ac32299121502c11e8037",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief"
+  ],
+  "include_root_session": true,
+  "red_agent": "discovery"
+ },
+ "seeds": [
+  7629,
+  7630,
+  7640,
+  7701,
+  7702,
+  7703,
+  7704,
+  7705
+ ],
+ "policies": [
+  "mappo_ckpt_factorized"
+ ],
+ "policy_kwargs": {
+  "mappo_ckpt_factorized": {
+   "ckpt_dir": "blue/results/models/iql_v2auto_s2/0",
+   "attn_layers": 0
+  }
+ },
+ "workers": 6,
+ "start_method": "spawn",
+ "interpreter": "/home/sourav/Projects/cyberally/.venv-train/bin/python",
+ "cells": {
+  "mappo_ckpt_factorized": {
+   "7629": {
+    "return": -50.0,
+    "steps": 399,
+    "trace_sha256": "09e316e18cd7115c4ac69619544bef4f190e99ae561da022711d70886b96bbd3",
+    "final": {
+     "total": 51,
+     "root": 10
+    },
+    "snapshots": {
+     "200": {
+      "total": 37,
+      "root": 13,
+      "return": -22.0
+     }
+    }
+   },
+   "7630": {
+    "return": -64.0,
+    "steps": 399,
+    "trace_sha256": "4ae0adb2150ce3d6366110e2b46281014e67663d4112cf07a4ae2d30bdf9bc79",
+    "final": {
+     "total": 32,
+     "root": 12
+    },
+    "snapshots": {
+     "200": {
+      "total": 24,
+      "root": 13,
+      "return": -25.0
+     }
+    }
+   },
+   "7640": {
+    "return": -51.0,
+    "steps": 399,
+    "trace_sha256": "1a0373fd358e9bab1a006ebbeb4723fe8da5a6e150f083a39972c99690b5d1a2",
+    "final": {
+     "total": 33,
+     "root": 14
+    },
+    "snapshots": {
+     "200": {
+      "total": 25,
+      "root": 11,
+      "return": -18.0
+     }
+    }
+   },
+   "7701": {
+    "return": -81.0,
+    "steps": 399,
+    "trace_sha256": "a1a2663786c7fad6a81cca8b677523908eddc0a6e3d11b1806f390576c292386",
+    "final": {
+     "total": 36,
+     "root": 9
+    },
+    "snapshots": {
+     "200": {
+      "total": 32,
+      "root": 14,
+      "return": -62.0
+     }
+    }
+   },
+   "7702": {
+    "return": -71.0,
+    "steps": 399,
+    "trace_sha256": "04c656405706e5e35d7c05c64def53a4154d5643d368f09a51c55aee20450ae6",
+    "final": {
+     "total": 47,
+     "root": 9
+    },
+    "snapshots": {
+     "200": {
+      "total": 38,
+      "root": 17,
+      "return": -48.0
+     }
+    }
+   },
+   "7703": {
+    "return": -65.0,
+    "steps": 399,
+    "trace_sha256": "0ccee23d4f4194c65dc16266d217c5555c839783943b5a6b5fdb2b3d7bb9e826",
+    "final": {
+     "total": 37,
+     "root": 10
+    },
+    "snapshots": {
+     "200": {
+      "total": 37,
+      "root": 19,
+      "return": -29.0
+     }
+    }
+   },
+   "7704": {
+    "return": -123.0,
+    "steps": 399,
+    "trace_sha256": "25d0e37f11ad9e2332b99b04761e22c5e297fb2f215249bd416ccbbe7b3f01c5",
+    "final": {
+     "total": 34,
+     "root": 12
+    },
+    "snapshots": {
+     "200": {
+      "total": 25,
+      "root": 14,
+      "return": -89.0
+     }
+    }
+   },
+   "7705": {
+    "return": -103.0,
+    "steps": 399,
+    "trace_sha256": "fffcd8ab5dada80c9862997d28dfa5d524d79c6730c9180428ad2e7e43dc12e3",
+    "final": {
+     "total": 30,
+     "root": 16
+    },
+    "snapshots": {
+     "200": {
+      "total": 27,
+      "root": 17,
+      "return": -89.0
+     }
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,883 @@
+{
+ "run_id": "guard-maxage-matrix-20261004",
+ "created": "2026-10-04",
+ "role": "blue",
+ "git_commit": "2900711242f9754e5b4e5d54c7cc98430f6d07d2",
+ "dirty": {
+  "dirty": true,
+  "diff_sha256": "5c05656286146e19",
+  "files": [
+   "M blue/analysis/ordering.py",
+   " M blue/policies/ordered.py",
+   " M blue/training/residual_pilot.py",
+   " M docs/status/blue-session.md",
+   " M docs/status/blue.md",
+   "?? blue/analysis/compare.py",
+   "?? blue/analysis/metrics.py",
+   "?? blue/analysis/recorder.py",
+   "?? blue/tests_blue/test_max_age_guard.py",
+   "?? blue/tests_blue/test_metric_semantics.py",
+   "?? blue/tests_blue/test_recorder_live.py",
+   "?? blue/tests_blue/test_residual_audit.py",
+   "?? docs/proposals/manifests/guard-maxage-20261004.json"
+  ]
+ },
+ "steps": 400,
+ "env": {
+  "temporal_features": [
+   "ages",
+   "belief"
+  ],
+  "include_root_session": true,
+  "red_agent": "discovery"
+ },
+ "mask_mode": "validity (wrapper default)",
+ "reward": "native simulator reward, common_reward normalization (rewards[0]); no shaping",
+ "seeds": [
+  7629,
+  7630,
+  7640,
+  7701,
+  7702,
+  7703,
+  7704,
+  7705,
+  7706,
+  7707,
+  7708,
+  7709,
+  7710,
+  7711,
+  7712,
+  7713,
+  7714,
+  7715,
+  7716,
+  7717,
+  7718,
+  7719,
+  7720,
+  7721,
+  7722,
+  7723,
+  7724,
+  7725,
+  7726,
+  7727,
+  7728,
+  7729
+ ],
+ "n_seeds": 32,
+ "seed_block": "development seeds already consumed by earlier phases; held-out/finite-red blocks untouched",
+ "exploratory": true,
+ "threshold_pre_registered": 48.0,
+ "threshold_pre_registration_manifest": "docs/proposals/manifests/guard-maxage-20261004.json",
+ "interval_method": "paired-seed percentile bootstrap n=10000 rng_seed=20261004",
+ "identity_check": {
+  "claim": "the unguarded lancer arm reproduces the historical manifest exactly",
+  "reference": "docs/proposals/manifests/ordering-phase2-20261004.json variant 'lancer'",
+  "n_seeds": 32,
+  "n_exact": 32,
+  "mismatches": []
+ },
+ "arms": {
+  "maxage24_lancer": {
+   "mean_return": -83.25,
+   "sd_return_ddof1": 30.973453774315796,
+   "median_return": -80.0,
+   "returns": {
+    "7629": -51.0,
+    "7630": -89.0,
+    "7640": -106.0,
+    "7701": -48.0,
+    "7702": -81.0,
+    "7703": -73.0,
+    "7704": -91.0,
+    "7705": -120.0,
+    "7706": -115.0,
+    "7707": -59.0,
+    "7708": -100.0,
+    "7709": -102.0,
+    "7710": -61.0,
+    "7711": -58.0,
+    "7712": -57.0,
+    "7713": -45.0,
+    "7714": -57.0,
+    "7715": -56.0,
+    "7716": -86.0,
+    "7717": -89.0,
+    "7718": -79.0,
+    "7719": -58.0,
+    "7720": -123.0,
+    "7721": -146.0,
+    "7722": -135.0,
+    "7723": -50.0,
+    "7724": -116.0,
+    "7725": -37.0,
+    "7726": -61.0,
+    "7727": -58.0,
+    "7728": -127.0,
+    "7729": -130.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 20.734375,
+   "end_of_episode_age_p90_mean": 57.78125,
+   "max_age_during_episode_median_mean": 88.421875,
+   "max_age_during_episode_p90_mean": 133.4375,
+   "max_age_during_episode_max_mean": 144.125,
+   "post_compromise_investigation_delay_median_mean": 23.90625,
+   "post_compromise_investigation_delay_n_mean": 82.15625,
+   "post_compromise_investigation_delay_n_censored_mean": 4.1875,
+   "detection_delay_median_mean": 26.015625,
+   "detection_delay_n_censored_mean": 30.1875,
+   "investigations_started_mean": 816.5625,
+   "investigations_failed_total": 0,
+   "guard_mode": true
+  },
+  "maxage48_lancer": {
+   "mean_return": -82.75,
+   "sd_return_ddof1": 32.812271504580764,
+   "median_return": -67.0,
+   "returns": {
+    "7629": -66.0,
+    "7630": -56.0,
+    "7640": -93.0,
+    "7701": -49.0,
+    "7702": -120.0,
+    "7703": -65.0,
+    "7704": -81.0,
+    "7705": -125.0,
+    "7706": -96.0,
+    "7707": -53.0,
+    "7708": -122.0,
+    "7709": -42.0,
+    "7710": -63.0,
+    "7711": -96.0,
+    "7712": -56.0,
+    "7713": -59.0,
+    "7714": -62.0,
+    "7715": -63.0,
+    "7716": -59.0,
+    "7717": -78.0,
+    "7718": -68.0,
+    "7719": -55.0,
+    "7720": -110.0,
+    "7721": -147.0,
+    "7722": -124.0,
+    "7723": -66.0,
+    "7724": -160.0,
+    "7725": -42.0,
+    "7726": -69.0,
+    "7727": -53.0,
+    "7728": -122.0,
+    "7729": -128.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 21.65625,
+   "end_of_episode_age_p90_mean": 58.75,
+   "max_age_during_episode_median_mean": 86.9375,
+   "max_age_during_episode_p90_mean": 137.34375,
+   "max_age_during_episode_max_mean": 148.15625,
+   "post_compromise_investigation_delay_median_mean": 26.09375,
+   "post_compromise_investigation_delay_n_mean": 80.0,
+   "post_compromise_investigation_delay_n_censored_mean": 4.84375,
+   "detection_delay_median_mean": 28.84375,
+   "detection_delay_n_censored_mean": 29.75,
+   "investigations_started_mean": 818.09375,
+   "investigations_failed_total": 0,
+   "guard_mode": true
+  },
+  "maxage48_oracle": {
+   "mean_return": -84.71875,
+   "sd_return_ddof1": 40.234982672360644,
+   "median_return": -65.0,
+   "returns": {
+    "7629": -51.0,
+    "7630": -44.0,
+    "7640": -139.0,
+    "7701": -40.0,
+    "7702": -142.0,
+    "7703": -48.0,
+    "7704": -153.0,
+    "7705": -113.0,
+    "7706": -97.0,
+    "7707": -54.0,
+    "7708": -145.0,
+    "7709": -47.0,
+    "7710": -46.0,
+    "7711": -57.0,
+    "7712": -56.0,
+    "7713": -55.0,
+    "7714": -63.0,
+    "7715": -55.0,
+    "7716": -139.0,
+    "7717": -62.0,
+    "7718": -49.0,
+    "7719": -93.0,
+    "7720": -96.0,
+    "7721": -170.0,
+    "7722": -132.0,
+    "7723": -70.0,
+    "7724": -149.0,
+    "7725": -56.0,
+    "7726": -56.0,
+    "7727": -67.0,
+    "7728": -91.0,
+    "7729": -76.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 28.96875,
+   "end_of_episode_age_p90_mean": 58.375,
+   "max_age_during_episode_median_mean": 83.125,
+   "max_age_during_episode_p90_mean": 118.5625,
+   "max_age_during_episode_max_mean": 133.3125,
+   "post_compromise_investigation_delay_median_mean": 25.1875,
+   "post_compromise_investigation_delay_n_mean": 79.3125,
+   "post_compromise_investigation_delay_n_censored_mean": 5.15625,
+   "detection_delay_median_mean": 28.0,
+   "detection_delay_n_censored_mean": 31.0625,
+   "investigations_started_mean": 825.40625,
+   "investigations_failed_total": 0,
+   "guard_mode": true
+  },
+  "maxage96_lancer": {
+   "mean_return": -80.6875,
+   "sd_return_ddof1": 34.29703034261976,
+   "median_return": -65.0,
+   "returns": {
+    "7629": -51.0,
+    "7630": -46.0,
+    "7640": -77.0,
+    "7701": -56.0,
+    "7702": -86.0,
+    "7703": -63.0,
+    "7704": -75.0,
+    "7705": -152.0,
+    "7706": -107.0,
+    "7707": -53.0,
+    "7708": -118.0,
+    "7709": -46.0,
+    "7710": -63.0,
+    "7711": -65.0,
+    "7712": -122.0,
+    "7713": -50.0,
+    "7714": -94.0,
+    "7715": -65.0,
+    "7716": -68.0,
+    "7717": -63.0,
+    "7718": -104.0,
+    "7719": -58.0,
+    "7720": -100.0,
+    "7721": -151.0,
+    "7722": -122.0,
+    "7723": -61.0,
+    "7724": -159.0,
+    "7725": -30.0,
+    "7726": -64.0,
+    "7727": -41.0,
+    "7728": -63.0,
+    "7729": -109.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 22.03125,
+   "end_of_episode_age_p90_mean": 70.34375,
+   "max_age_during_episode_median_mean": 98.328125,
+   "max_age_during_episode_p90_mean": 148.09375,
+   "max_age_during_episode_max_mean": 159.75,
+   "post_compromise_investigation_delay_median_mean": 25.71875,
+   "post_compromise_investigation_delay_n_mean": 79.03125,
+   "post_compromise_investigation_delay_n_censored_mean": 5.75,
+   "detection_delay_median_mean": 27.125,
+   "detection_delay_n_censored_mean": 31.25,
+   "investigations_started_mean": 822.625,
+   "investigations_failed_total": 0,
+   "guard_mode": true
+  },
+  "strict_lancer": {
+   "mean_return": -82.53125,
+   "sd_return_ddof1": 33.75431573362377,
+   "median_return": -68.5,
+   "returns": {
+    "7629": -85.0,
+    "7630": -82.0,
+    "7640": -90.0,
+    "7701": -64.0,
+    "7702": -103.0,
+    "7703": -57.0,
+    "7704": -66.0,
+    "7705": -175.0,
+    "7706": -77.0,
+    "7707": -59.0,
+    "7708": -100.0,
+    "7709": -51.0,
+    "7710": -46.0,
+    "7711": -52.0,
+    "7712": -63.0,
+    "7713": -54.0,
+    "7714": -63.0,
+    "7715": -69.0,
+    "7716": -54.0,
+    "7717": -82.0,
+    "7718": -87.0,
+    "7719": -59.0,
+    "7720": -109.0,
+    "7721": -116.0,
+    "7722": -166.0,
+    "7723": -60.0,
+    "7724": -153.0,
+    "7725": -51.0,
+    "7726": -58.0,
+    "7727": -68.0,
+    "7728": -115.0,
+    "7729": -107.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 20.921875,
+   "end_of_episode_age_p90_mean": 63.34375,
+   "max_age_during_episode_median_mean": 88.5,
+   "max_age_during_episode_p90_mean": 152.9375,
+   "max_age_during_episode_max_mean": 179.125,
+   "post_compromise_investigation_delay_median_mean": 22.4375,
+   "post_compromise_investigation_delay_n_mean": 83.46875,
+   "post_compromise_investigation_delay_n_censored_mean": 4.53125,
+   "detection_delay_median_mean": 24.546875,
+   "detection_delay_n_censored_mean": 30.6875,
+   "investigations_started_mean": 813.0,
+   "investigations_failed_total": 0,
+   "guard_mode": false
+  },
+  "strict_oracle": {
+   "mean_return": -85.65625,
+   "sd_return_ddof1": 32.01774646519766,
+   "median_return": -70.5,
+   "returns": {
+    "7629": -70.0,
+    "7630": -48.0,
+    "7640": -119.0,
+    "7701": -62.0,
+    "7702": -90.0,
+    "7703": -53.0,
+    "7704": -113.0,
+    "7705": -117.0,
+    "7706": -102.0,
+    "7707": -52.0,
+    "7708": -128.0,
+    "7709": -56.0,
+    "7710": -67.0,
+    "7711": -78.0,
+    "7712": -58.0,
+    "7713": -58.0,
+    "7714": -54.0,
+    "7715": -60.0,
+    "7716": -102.0,
+    "7717": -63.0,
+    "7718": -90.0,
+    "7719": -88.0,
+    "7720": -125.0,
+    "7721": -178.0,
+    "7722": -140.0,
+    "7723": -70.0,
+    "7724": -132.0,
+    "7725": -60.0,
+    "7726": -69.0,
+    "7727": -71.0,
+    "7728": -67.0,
+    "7729": -101.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 20.328125,
+   "end_of_episode_age_p90_mean": 59.34375,
+   "max_age_during_episode_median_mean": 88.9375,
+   "max_age_during_episode_p90_mean": 146.6875,
+   "max_age_during_episode_max_mean": 172.90625,
+   "post_compromise_investigation_delay_median_mean": 12.609375,
+   "post_compromise_investigation_delay_n_mean": 84.4375,
+   "post_compromise_investigation_delay_n_censored_mean": 3.28125,
+   "detection_delay_median_mean": 14.09375,
+   "detection_delay_n_censored_mean": 30.21875,
+   "investigations_started_mean": 815.875,
+   "investigations_failed_total": 0,
+   "guard_mode": false
+  },
+  "unguarded_lancer": {
+   "mean_return": -79.40625,
+   "sd_return_ddof1": 34.375403223441516,
+   "median_return": -63.5,
+   "returns": {
+    "7629": -52.0,
+    "7630": -54.0,
+    "7640": -63.0,
+    "7701": -54.0,
+    "7702": -90.0,
+    "7703": -57.0,
+    "7704": -81.0,
+    "7705": -151.0,
+    "7706": -123.0,
+    "7707": -46.0,
+    "7708": -120.0,
+    "7709": -49.0,
+    "7710": -67.0,
+    "7711": -56.0,
+    "7712": -56.0,
+    "7713": -60.0,
+    "7714": -74.0,
+    "7715": -57.0,
+    "7716": -68.0,
+    "7717": -59.0,
+    "7718": -111.0,
+    "7719": -64.0,
+    "7720": -110.0,
+    "7721": -151.0,
+    "7722": -129.0,
+    "7723": -54.0,
+    "7724": -148.0,
+    "7725": -36.0,
+    "7726": -61.0,
+    "7727": -49.0,
+    "7728": -68.0,
+    "7729": -123.0
+   },
+   "coverage_mean": 1.0,
+   "n_never_investigated_mean": 0.0,
+   "end_of_episode_age_median_mean": 22.046875,
+   "end_of_episode_age_p90_mean": 91.84375,
+   "max_age_during_episode_median_mean": 96.78125,
+   "max_age_during_episode_p90_mean": 216.03125,
+   "max_age_during_episode_max_mean": 274.28125,
+   "post_compromise_investigation_delay_median_mean": 23.203125,
+   "post_compromise_investigation_delay_n_mean": 78.875,
+   "post_compromise_investigation_delay_n_censored_mean": 5.9375,
+   "detection_delay_median_mean": 25.078125,
+   "detection_delay_n_censored_mean": 30.875,
+   "investigations_started_mean": 822.21875,
+   "investigations_failed_total": 0,
+   "guard_mode": false
+  },
+  "unguarded_oracle": {
+   "mean_return": -63.1875,
+   "sd_return_ddof1": 37.08006811769503,
+   "median_return": -45.5,
+   "returns": {
+    "7629": -26.0,
+    "7630": -24.0,
+    "7640": -103.0,
+    "7701": -38.0,
+    "7702": -116.0,
+    "7703": -48.0,
+    "7704": -93.0,
+    "7705": -102.0,
+    "7706": -71.0,
+    "7707": -31.0,
+    "7708": -131.0,
+    "7709": -44.0,
+    "7710": -31.0,
+    "7711": -41.0,
+    "7712": -52.0,
+    "7713": -24.0,
+    "7714": -28.0,
+    "7715": -28.0,
+    "7716": -110.0,
+    "7717": -35.0,
+    "7718": -45.0,
+    "7719": -63.0,
+    "7720": -42.0,
+    "7721": -124.0,
+    "7722": -92.0,
+    "7723": -46.0,
+    "7724": -130.0,
+    "7725": -27.0,
+    "7726": -24.0,
+    "7727": -39.0,
+    "7728": -104.0,
+    "7729": -110.0
+   },
+   "coverage_mean": 0.2836634379815086,
+   "n_never_investigated_mean": 54.96875,
+   "end_of_episode_age_median_mean": 110.171875,
+   "end_of_episode_age_p90_mean": 324.78125,
+   "max_age_during_episode_median_mean": 167.546875,
+   "max_age_during_episode_p90_mean": 326.53125,
+   "max_age_during_episode_max_mean": 370.96875,
+   "post_compromise_investigation_delay_median_mean": 3.421875,
+   "post_compromise_investigation_delay_n_mean": 41.40625,
+   "post_compromise_investigation_delay_n_censored_mean": 31.875,
+   "detection_delay_median_mean": 6.328125,
+   "detection_delay_n_censored_mean": 39.09375,
+   "investigations_started_mean": 890.875,
+   "investigations_failed_total": 0,
+   "guard_mode": false
+  }
+ },
+ "comparisons_vs_unguarded_lancer": {
+  "maxage24_lancer_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -3.84375,
+   "sd_diff_ddof1": 22.143388112408953,
+   "median_diff": -0.5,
+   "ci95": [
+    -11.875,
+    3.53125
+   ],
+   "wins": 15,
+   "ties": 1,
+   "losses": 16,
+   "verdict": "stop",
+   "verdict_reason": "upper bound 3.5 < +5.0",
+   "worst_3": [
+    {
+     "seed": 7728,
+     "diff": -59.0
+    },
+    {
+     "seed": 7709,
+     "diff": -53.0
+    },
+    {
+     "seed": 7640,
+     "diff": -43.0
+    }
+   ]
+  },
+  "maxage48_lancer_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -3.34375,
+   "sd_diff_ddof1": 18.659269727783922,
+   "median_diff": -2.0,
+   "ci95": [
+    -9.8125,
+    3.0
+   ],
+   "wins": 12,
+   "ties": 3,
+   "losses": 17,
+   "verdict": "stop",
+   "verdict_reason": "upper bound 3.0 < +5.0",
+   "worst_3": [
+    {
+     "seed": 7728,
+     "diff": -54.0
+    },
+    {
+     "seed": 7711,
+     "diff": -40.0
+    },
+    {
+     "seed": 7640,
+     "diff": -30.0
+    }
+   ]
+  },
+  "maxage48_oracle_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -5.3125,
+   "sd_diff_ddof1": 31.41238455173065,
+   "median_diff": -0.5,
+   "ci95": [
+    -16.1875,
+    5.125
+   ],
+   "wins": 15,
+   "ties": 1,
+   "losses": 16,
+   "verdict": "inconclusive",
+   "verdict_reason": "interval [-16.2,5.1] spans +5.0",
+   "worst_3": [
+    {
+     "seed": 7640,
+     "diff": -76.0
+    },
+    {
+     "seed": 7704,
+     "diff": -72.0
+    },
+    {
+     "seed": 7716,
+     "diff": -71.0
+    }
+   ]
+  },
+  "maxage96_lancer_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -1.28125,
+   "sd_diff_ddof1": 14.353226848612891,
+   "median_diff": 1.5,
+   "ci95": [
+    -6.65625,
+    2.875
+   ],
+   "wins": 17,
+   "ties": 2,
+   "losses": 13,
+   "verdict": "stop",
+   "verdict_reason": "upper bound 2.9 < +5.0",
+   "worst_3": [
+    {
+     "seed": 7712,
+     "diff": -66.0
+    },
+    {
+     "seed": 7714,
+     "diff": -20.0
+    },
+    {
+     "seed": 7640,
+     "diff": -14.0
+    }
+   ]
+  },
+  "strict_lancer_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -3.125,
+   "sd_diff_ddof1": 21.173248489849243,
+   "median_diff": -3.5,
+   "ci95": [
+    -10.25,
+    4.0625
+   ],
+   "wins": 14,
+   "ties": 1,
+   "losses": 17,
+   "verdict": "stop",
+   "verdict_reason": "upper bound 4.1 < +5.0",
+   "worst_3": [
+    {
+     "seed": 7728,
+     "diff": -47.0
+    },
+    {
+     "seed": 7722,
+     "diff": -37.0
+    },
+    {
+     "seed": 7629,
+     "diff": -33.0
+    }
+   ]
+  },
+  "strict_oracle_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": -6.25,
+   "sd_diff_ddof1": 19.161453241405795,
+   "median_diff": -6.5,
+   "ci95": [
+    -12.75,
+    0.28125
+   ],
+   "wins": 10,
+   "ties": 2,
+   "losses": 20,
+   "verdict": "stop",
+   "verdict_reason": "upper bound 0.3 < +5.0",
+   "worst_3": [
+    {
+     "seed": 7640,
+     "diff": -56.0
+    },
+    {
+     "seed": 7716,
+     "diff": -34.0
+    },
+    {
+     "seed": 7704,
+     "diff": -32.0
+    }
+   ]
+  },
+  "unguarded_oracle_vs_unguarded_lancer": {
+   "n_matched": 32,
+   "mean_diff": 16.21875,
+   "sd_diff_ddof1": 27.826344415829887,
+   "median_diff": 15.5,
+   "ci95": [
+    6.65625,
+    25.5625
+   ],
+   "wins": 26,
+   "ties": 0,
+   "losses": 6,
+   "verdict": "advance",
+   "verdict_reason": "lower bound 6.7 > +5.0",
+   "worst_3": [
+    {
+     "seed": 7716,
+     "diff": -42.0
+    },
+    {
+     "seed": 7640,
+     "diff": -40.0
+    },
+    {
+     "seed": 7728,
+     "diff": -36.0
+    }
+   ]
+  }
+ },
+ "within_regime_oracle_vs_lancer": {
+  "oracle_vs_lancer__maxage48": {
+   "arms": [
+    "maxage48_lancer",
+    "maxage48_oracle"
+   ],
+   "n_matched": 32,
+   "mean_diff": -1.96875,
+   "sd_diff_ddof1": 28.171690634851974,
+   "ci95": [
+    -12.09375,
+    7.21875
+   ],
+   "wins": 16,
+   "ties": 1,
+   "losses": 15
+  },
+  "oracle_vs_lancer__strict": {
+   "arms": [
+    "strict_lancer",
+    "strict_oracle"
+   ],
+   "n_matched": 32,
+   "mean_diff": -3.125,
+   "sd_diff_ddof1": 26.55335468752094,
+   "ci95": [
+    -12.15625,
+    6.0
+   ],
+   "wins": 15,
+   "ties": 0,
+   "losses": 17
+  },
+  "oracle_vs_lancer__unguarded": {
+   "arms": [
+    "unguarded_lancer",
+    "unguarded_oracle"
+   ],
+   "n_matched": 32,
+   "mean_diff": 16.21875,
+   "sd_diff_ddof1": 27.826344415829887,
+   "ci95": [
+    6.65625,
+    25.5625
+   ],
+   "wins": 26,
+   "ties": 0,
+   "losses": 6
+  }
+ },
+ "guard_activity": {
+  "maxage24_lancer": {
+   "interventions_mean": 424.375,
+   "deferrals_urgent_mean": 198.3125,
+   "overdue_host_decisions_mean": 424.375,
+   "max_overdue_hosts_mean": 29.75,
+   "max_observed_age_mean": 143.125,
+   "max_threshold_overshoot_mean": 119.125,
+   "repeated_selection_mean": 0.875,
+   "revisit_selections_mean": 400.0,
+   "sweep_selections_mean": 424.375
+  },
+  "maxage48_lancer": {
+   "interventions_mean": 216.0,
+   "deferrals_urgent_mean": 121.40625,
+   "overdue_host_decisions_mean": 216.0,
+   "max_overdue_hosts_mean": 25.71875,
+   "max_observed_age_mean": 147.15625,
+   "max_threshold_overshoot_mean": 99.15625,
+   "repeated_selection_mean": 0.5,
+   "revisit_selections_mean": 201.1875,
+   "sweep_selections_mean": 216.0
+  },
+  "maxage48_oracle": {
+   "interventions_mean": 367.96875,
+   "deferrals_urgent_mean": 153.40625,
+   "overdue_host_decisions_mean": 367.96875,
+   "max_overdue_hosts_mean": 29.625,
+   "max_observed_age_mean": 142.21875,
+   "max_threshold_overshoot_mean": 94.21875,
+   "repeated_selection_mean": 0.0,
+   "revisit_selections_mean": 302.28125,
+   "sweep_selections_mean": 367.96875
+  },
+  "maxage96_lancer": {
+   "interventions_mean": 84.78125,
+   "deferrals_urgent_mean": 42.5,
+   "overdue_host_decisions_mean": 84.78125,
+   "max_overdue_hosts_mean": 16.875,
+   "max_observed_age_mean": 158.8125,
+   "max_threshold_overshoot_mean": 62.8125,
+   "repeated_selection_mean": 0.0,
+   "revisit_selections_mean": 76.09375,
+   "sweep_selections_mean": 84.78125
+  }
+ },
+ "verdict": {
+  "max_age_guard": "STOP",
+  "reasoning": [
+   "no threshold shows a detectable benefit over unguarded at this resolution: maxage24 -3.84 CI[-11.88,+3.53], maxage48 -3.34 CI[-9.81,+3.00], maxage96 -1.28 CI[-6.66,+2.88]. With n=32 the design resolves ~7-16 per contrast (see power.mde_vs_unguarded_lancer), at or above the +5 advancement threshold for most contrasts, so stop means no detectable benefit, not a proven zero effect.",
+   "monotone in how hard the guard binds: the more it overrides the scorer the worse the return (-3.84 at A=24, -3.34 at A=48, -1.28 at A=96), so the age tail is not where the return is lost.",
+   "the guard changes the metric it targets: means of per-episode maxima fall 274.3 -> 133.3-179.1 (global worst 370 -> 186-324 across guarded arms); coverage stays 1.00 with 0 never-investigated hosts, i.e. no coverage collapse. The mechanism acts; it does not pay in return. Unguarded lancer coverage was already 1.000, so the guard bought freshness, not coverage.",
+   "A is not a maximum and cannot be: observed overshoot is 62.8-119.1 ticks above threshold (one pending action per agent, 2-tick Analyse latency, illegal-to-analyse hosts and 42-198 urgent-rule deferrals per episode).",
+   "maxage48 is statistically indistinguishable from the strict coverage guard (-0.22 CI[-6.78,+6.53]), so there is no reason to prefer the more complex mechanism.",
+   "the tested privileged scorer improves unguarded return (+16.22 CI[+6.66,+25.56]) but is not an upper bound on ordering choices: it is a greedy per-host onset-likelihood scorer that ignores action cost and timing, and its own age metrics are worse (mean-of-maxima 371.0 vs unguarded lancer 274.3). Its coverage 0.284 is a mean 54.97 never-investigated hosts of a seed-dependent 57-96 (mean 76.3) defendable universe, an association with the return gain, not a demonstrated cause. Under coverage guards its edge over lancer vanishes (strict -3.12 CI[-12.16,+6.00], maxage48 -1.97 CI[-12.09,+7.22]); those upper bounds do not exclude a +5 effect."
+  ]
+ },
+ "pilot_gate": {
+  "decision": "DO NOT RUN the residual pilot (original gate output; SUPERSEDED)",
+  "rule": "the pilot may only start if there is measurable ordering headroom inside the regime the learner will be trained and evaluated in",
+  "evidence": "CORRECTED 2026-10-05: the privileged scorer is not an upper bound (see verdict reasoning bullet 6). Within-regime oracle-vs-lancer intervals (strict upper bound +6.00, maxage48 +7.22) do not exclude a +5 effect at this resolution.",
+  "secondary": "the guard costs ~3.3 return versus unguarded with no detectable benefit, so a learner forced inside the guard starts worse; the bounded pilot therefore runs UNGUARDED per blue-handoff-20261004 P4.",
+  "status": "superseded by docs/status/blue-handoff-20261004.md P4 (one bounded unguarded residual-PPO pilot, dev seeds)",
+  "what_would_change_the_verdict": [
+   "a within-regime ordering headroom above +5 (needs more seeds or a lower-variance contrast)",
+   "attack-level common-random-numbers over identical compromise scenarios: REQUESTED-and-deferred on cost and uncertain benefit, not on a bounded-benefit claim; the observed r2 values (0.07-0.24 for return-diff vs compromise-diff) describe these 32 observations and do not bound a different coupling",
+   "or a change of objective: the residual learner aimed at post-compromise investigation delay (23.2 -> 3.4 under the unguarded regime when ordering is prioritised, at the cost of coverage) rather than at bounding investigation age"
+  ]
+ },
+ "cost": {
+  "matrix_wall_clock_s": 1750,
+  "baseline_arm_wall_clock_s": 162,
+  "note": "no training was run; measured-runs wall time is far below the 4h cap"
+ },
+ "power": {
+  "n_per_arm": 32,
+  "min_detectable_effect_note": "paired MDE ~ 2.9*sd_diff/sqrt(n) at 80% power, alpha .05",
+  "mde_vs_unguarded_lancer": {
+   "maxage24_lancer_vs_unguarded_lancer": 11.35,
+   "maxage48_lancer_vs_unguarded_lancer": 9.57,
+   "maxage48_oracle_vs_unguarded_lancer": 16.1,
+   "maxage96_lancer_vs_unguarded_lancer": 7.36,
+   "strict_lancer_vs_unguarded_lancer": 10.85,
+   "strict_oracle_vs_unguarded_lancer": 9.82,
+   "unguarded_oracle_vs_unguarded_lancer": 14.27
+  },
+  "caveat": "the pre-registered +5 advancement threshold is at or below the MDE of most contrasts; the design resolves large effects only, so 'stop' means no detectable benefit, not a proven zero effect"
+ },
+ "cells_artifact": "docs/proposals/manifests/guard-maxage-matrix-20261004-cells.jsonl",
+ "corrections_applied_20261005": {
+  "doc": "docs/status/blue-handoff-20261004.md sections 2-3",
+  "items": [
+   "oracle is not an upper bound",
+   "no detectable benefit (not no headroom); upper bounds +6.00/+7.22 do not exclude +5",
+   "learned-minus-lancer is the primary deployment comparison",
+   "means of maxima 274.3->148.2 (global worst 370->217), not worst-case 274->148",
+   "54.97 of seed-dependent 57-96 (mean 76.3); association not cause",
+   "CRN deferred on cost/uncertain benefit, not a 5pct bound"
+  ],
+  "coupling_r": {
+   "note": "r(return_diff, delta_compromise_episodes) recomputed 2026-10-05 from cells.jsonl; handoff quote -0.265 to -0.488 covered only a subset",
+   "strict_lancer": -0.265,
+   "maxage24_lancer": 0.003,
+   "maxage48_lancer": -0.3,
+   "maxage96_lancer": -0.365,
+   "maxage48_oracle": -0.488,
+   "strict_oracle": -0.188,
+   "unguarded_oracle": -0.381,
+   "r2_range": "0.00-0.24"
+  }
+ }
+}

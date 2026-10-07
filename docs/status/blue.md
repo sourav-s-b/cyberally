@@ -1,86 +1,150 @@
-# Blue handoff
+# Blue program summary (general index)
 
-## Telemetry producer, 2026-10-01
+## Next session: read `blue-handoff-20261004.md` first
 
-- Branch `blue/telemetry-schema`; exact main dependency
-  `2f0cfb67ae1d3b2da6a1b1ccff28eff9e1a5c915`. Local, uncommitted work.
-- Added simulated Proc/Conn/File/Auth mapping, strict JSON boundary, source-field
-  ticks, optional per-agent wrapper export and schema-based collection/manifest.
-- Validation: 18 telemetry tests; 60 tests passed in the isolated main-based publication
-  checkout. Earlier 67-test result includes local uncommitted MAPPO tests.
-  All ten existing features preserved; passive/Analyse/reset coverage is live.
-- Existing local training work and staging preserved. No real telemetry,
-  detector fitting, truth labels or acceptance of the shared schema claimed.
-- Next: Environment/Evaluation review of documented refinements before merge,
-  then separately scoped anomaly data/experiment work. Full handoff below.
+[`blue-handoff-20261004.md`](blue-handoff-20261004.md) is the authoritative
+starting point for the next session. It carries the verified matrix numbers, the
+six claim corrections two external reviews forced, the settled statistical design
+(power formula, decision rules, freeze order, five named controls), the P0-P7
+phase list with rationale, the cross-role blockers, and a copy-pasteable resume
+prompt. `blue-session.md` remains the long-form session log; the handoff
+supersedes it wherever they disagree about the max-age guard conclusion.
 
-**Latest detailed session state and resume prompt:** [blue-session.md](blue-session.md).
-Read [docs/current-state.md](../current-state.md) first — it holds the measured
-facts and the list of traps. Update this file at each meaningful Blue handoff;
-this page is its short index.
+## Research audit, 2026-10-03
 
-- Owner: Sourav
-- First branch: `blue/foundation`
-- Status: BLUE-01 implemented, tested and **merged into `main`**. Both
-  `main` and `blue/foundation` are at `f8a9deb`. Action-space proposal drafted.
-- Completed: repaired joint reset/seeding, host capacity (raises instead of
-  truncating), agent-wide pending actions, passive observation merging,
-  validity/evidence mask separation, `VERIFY` state after remediation, episode
-  boundaries, and a single-agent facade over the joint implementation. Added a
-  live regression suite. Documented per-agent host bounds (17 / 51).
-- Validation: isolated Python 3.12.10 venv with NumPy 1.26.4, Gym 0.26.2,
-  NetworkX 3.2.1, pytest 8.0.0. **20 focused tests pass.** Three 75-step
-  masked-random episodes pass. Measured directly this session: 44 ms/joint step;
-  true-state Red reaches 34 sessions by step 100 at seed 7629 while Blue's own
-  view shows 0 the whole episode; 41 % of steps carry reward and the first ~135
-  do not; forced Sleep is 100 % pending-action lockout (676/676 ticks, zero
-  session losses, seed-7629 breakdown) and policy-dependent — 68.7 %
-  masked-random vs 54.4 % round-robin — so it is a throughput ceiling, not an
-  unfixable blocker. See `docs/current-state.md` for the tables.
-- Blockers: none for branching — Environment, Red and Evaluation may branch from
-  `main`, which now carries the fixed wrapper and `tests_blue/`. Open items: the
-  action-space proposal is unaccepted. Torch unblocked 2026-09-30 (Blue-drafted,
-  needs Environment review): uv-built `.venv-train/` holds torch 2.14.1+cpu on
-  system Python 3.12 with sim pins identical to `.venv`;
-  see `environment/requirements-train.txt`. uv cannot supply 3.10 here (App
-  Control blocks it), so the 3.10 target needs an IT-approved install.
-  EPyMARL pinned at `cbc38c09` but not installed; wrapper already speaks the
-  runner contract (ctor kwargs, scalar common reward, `episode_limit` info,
-  lifecycle methods — see blue-session.md) and a torch train-smoke passes.
-  Real MAPPO-in-their-runner is the remaining BLUE-03 step, not torch.
-- foundation-v2 landed on `blue` (unpushed): `per_agent_bounds=True` gives
-  17/17/17/17/51 hosts, 53/155 actions, 170/510 obs, 1190 critic state, with
-  identical host indexing and trajectories; default mode unchanged and still
-  required for stock EPyMARL. Proposal step 1 of 3; consumers unmigrated. `TrueStateWrapper` is broken against this
-  CAGE4 snapshot, so the privileged-label path for Evaluation must be built from
-  `get_true_state(info).data`. Upstream `test_blue_actions.py` cannot collect
-  because its conftest imports Ray.
-- Dependency commits/PRs: bootstrap `e605ef3`; BLUE-01 fixes `7b76fc2` and
-  `58b6cc7`; documentation and measured-state commit `f8a9deb`, fast-forwarded
-  into `main`. No Environment, Red or Evaluation branch or PR exists as of
-  2026-09-30.
-- Contract changes: **drafted, not accepted** —
-  [`docs/coordination/blue-action-space.md`](../coordination/blue-action-space.md)
-  proposes per-agent host bounds (17 for agents 0–3, 51 for agent 4), which
-  moves obs to 170/510, actions to 53/155 and critic state from 2550 to 1190.
-  Today 111–126 of 155 action slots are permanently masked for agents 0–3.
-  Also unresolved: how a `VERIFY` state resolves from Blue-visible evidence,
-  and whole-agent primary-session loss, where native Monitor dereferences
-  session 0 and needs a simulator-level decision from Environment.
-- Next: (1) review/merge the three stacked PRs branch-by-branch
-  (`blue/baseline-policies` = `4471c27`, then `blue/epymarl-conformance` =
-  `3b414b4` with its contract proposal, then `blue/status-handoff` docs);
-  (2) hand Environment the per-agent bounds so their configs are not written
-  against 155/510/2550; (3) install EPyMARL and run the first real MAPPO
-  rollout-plus-update in their runner, behind the already-passing
-  torch train-smoke.
-- BLUE-02 measured (seed 7629, fixed wrapper, hosts-with-Red-session @ step 200):
-  Sleep 64 total / 54 root (return -60); masked-random 33 / 25 (-102);
-  round-robin heuristic 38 / 11 (-65). Historical broken-wrapper targets
-  (Sleep 60/43, random 48/35) are superseded — recomputed here, do not compare
-  across wrapper versions. Masked-random used a single policy seed (0).
-  Extended to seeds 7629/7630/7640 via `evaluate_policies()`: round-robin
-  halves root compromise vs masked-random on every seed (25→11, 19→13, 15→9).
-- Artifacts: **no trained policy, no checkpoint, no EPyMARL registration.**
-  Historical baseline numbers (Sleep 60, masked random 48 compromised hosts at
-  step 200) remain unreproduced and must not be reported as fresh results.
+On `blue/mappo-training` at `a6eab7e` (main dependency `6f1d1ca`),
+[`blue-rl-feasibility-audit-20261003.md`](../research/blue-rl-feasibility-audit-20261003.md)
+reviews primary sources against the current Blue code and experiment records.
+It identifies an invalid FQE regression (logged actions ignored), an unused IQL
+target Q, lost final offline reward, extraction/deployment mask mismatch, and
+linear actor context that cancels in same-command host comparisons. The latest
+FQE note's value-indistinguishability conclusion is retracted pending a valid
+evaluation method. No new policy result or simulator check is claimed.
+Next: audit/fix the offline data and FQE equations, then compare episode-valid
+extraction and contextual host scoring on development seeds before more RL.
+This research document changes no shared schema or runtime contract and needs
+no dependent branch migration. Exact tests run: documentation `git diff --check`;
+training/simulator tests skipped because this handoff changes no executable
+code. PR review should verify paper links and algebra, and keep 8201+ final
+seeds untouched.
+
+Objective: a CAGE-4 Blue defender that beats the round-robin teacher
+(-93.5 ± 27.8, 400-step native episodes) and holds up off-distribution.
+Branch `blue/mappo-training` (pushed, tracks origin). Details live in
+`docs/proposals/` (15 records + manifests), `docs/research/`, and the
+chronological `blue-session.md`. This page is the short index — update it
+at each meaningful handoff. (Prior foundation-era content superseded;
+see git history.)
+
+## What was tried, in order
+
+1. **Literature** (`docs/research/`): sparse-reward/forgetting review
+   (warmup tested: null), then architecture review — official CAGE-4
+   analysis shows the podium was all sweep-and-remediate heuristics.
+2. **Hybrid rules + ordering** (proposal 01, CLOSED): parity proven
+   byte-identical; lancer constants hit -63.2 regression but failed
+   held-out (-110.1 ± 130.4, incl. a -414 seed); v2 regularized to parity;
+   snapshot risk scorer (AUC 0.67) collapsed coverage (-191); risk×recency
+   hybrids failed the held-out gate. Fixed ordering cannot win robustly.
+3. **Factorized actor + distill ladder** (proposals 02/10/11): host-then-
+   command head (zero vendor edits) distills the teacher at 21.8% vs 12.2%
+   flat; aux host-loss hurts; 1-layer slot attention reaches **teacher
+   parity on held-out with no RL** (-93.9 ± 45.8 vs -85.1 ± 46.1).
+   Every MAPPO fine-tune diverges (flat and factorized); KL-to-teacher
+   (recorded vendor patch) only slows it. Fine-tune line closed absent a
+   better distill.
+4. **Generalization suite** (proposal 15, standing): `red_agent=` flag +
+   pool support; finite red much harsher than discovery (-139 vs -59);
+   lancer_v2 ≈ teacher on every red. Green rates/durations need
+   Environment hooks (`docs/coordination/blue-red-variants.md`, draft).
+
+## Standings (8-seed native means; manifests in `docs/proposals/manifests/`)
+
+| policy | regression | held-out | note |
+|---|---|---|---|
+| round-robin (teacher) | -93.5 ± 27.8 | -85.1 ± 46.1 | the bar |
+| hybrid_lancer_v2 | -75.2 ± 33.6 | -91.2 ± 48.5 | best fixed; no transfer edge |
+| attn-1 distill (learned) | -85.5 ± 31.1 | -93.9 ± 45.8 | first learned parity, no RL |
+| flat BC | -393.4 ± 276.9 | — | learned start point |
+| MAPPO fine-tunes | diverge (-500 → -1710) | — | closed |
+| risk / risk×recency | -191…-251 | — | closed (coverage collapse) |
+
+## Metric-semantics repair + max-age guard, 2026-10-04
+
+On `blue/mappo-training` at `2900711` (uncommitted at time of writing).
+**No training run in this session.** The Phase 2/5 harness
+(`blue/analysis/ordering.py`) was measuring requested instead of completed
+analyses, kept only the first analysis per host, let failed requests refresh
+ages, counted non-defendable `contractor_network` hosts, and reported the
+final-tick age as `max_age` (constant 398). Replaced by
+`blue/analysis/metrics.py` + `blue/analysis/recorder.py` (30 tests, including
+live cross-checks against the wrapper's own tracker fields).
+
+Consequences worth knowing before reading any older number: the defendable
+universe is **seed-dependent, 57–96 hosts (mean 76.3)** — per-agent splits
+vary by seed (e.g. agent 4 holds 21–39, not a fixed 26); any fixed "66
+hosts (5/12/14/9/26)" denominator was one seed's layout (7701);
+analysis failures are **0 in 32 seeds**; ~1.97 investigations per episode are
+unresolved at the episode end (one pending request per agent). The unguarded
+lancer arm re-runs **32/32 returns exactly equal** to the historical manifest,
+so the identity claim holds on the repaired path. Design finding: unguarded
+lancer coverage was already **1.000** (0 never-investigated in 32/32 seeds),
+so the guard bought freshness, not coverage.
+
+`MaxAgeGuard` added with explicit guard modes; threshold **A = 48**
+pre-registered from the baseline age profile only, plus 24/96 sensitivity
+arms. `A` is an intervention threshold, not a guaranteed maximum — overshoot
+is reported, not hidden. Invalidated evidence is listed in
+`docs/proposals/manifests/guard-maxage-20261004.json`: the ordering/guard
+metric columns and the -83.0 residual pilot (preserved as history, not
+evidence).
+
+**Outcome (32 seeds x 8 arms, `guard-maxage-matrix-20261004.json`, corrected
+2026-10-05 per `blue-handoff-20261004.md` §3): no detectable guard benefit
+at this resolution.** Means of per-episode maxima fall 274.3 -> 133.3–179.1
+(global worst 370 -> 186–324) with coverage 1.00 (the mechanism acts), but
+return is 1.3–6.3 *worse* than unguarded at every threshold, monotonically
+so in how hard the guard binds, and `maxage48` is indistinguishable from
+the strict coverage guard (-0.22 CI[-6.78,+6.53]). With n=32 the design
+resolves only ~7–16 per contrast, so "stop" means no detectable benefit,
+not a proven zero effect. The tested privileged scorer improves unguarded
+return (+16.22 CI[+6.66,+25.56]) but is **not an upper bound** on ordering
+choices (greedy onset scorer ignoring cost/timing; its own mean-of-maxima
+age is worse, 371.0 vs 274.3); its 0.284 coverage is a mean 54.97
+never-investigated hosts of the seed-dependent 57–96 universe — an
+association with the gain, not a demonstrated cause — and inside a coverage
+guard its edge over lancer vanishes (strict -3.12, max-age -1.97, upper
+bounds +6.00/+7.22 not excluding +5). The raw 256 cells are committed as
+`guard-maxage-matrix-20261004-cells.jsonl`. The bounded **unguarded**
+residual/MAPPO pilot therefore proceeds (handoff P4) instead of the
+guarded pilot the original gate blocked.
+
+Audit outcome: the residual/PPO path is green (16 torch-gated tests) and the
+one real defect it found is now fixed — `residual_pilot cmd_eval` contrasted
+learned-vs-`lancer`, which changes the guard and the learner at once. The
+**primary deployment comparison is `learned − lancer`** (replacing the
+incumbent is a total-system question); the scheduler control
+(`learned − sched_control`, identical guard) is the secondary attribution
+contrast, not the headline. The legacy `analysis/ordering.py` entry point now
+withholds its four known-invalid metric columns by default
+(`--emit-invalid-metrics` to reproduce them), so the superseded numbers
+cannot be re-published by accident.
+
+Validation: sim venv 178 passed / 11 skipped, train venv 227 passed /
+1 skipped (pre-existing rvs checkpoint skip). The seed ledger conflict (`blue.md` said `8201+` reserved
+although 8201-8216 are consumed; `blue-session.md` claimed 8200-8420 free
+although `8301-8400` belong to finite Red) is reported and deliberately
+untouched — `8301-8400`, `8401+` and `8501+` stay clear.
+
+## Open threads / next
+
+- KL-anchored PPO from the attention ckpt is unlocked (stop-rules apply).
+  Seed blocks: development seeds 7629-7729 are consumed; `8301-8400`
+  (finite Red), `8401+` (ledger conflict) and `8501+` (reserved) are
+  untouched. The "8201+ reserved" claim in earlier notes is stale: 8201-8216
+  are already consumed.
+- Coordination proposal awaits Environment review (green rates, durations).
+- Infra: process-pool eval + manifests; 2 vendored-learner patches recorded
+  in `environment/patches/` (third_party itself is gitignored).
+- Suites: sim 112 passed / 7 skipped; train 22+ passed. No privileged state
+  in any actor/mask/scorer (audited); native reward is the only score.

@@ -1,0 +1,167 @@
+{
+ "run_id": "fact-ckpt-9975-20261002",
+ "created": "2026-10-02T14:35:14",
+ "git_commit": "3c4e555c4a40d430cec1a40c75472e9221e32bc9",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief"
+  ],
+  "include_root_session": true
+ },
+ "seeds": [
+  7629,
+  7630,
+  7640,
+  7701,
+  7702,
+  7703,
+  7704,
+  7705
+ ],
+ "policies": [
+  "mappo_ckpt_factorized"
+ ],
+ "policy_kwargs": {
+  "mappo_ckpt_factorized": {
+   "ckpt_dir": "results/models/mappo_cc4_seed7_20261002T082828Z/9975"
+  }
+ },
+ "workers": 6,
+ "start_method": "spawn",
+ "interpreter": "/home/sourav/Projects/cyberally/cage-challenge-4/../.venv-train/bin/python",
+ "cells": {
+  "mappo_ckpt_factorized": {
+   "7629": {
+    "return": -1135.0,
+    "steps": 399,
+    "trace_sha256": "2aae6b4c8ed0a616a900663ba5f292b73358dab71bb5d5cff29f12391787c1f3",
+    "final": {
+     "total": 73,
+     "root": 63
+    },
+    "snapshots": {
+     "200": {
+      "total": 62,
+      "root": 50,
+      "return": -46.0
+     }
+    }
+   },
+   "7630": {
+    "return": -616.0,
+    "steps": 399,
+    "trace_sha256": "c81f4b54739daa2277130eee9fc35c99f21ed020fe5687856e96359f669181d3",
+    "final": {
+     "total": 65,
+     "root": 61
+    },
+    "snapshots": {
+     "200": {
+      "total": 52,
+      "root": 42,
+      "return": -51.0
+     }
+    }
+   },
+   "7640": {
+    "return": -2987.0,
+    "steps": 399,
+    "trace_sha256": "8fa64446ac037eaa1cdd27081eb50c625253deac67c0a13837a29fb31b009590",
+    "final": {
+     "total": 62,
+     "root": 48
+    },
+    "snapshots": {
+     "200": {
+      "total": 54,
+      "root": 46,
+      "return": -306.0
+     }
+    }
+   },
+   "7701": {
+    "return": -1210.0,
+    "steps": 399,
+    "trace_sha256": "476304262fd28201ca931487bfa0576f73cafc97478589b0641de87bf56ac2ab",
+    "final": {
+     "total": 56,
+     "root": 43
+    },
+    "snapshots": {
+     "200": {
+      "total": 48,
+      "root": 39,
+      "return": -206.0
+     }
+    }
+   },
+   "7702": {
+    "return": -732.0,
+    "steps": 399,
+    "trace_sha256": "da55acd22841af26c8838adbbc4b767c2a3c31699b6353136dd577981fd34c7a",
+    "final": {
+     "total": 75,
+     "root": 63
+    },
+    "snapshots": {
+     "200": {
+      "total": 52,
+      "root": 41,
+      "return": -55.0
+     }
+    }
+   },
+   "7703": {
+    "return": -1343.0,
+    "steps": 399,
+    "trace_sha256": "f883cf99c7780e5be5690c5e2e9bf1126643d626beaddcae5beb792e5eeae561",
+    "final": {
+     "total": 65,
+     "root": 51
+    },
+    "snapshots": {
+     "200": {
+      "total": 56,
+      "root": 42,
+      "return": -8.0
+     }
+    }
+   },
+   "7704": {
+    "return": -2200.0,
+    "steps": 399,
+    "trace_sha256": "ce2e05bac7f1f388b55103cb7f422656d4c6e12939d5106766b771f93995c806",
+    "final": {
+     "total": 70,
+     "root": 58
+    },
+    "snapshots": {
+     "200": {
+      "total": 55,
+      "root": 44,
+      "return": -123.0
+     }
+    }
+   },
+   "7705": {
+    "return": -2465.0,
+    "steps": 399,
+    "trace_sha256": "207b4cfc568bf2a50d0efb4e639c4ba5594dcc03b7cd9254aaa8acf630563bb9",
+    "final": {
+     "total": 52,
+     "root": 52
+    },
+    "snapshots": {
+     "200": {
+      "total": 45,
+      "root": 41,
+      "return": -179.0
+     }
+    }
+   }
+  }
+ }
+}

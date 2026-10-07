@@ -1,0 +1,432 @@
+{
+ "run_id": "red-sleep-20261002",
+ "created": "2026-10-02T16:11:06",
+ "git_commit": "b559b1168e37daa60dbd624afdc7d7b5c8d0951f",
+ "steps": 400,
+ "mask_mode": "validity",
+ "env_kwargs": {
+  "temporal_features": [
+   "ages",
+   "belief",
+   "freshness",
+   "mission"
+  ],
+  "include_root_session": true,
+  "red_agent": "sleep"
+ },
+ "seeds": [
+  8001,
+  8002,
+  8003,
+  8004,
+  8005,
+  8006,
+  8007,
+  8008
+ ],
+ "policies": [
+  "hybrid_lancer_v2",
+  "round_robin",
+  "sleep"
+ ],
+ "policy_kwargs": {
+  "sleep": {},
+  "round_robin": {},
+  "hybrid_lancer_v2": {}
+ },
+ "workers": 6,
+ "start_method": "fork",
+ "interpreter": "/home/sourav/Projects/cyberally/cage-challenge-4/../.venv/bin/python",
+ "cells": {
+  "sleep": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 37,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 22,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 19,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8004": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 46,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 29,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8005": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 40,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 26,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 31,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 21,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 32,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8008": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4f3302de66fa5edd0d20fa4418330bb69e32f77a697d71b2c140e385b6291ccf",
+    "final": {
+     "total": 42,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 33,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   }
+  },
+  "round_robin": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "14097fc13d4fb0b851181e4f9ec50f362eed3d1c9c102ec305629195324a0e25",
+    "final": {
+     "total": 37,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "b07b9613b95b62b07cb9f7077e769329ef7da299dfd24fbea1ec8072a923f3ea",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 22,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "cb49d3104c22580582e09d7465cf53500205a1db57bad4c15523b610c275840e",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 19,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8004": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "4a7f0c4c2d5498a21621ceb1122b80ecd4ff99956884640dd1bbecd92810c43c",
+    "final": {
+     "total": 46,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 29,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8005": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "69f76fc77bc52bbc0de49758ff6ff78b27de3156b086bad59b680ec28f87ffc2",
+    "final": {
+     "total": 40,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 26,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "8d73878162ef8a0adcd4fc87ff556cfffa6c2c7223a6bfc52641a2424c3f95a2",
+    "final": {
+     "total": 31,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 21,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "9ead5f52da95fba4f9d7be6d74de4ac83473559077ff7cf8608f00ab46357f7f",
+    "final": {
+     "total": 32,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8008": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "fe25dd4529b8456141e3bbfb27355adf4f2adb8070489c6f8d92c4f891232d95",
+    "final": {
+     "total": 42,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 33,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   }
+  },
+  "hybrid_lancer_v2": {
+   "8001": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "06d5da965ce983b2a99f3bebd13428823ce13797570ef0e5af2a5ef562f449b2",
+    "final": {
+     "total": 37,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8002": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "afdba71ed8d230d60c0624be2671e1a05694ec73cbe8807fe59f1f05c397a76c",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 22,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8003": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "a9168d57504324784add6628457c1c64a8056734df22a1f9a27e3e8dde04ef4c",
+    "final": {
+     "total": 35,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 19,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8004": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "22b6e63554dccaffc7c5ba48e9f74d98c6f011bcc8c85819ce6d7248f053d77d",
+    "final": {
+     "total": 46,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 29,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8005": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "a543bc183c7733a8b32128d287ebe0b69d0138199ed7d68a887915c2e494f9b5",
+    "final": {
+     "total": 40,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 26,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8006": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "c36e19b7e1f0c948da088faac2b844010cdcca5ac2040a4b4a5705e6dd61498e",
+    "final": {
+     "total": 31,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 21,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8007": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "15b77f2128a33a8db242d231af9f2a7ca4540ef51125fbb6af1d2c29a742cad2",
+    "final": {
+     "total": 32,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 23,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   },
+   "8008": {
+    "return": 0.0,
+    "steps": 399,
+    "trace_sha256": "884a3a55c0a3687f5006216f5f4fe8644bb23adf20929aaac5971624600894b7",
+    "final": {
+     "total": 42,
+     "root": 0
+    },
+    "snapshots": {
+     "200": {
+      "total": 33,
+      "root": 0,
+      "return": 0.0
+     }
+    }
+   }
+  }
+ }
+}

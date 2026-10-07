@@ -6,8 +6,8 @@ bounds 17/17/17/17/51 with identical host indexing.
 """
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-import blue_baselines as baselines
+import blue.core.wrapper as wrapper
+import blue.core.baselines as baselines
 from CybORG.Agents import SleepAgent
 
 
@@ -32,7 +32,7 @@ def test_per_agent_widths_and_env_info(v2):
     info = v2.get_env_info()
     assert info["per_agent_bounds"] is True
     assert info["n_actions_per_agent"] == [53, 53, 53, 53, 155]
-    assert info["wrapper_version"] == "foundation-v2"
+    assert info["wrapper_version"] == "foundation-v3"
 
 
 def test_no_dead_slots_inside_live_range(v2):

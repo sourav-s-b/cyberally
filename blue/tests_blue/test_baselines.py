@@ -1,8 +1,8 @@
 """BLUE-02 baseline tests; live sim, Sleep red/green for speed unless noted."""
 import numpy as np
 import pytest
-import cc4_epymarl_wrapper as wrapper
-import blue_baselines as baselines
+import blue.core.wrapper as wrapper
+import blue.core.baselines as baselines
 from CybORG.Agents import SleepAgent
 
 
@@ -114,3 +114,15 @@ def test_run_episode_short_sleep_trace_shape(quiet):
     assert result["snapshots"][5]["total"] >= 0
     assert all(set(r) == {"step", "agent", "action", "host", "reward"}
                for r in result["trace"])
+
+
+def test_stalest_first_deterministic_and_legal():
+    # Full-episode equality vs round-robin lives in the pool manifest
+    # (proposal 12); here: determinism + mask legality on short episodes.
+    key = lambda tr: [(t["step"], t["agent"], t["action"], t["host"])
+                      for t in tr]
+    r1 = baselines.run_episode(baselines.StalestFirstBaseline(), seed=7629,
+                               steps=30)
+    r2 = baselines.run_episode(baselines.StalestFirstBaseline(), seed=7629,
+                               steps=30)
+    assert key(r1["trace"]) == key(r2["trace"])

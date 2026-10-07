@@ -1,0 +1,573 @@
+"""CAGE4 Blue wrappers, foundation-v3 (not yet an EPyMARL training integration).
+
+Fixed slots include all visible hosts, including routers and HQ's three subnets.
+Action order remains Sleep, Monitor, then Analyse/Remove/Restore per sorted host.
+Default masks enforce known simulator validity; evidence gating is opt-in.
+Only per-agent observations/action spaces enter policy views. No true Red state.
+
+v2 adds opt-in per-agent bounds (`per_agent_bounds=True`): slot counts derived
+from each agent's own subnet assignment instead of one global 51-host bound.
+Default mode is unchanged v1 behaviour. Stock EPyMARL shares one head across
+agents and therefore requires the homogeneous (default) mode; per-agent widths
+are reported for heuristics, logging, and future heterogeneous training.
+
+v3 adds opt-in temporal/belief features (`temporal_features=(...)`, BLUE-04):
+per-host evidence ages, belief one-hot, freshness/pending state and mission
+progress, all Blue-visible, appended after the base snapshot vector.
+Default (no groups) is byte-identical v2 behaviour. `include_root_session`
+drops the base has_root_session feature (BLUE-04 ablation: a Blue-visible
+root session is not proof of attacker root).
+"""
+from copy import deepcopy
+from collections.abc import Mapping
+import numpy as np
+
+import os as _os
+import sys as _sys
+# Blue lives in blue/ (packaged as blue.core, blue.policies, ...); the
+# pristine simulator in cage-challenge-4/. This insert (derived from
+# __file__, not cwd) is the ONLY bridge between them: everything else
+# imports as absolute blue.* packages from the repo root.
+_CAGE = _os.path.join(
+    _os.path.dirname(_os.path.dirname(_os.path.dirname(
+        _os.path.abspath(__file__)))),
+    "cage-challenge-4")
+if _CAGE not in _sys.path:
+    _sys.path.insert(0, _CAGE)
+
+from CybORG import CybORG
+from CybORG.Simulator.Scenarios import EnterpriseScenarioGenerator
+from CybORG.Agents import SleepAgent, EnterpriseGreenAgent, DiscoveryFSRed
+from CybORG.Agents.SimpleAgents.FiniteStateRedAgent import FiniteStateRedAgent
+from CybORG.Agents.SimpleAgents.FSMRedVariants import VerboseFSRed
+from CybORG.Agents.SimpleAgents.RandomSelectRedAgent import RandomSelectRedAgent
+
+# Generalization suite (proposal 15): red behavior is a config flag, not a
+# code change. Names mirror the published CAGE-4 variants plus in-tree reds.
+RED_AGENTS = {
+    "discovery": DiscoveryFSRed,  # default; matches all prior results
+    "finite": FiniteStateRedAgent,
+    "verbose": VerboseFSRed,
+    "random": RandomSelectRedAgent,
+    "sleep": SleepAgent,
+}
+from CybORG.Simulator.Actions import Sleep
+from CybORG.Simulator.Actions.AbstractActions import Monitor, Analyse, Remove, Restore
+from blue.core.obs_features import (host_to_vector, extract_subnets, VECTOR_LEN,
+                               host_to_temporal, temporal_len, TEMPORAL_GROUPS,
+                               ROOT_SESSION_INDEX)
+from blue.core.masking import BlueZoneTracker
+
+BLUE_AGENTS = [f"blue_agent_{i}" for i in range(5)]
+ACTION_TEMPLATES = ("Analyse", "Remove", "Restore")
+CLASSES = {"Analyse": Analyse, "Remove": Remove, "Restore": Restore}
+# Scenario's largest Blue area is HQ: three subnets, each with a router.
+DEFAULT_MAX_HOSTS = 3 * (EnterpriseScenarioGenerator.MAX_USER_HOSTS
+                         + EnterpriseScenarioGenerator.MAX_SERVER_HOSTS + 1)
+# Per-agent subnet counts mirror
+# EnterpriseScenarioGenerator._generate_blue_agents: agents 0-3 own one zone
+# each; agent 4 (HQ) owns public_access_zone + admin_network + office_network.
+AGENT_SUBNET_COUNTS = (1, 1, 1, 1, 3)
+PER_SUBNET_MAX_HOSTS = (EnterpriseScenarioGenerator.MAX_USER_HOSTS
+                        + EnterpriseScenarioGenerator.MAX_SERVER_HOSTS + 1)  # 17
+AGENT_MAX_HOSTS = tuple(n * PER_SUBNET_MAX_HOSTS
+                        for n in AGENT_SUBNET_COUNTS)  # (17, 17, 17, 17, 51)
+WRAPPER_VERSION = "foundation-v3"
+
+# Reward-shaping magnitudes (v1). Applied ONLY when shaping is enabled
+# (training); evaluation always scores native rewards. Privileged true
+# state may inform REWARDS (coach may know the score); only Blue-visible
+# observations may inform POLICIES. Shaping is scaffolding: final grading
+# is native return on held-out seeds, with shaping ablated on/off.
+SHAPING_DEFAULTS = {"clear": 3.0, "confirm": 1.0, "vandalism": -3.0}
+
+
+def shaping_event_bonus(action_name, was_compromised, now_compromised,
+                        confirmed, scales=SHAPING_DEFAULTS):
+    """Pure shaping rule for one completed Blue action (reward-channel only).
+
+    - Remove/Restore on a host compromised at issue that is clean now:
+      +clear (actually evicted the attacker).
+    - Remove/Restore on a host clean at issue: +vandalism (negative:
+      wasted remediation the native disruption penalty under-prices).
+    - Remove/Restore that did not clear: 0 — failed clears of privileged
+      attackers are correct behavior (escalation handles them), not error.
+    - Analyse landing on CONFIRMED: +confirm (information value).
+    """
+    if action_name in ("Remove", "Restore"):
+        if not was_compromised:
+            return float(scales["vandalism"])
+        if not now_compromised:
+            return float(scales["clear"])
+        return 0.0
+    if action_name == "Analyse" and confirmed:
+        return float(scales["confirm"])
+    return 0.0
+
+
+class CC4MARLEnv:
+    def __init__(self, seed=7629, max_hosts=DEFAULT_MAX_HOSTS, steps=400,
+                 mask_mode="validity", common_reward=False,
+                 reward_scalarisation="sum", per_agent_bounds=False,
+                 seed_cycle=None, temporal_features=(),
+                 include_root_session=True, shaping=None,
+                 red_agent="discovery", red_agent_class=None):
+        if not isinstance(max_hosts, int) or max_hosts < 1:
+            raise ValueError("max_hosts must be a positive integer")
+        if not isinstance(steps, int) or steps < 3:
+            raise ValueError("steps must be >= 3 for the three mission phases")
+        if mask_mode not in ("validity", "evidence"):
+            raise ValueError("mask_mode must be validity or evidence")
+        if shaping is not None:
+            shaping = dict(shaping) if shaping is not True else dict(SHAPING_DEFAULTS)
+            unknown = set(shaping) - set(SHAPING_DEFAULTS)
+            if unknown:
+                raise ValueError(f"unknown shaping keys: {sorted(unknown)}")
+        if reward_scalarisation not in ("sum", "mean"):
+            raise ValueError("reward_scalarisation must be sum or mean")
+        if red_agent_class is not None and not isinstance(red_agent_class, type):
+            raise TypeError("red_agent_class must be a native agent class")
+        if red_agent_class is None and red_agent not in RED_AGENTS:
+            raise ValueError(f"unknown red_agent {red_agent!r}; known: "
+                             f"{sorted(RED_AGENTS)}")
+        self.red_agent = red_agent
+        if per_agent_bounds and max_hosts != DEFAULT_MAX_HOSTS:
+            raise ValueError("explicit max_hosts is incompatible with "
+                             "per_agent_bounds (bounds come from the scenario)")
+        # EPyMARL's EpisodeRunner always passes common_reward and
+        # reward_scalarisation; accept and store them. `seed` stays an
+        # attribute (applied on reset); the runner-style `seed()` setter
+        # below writes to the same value for the *next* reset.
+        self._seed = seed
+        self._seed_pending = False
+        if seed_cycle is not None:
+            seed_cycle = tuple(seed_cycle)
+            if (not seed_cycle or any(not isinstance(s, int)
+                                      or isinstance(s, bool)
+                                      for s in seed_cycle)):
+                raise ValueError("seed_cycle must be a non-empty "
+                                 "list/tuple of int seeds")
+        # Multi-episode training: EPyMARL's runner calls bare reset() every
+        # episode, so an explicit cycle consumes the next seed per bare
+        # reset (wrapping around) and records every applied seed in
+        # reset_seeds for the run manifest. Default None preserves the
+        # v1/v2 behaviour: constructor seed once, then RNG continuation.
+        self.seed_cycle = seed_cycle
+        self._cycle_pos = 0
+        self.reset_seeds = []
+        # BLUE-04 temporal/belief features (v3). Default () preserves v2
+        # byte-identical observations; any enabled group widens the host
+        # vector and is recorded in get_env_info() and run manifests, so
+        # checkpoints are only loadable under identical flags.
+        # include_root_session=False drops the base has_root_session
+        # feature (ablation: Blue-visible root != attacker root).
+        self.temporal_features = tuple(temporal_features or ())
+        self.temporal_len = temporal_len(self.temporal_features)
+        self.include_root_session = bool(include_root_session)
+        self.base_len = (VECTOR_LEN if self.include_root_session
+                         else VECTOR_LEN - 1)
+        self.host_vector_len = self.base_len + self.temporal_len
+        self.common_reward = bool(common_reward)
+        self.shaping = shaping
+        self.reward_scalarisation = reward_scalarisation
+        self.per_agent_bounds = bool(per_agent_bounds)
+        if self.per_agent_bounds:
+            self.max_hosts_per_agent = list(AGENT_MAX_HOSTS)
+        else:
+            self.max_hosts_per_agent = [max_hosts] * len(BLUE_AGENTS)
+        self.n_actions_per_agent = [2 + 3 * h for h in self.max_hosts_per_agent]
+        self.obs_size_per_agent = [h * self.host_vector_len
+                                   for h in self.max_hosts_per_agent]
+        # Scalar widths are the max across agents. In default (global) mode all
+        # agents share them; in per-agent mode they are allocation upper bounds
+        # for homogeneous consumers (stock EPyMARL requires default mode).
+        self.max_hosts = max(self.max_hosts_per_agent)
+        self.mask_mode = mask_mode
+        self.n_agents = len(BLUE_AGENTS)
+        self.episode_limit = steps
+        self.n_actions = max(self.n_actions_per_agent)
+        self.obs_size = max(self.obs_size_per_agent)
+        sg = EnterpriseScenarioGenerator(blue_agent_class=SleepAgent,
+            green_agent_class=EnterpriseGreenAgent,
+            red_agent_class=red_agent_class or RED_AGENTS[self.red_agent],
+            steps=steps)
+        self.cyborg = CybORG(scenario_generator=sg, seed=seed)
+        self.env = self.cyborg.environment_controller
+        self.hostnames, self.subnets, self.views, self.trackers = {}, {}, {}, {}
+        self.observed_at = {}
+        self._tick = 0
+        self._awaiting = {}
+        self._has_reset = False
+        self._finished = True
+
+    def reset(self, seed=None, options=None):
+        if options:
+            raise ValueError("reset options are not supported")
+        if seed is not None:
+            self._seed = seed
+            self._seed_pending = True
+        elif self.seed_cycle is not None and not self._seed_pending:
+            # Bare reset under an active cycle: consume the next cycled
+            # seed (first reset takes cycle[0]; the constructor seed is
+            # only a fallback when no cycle is given). An explicit
+            # reset(seed=...) or pending seed() wins for that reset
+            # without advancing the cycle pointer.
+            self._seed = self.seed_cycle[self._cycle_pos % len(self.seed_cycle)]
+            self._cycle_pos += 1
+            self._seed_pending = True
+        # First reset honors the constructor/cycle seed; an explicit
+        # seed()/reset(seed) applies once; otherwise seed=None advances
+        # the RNG.
+        reset_seed = (self._seed if seed is not None or not self._has_reset
+                      or self._seed_pending else None)
+        self._seed_pending = False
+        self._finished = True
+        self.cyborg.reset(seed=reset_seed)
+        self._tick = 0
+        self._awaiting = {}
+        for i, agent in enumerate(BLUE_AGENTS):
+            base = deepcopy(self.cyborg.get_observation(agent))
+            hosts = sorted(h for h, value in base.items()
+                           if isinstance(value, dict) and "System info" in value)
+            bound = self.max_hosts_per_agent[i]
+            if len(hosts) > bound:
+                raise ValueError(f"{agent} has {len(hosts)} hosts; max_hosts="
+                                 f"{bound} would truncate them")
+            self.hostnames[agent] = hosts
+            self.views[agent] = {h: base[h] for h in hosts}
+            self.subnets[agent] = {h: extract_subnets(base[h]) for h in hosts}
+            self.observed_at[agent] = {h: {k: 0 for k in base[h]} for h in hosts}
+            self.trackers[agent] = BlueZoneTracker(hosts)
+        self._has_reset = True
+        self._finished = False
+        self.reset_seeds.append(reset_seed)
+        return self.get_obs(), {}
+
+    def _mask_agent(self, agent):
+        mask = np.zeros(self.n_actions_per_agent[BLUE_AGENTS.index(agent)],
+                        dtype=np.int64)
+        mask[0] = 1
+        if agent in self._awaiting:
+            return mask
+        space = self.env.get_action_space(agent)
+        if not space["session"].get(0, False):
+            return mask
+        mask[1] = int(space["action"].get(Monitor, False))
+        for i, host in enumerate(self.hostnames[agent]):
+            if not space["hostname"].get(host, False):
+                continue
+            allowed = self.trackers[agent].mask_for(host, self.mask_mode)
+            for offset, name in enumerate(ACTION_TEMPLATES):
+                mask[2 + 3*i + offset] = int(
+                    name in allowed and space["action"].get(CLASSES[name], False))
+        return mask
+
+    def _decode(self, agent, idx):
+        if idx == 0:
+            return Sleep(), None
+        if idx == 1:
+            return Monitor(session=0, agent=agent), None
+        hi, action_type = divmod(idx - 2, 3)
+        host = self.hostnames[agent][hi]
+        return CLASSES[ACTION_TEMPLATES[action_type]](
+            session=0, agent=agent, hostname=host), host
+
+    def _obs_agent(self, agent):
+        ai = BLUE_AGENTS.index(agent)
+        obs = np.zeros((self.max_hosts_per_agent[ai], self.host_vector_len),
+                       dtype=np.float32)
+        busy = agent in self._awaiting
+        tracker = self.trackers[agent]
+        for i, host in enumerate(self.hostnames[agent]):
+            row = host_to_vector(self.views[agent][host], agent,
+                                 self.subnets[agent][host])
+            if not self.include_root_session:
+                del row[ROOT_SESSION_INDEX]
+            row += host_to_temporal(tracker, host,
+                                    self.observed_at[agent][host],
+                                    self._tick, self.episode_limit, busy,
+                                    self.temporal_features)
+            obs[i] = row
+        return obs.flatten()
+
+    def get_host_presence(self, agent_id):
+        mask = np.zeros(self.max_hosts_per_agent[agent_id], dtype=np.int64)
+        mask[:len(self.hostnames[BLUE_AGENTS[agent_id]])] = 1
+        return mask
+
+    def get_obs(self):
+        return [self._obs_agent(a) for a in BLUE_AGENTS]
+
+    def get_obs_agent(self, agent_id):
+        return self._obs_agent(BLUE_AGENTS[agent_id])
+
+    def get_telemetry(self, agent_id):
+        """Optional draft JSONL block from this agent's local retained Blue view.
+
+        Does not change actor features, masks, simulator behavior or action state.
+        """
+        from blue.core.telemetry import telemetry_block
+        agent = BLUE_AGENTS[agent_id]
+        return telemetry_block(self.views[agent], self.observed_at[agent],
+                               tick=self._tick, subnets_by_host=self.subnets[agent])
+
+    def get_obs_size(self):
+        return self.obs_size
+
+    def get_state(self):
+        return np.concatenate(self.get_obs()).astype(np.float32)
+
+    def get_state_size(self):
+        return sum(self.obs_size_per_agent)
+
+    def get_avail_actions(self):
+        return [self._mask_agent(a) for a in BLUE_AGENTS]
+
+    def get_avail_agent_actions(self, agent_id):
+        return self._mask_agent(BLUE_AGENTS[agent_id])
+
+    def get_total_actions(self):
+        return self.n_actions
+
+    def get_env_info(self):
+        return {"state_shape": self.get_state_size(), "obs_shape": self.obs_size,
+                "n_actions": self.n_actions, "n_agents": self.n_agents,
+                "episode_limit": self.episode_limit,
+                "max_hosts_per_agent": list(self.max_hosts_per_agent),
+                "n_actions_per_agent": list(self.n_actions_per_agent),
+                "obs_size_per_agent": list(self.obs_size_per_agent),
+                "per_agent_bounds": self.per_agent_bounds,
+                "temporal_features": list(self.temporal_features),
+                "host_vector_len": self.host_vector_len,
+                "include_root_session": self.include_root_session,
+                "shaping": dict(self.shaping) if self.shaping else None,
+                "red_agent": self.red_agent,
+                "wrapper_version": WRAPPER_VERSION}
+
+    def _consume(self, agent, data):
+        tracker = self.trackers[agent]
+        # Merge every visible host, including unsolicited Monitor observations.
+        # Replace fields, never concatenate repeated snapshots/events. Timestamps
+        # preserve freshness for later temporal features; absent fields stay unknown
+        # or last-known, not fabricated zero measurements.
+        for host in self.hostnames[agent]:
+            detail = data.get(host, {})
+            for field, value in detail.items():
+                self.views[agent][host][field] = deepcopy(value)
+                self.observed_at[agent][host][field] = self._tick
+        pending = self._awaiting.get(agent)
+        if pending is None:
+            return
+        host, name = pending
+        success = str(data.get("success", ""))
+        if success == "TRUE":
+            if name == "Analyse":
+                detail = data.get(host, {})
+                # A completed empty scan supersedes the *latest file observation*,
+                # but does not itself clear the tracker's prior positive evidence.
+                self.views[agent][host]["Files"] = deepcopy(detail.get("Files", []))
+                self.observed_at[agent][host]["Files"] = self._tick
+                tracker.note_analyse_result(host, detail, self._tick)
+            else:
+                tracker.note_remediation_result(host, name, self._tick)
+                # Historical artifacts are no longer current measurements. Do not
+                # mark the host clean; VERIFY remains until subsequent observations.
+                for field in ("Files", "Processes"):
+                    if field not in data.get(host, {}):
+                        self.views[agent][host].pop(field, None)
+                        self.observed_at[agent][host].pop(field, None)
+            del self._awaiting[agent]
+        elif success == "FALSE":
+            tracker.note_failure(host, name)
+            del self._awaiting[agent]
+        elif self._tick >= tracker.pending_until[host]:
+            raise RuntimeError(f"{agent}: {name} on {host} overdue without result")
+
+    def _compromised_set(self):
+        """Privileged compromised-host set. REWARD-CHANNEL ONLY (shaping);
+        never exposed to policies. Mirrors the eval-only label logic."""
+        controller = self.env
+        true_state = controller.get_true_state(controller.INFO_DICT["True"]).data
+        out = set()
+        for hostname, host_obs in true_state.items():
+            if not isinstance(host_obs, dict):
+                continue
+            red = [s for s in (host_obs.get("Sessions", []) or [])
+                   if "red" in str(s.get("agent", ""))]
+            if red:
+                out.add(hostname)
+        return out
+
+    def step(self, actions):
+        if self._finished:
+            raise RuntimeError("Call reset before stepping a new episode")
+        if not isinstance(actions, Mapping):
+            if hasattr(actions, "detach"):
+                actions = actions.detach().cpu().numpy()
+            values = np.asarray(actions)
+            if values.shape != (self.n_agents,):
+                raise ValueError(f"Expected {self.n_agents} scalar actions")
+            actions = dict(zip(BLUE_AGENTS, values))
+        if set(actions) - set(BLUE_AGENTS):
+            raise ValueError("Unknown Blue agent in action mapping")
+        decoded = {}
+        for agent in BLUE_AGENTS:
+            idx = actions.get(agent, 0)
+            width = self.n_actions_per_agent[BLUE_AGENTS.index(agent)]
+            if (not isinstance(idx, (int, np.integer)) or idx < 0
+                    or idx >= width or not self._mask_agent(agent)[idx]):
+                idx = 0
+            action, host = self._decode(agent, int(idx))
+            decoded[agent] = action
+            if host is not None:
+                name = type(action).__name__
+                self.trackers[agent].note_action_issued(
+                    host, name, action.duration, self._tick)
+                self._awaiting[agent] = (host, name)
+        prev_comp = self._compromised_set() if self.shaping else None
+        self.env.step(decoded)
+        self._tick += 1
+        rewards = []
+        for agent in BLUE_AGENTS:
+            self._consume(agent, self.env.get_last_observation(agent).data)
+            rewards.append(float(sum(self.env.get_reward(agent).values())))
+        if self.shaping:
+            now_comp = self._compromised_set()
+            bonus = 0.0
+            for agent in BLUE_AGENTS:
+                tracker = self.trackers[agent]
+                for host in self.hostnames[agent]:
+                    last_re = tracker.last_remediation.get(host)
+                    if last_re == self._tick:
+                        name, _ = tracker.last_result.get(host, (None, None))
+                        if name in ("Remove", "Restore"):
+                            bonus += shaping_event_bonus(
+                                name, host in prev_comp, host in now_comp,
+                                False, self.shaping)
+                            continue
+                    last_an = tracker.last_analysis.get(host)
+                    if last_an == self._tick:
+                        name, _ = tracker.last_result.get(host, (None, None))
+                        if name == "Analyse":
+                            bonus += shaping_event_bonus(
+                                name, False, False,
+                                tracker.state.get(host) == "CONFIRMED",
+                                self.shaping)
+            rewards = [r + bonus for r in rewards]
+        # Preserve the native finite scenario terminal (upstream ends at steps-1).
+        # A wrapper-only cut-off is a truncation, not a fabricated natural terminal.
+        terminated = bool(self.env.done)
+        truncated = self._tick >= self.episode_limit and not terminated
+        self._finished = terminated or truncated
+        # EPyMARL reads info["episode_limit"] to tell horizon cut-offs (bootstrap)
+        # from true terminals. The native end always coincides with our horizon.
+        info = {"episode_limit": bool(
+            truncated or (terminated and self._tick >= self.episode_limit - 1))}
+        if self.common_reward:
+            # Native Blue reward is already one shared team signal duplicated
+            # per agent; normalize once (rewards[0]), never a 5x sum, per the
+            # contracts invariant. sum/mean coincide on identical values.
+            return self.get_obs(), float(rewards[0]), terminated, truncated, info
+        return self.get_obs(), rewards, terminated, truncated, info
+
+    def seed(self, seed=None):
+        """Runner-style seed setter; takes effect on the next reset."""
+        if seed is not None:
+            self._seed = seed
+            self._seed_pending = True
+
+    def close(self):
+        """No simulator resource to release; present for the runner lifecycle."""
+
+    def render(self):
+        """No visual rendering in this wrapper; present for the runner lifecycle."""
+
+    def save_replay(self):
+        raise NotImplementedError("CC4MARLEnv has no replay recording")
+
+    def get_stats(self):
+        return {}
+
+
+class CC4BlueWrapper:
+    """Single-agent development facade over the same joint-step implementation.
+
+    Other Blue agents Sleep. This avoids separate, diverging bookkeeping logic.
+    reset -> (obs, mask); step -> (obs, mask, scalar team reward, done).
+    """
+    def __init__(self, seed=7629, blue_id="blue_agent_0",
+                 max_hosts=DEFAULT_MAX_HOSTS, steps=400, mask_mode="validity",
+                 per_agent_bounds=False, seed_cycle=None, temporal_features=(),
+                 include_root_session=True, shaping=None):
+        if blue_id not in BLUE_AGENTS:
+            raise ValueError("Unknown Blue agent")
+        self.blue_id = blue_id
+        self._agent_id = BLUE_AGENTS.index(blue_id)
+        self._joint = CC4MARLEnv(seed, max_hosts, steps, mask_mode,
+                                 per_agent_bounds=per_agent_bounds,
+                                 seed_cycle=seed_cycle,
+                                 temporal_features=temporal_features,
+                                 include_root_session=include_root_session,
+                                 shaping=shaping)
+        self.cyborg = self._joint.cyborg
+        self.env = self._joint.env
+        self.max_hosts = self._joint.max_hosts_per_agent[self._agent_id]
+        self.n_actions = self._joint.n_actions_per_agent[self._agent_id]
+        self.obs_size = self._joint.obs_size_per_agent[self._agent_id]
+
+    def reset(self, seed=None):
+        self._joint.reset(seed=seed)
+        return self.get_obs(), self.get_mask()
+
+    @property
+    def reset_seeds(self):
+        return self._joint.reset_seeds
+
+    @property
+    def hostnames(self):
+        return self._joint.hostnames[self.blue_id]
+
+    @property
+    def views(self):
+        return self._joint.views[self.blue_id]
+
+    @property
+    def subnets(self):
+        return self._joint.subnets[self.blue_id]
+
+    @property
+    def tracker(self):
+        return self._joint.trackers[self.blue_id]
+
+    @property
+    def _awaiting(self):
+        return self._joint._awaiting.get(self.blue_id)
+
+    @property
+    def _tick(self):
+        return self._joint._tick
+
+    def get_obs(self):
+        return self._joint.get_obs_agent(self._agent_id)
+
+    def get_mask(self):
+        return self._joint.get_avail_agent_actions(self._agent_id)
+
+    def get_obs_size(self):
+        return self.obs_size
+
+    def get_total_actions(self):
+        return self.n_actions
+
+    def get_state(self):
+        return self.get_obs().copy()
+
+    def step(self, idx):
+        _, rewards, terminated, truncated, _ = self._joint.step({self.blue_id: idx})
+        return self.get_obs(), self.get_mask(), rewards[self._agent_id], terminated or truncated
+
+    def seed(self, seed=None):
+        self._joint.seed(seed)
+
+    def close(self):
+        pass
