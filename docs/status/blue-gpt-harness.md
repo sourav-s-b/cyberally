@@ -263,3 +263,41 @@ User steering:run small training locally, Kaggle reserved for long runs.
 The four-model pipeline is moved to `harness_redesign_smoke` on the local
 locked runtime. No v2 Kaggle training kernel was launched; the remote
 smoke bootstrap is a future template only.
+
+## Local check completed after user steering
+
+Four models completed locally (MAPPO/A2C, training RNG0/1, two iterations,
+two episodes per iteration,400-step configuration, original risk scorer).
+Exact experiment source:8a5da51b2c7649283f60a4269540671072c27748.
+Artifacts:`blue/results/gpt_harness/v2_local_smoke/cohort/analysis.json`.
+All four sampled policies return -49,-68 on reused8233, exactly matching
+the untrained-mixture control. No learning benefit or algorithm ranking
+established. Lancer -110, guard -97, Sleep -2901, random -203.
+Greedy diagnostic results are reported separately, never selected as
+primary. Seed0 request hashes distinguish MAPPO's changed first sequence
+with equal return from A2C's unchanged sequences.
+
+Validation:30focused tests passed; full-horizon local training/evaluation
+completed; same-source/runtime/model/scorer hashes verified; resume actor
+weights matched exactly. Numerical audit on Kaggle completed, with full
+local/remote hashes matching under declared near-tie resolution on both
+diagnostic episodes. No long training started. Original final seeds
+7809–8200 untouched.
+
+Fair ML comparison on eight reused episodes:original HGB macro PR-AUC
+0.722771, weighted candidate0.741667; difference0.018896, conditional
+episode interval[0.01043,0.02736], one fit per variant. Prediction gain
+does not establish defense gain.
+
+Next concrete task:local one-factor discount/exploration sensitivity
+check with more development episodes and untrained controls, before
+freezing a longer multi-seed Kaggle algorithm comparison.
+
+PR checklist:Blue-only additive implementation; existing checkpoints and
+simulator unchanged; tests and fixed artifact manifests recorded; no
+weights/logs/runtime committed; shared evaluation protocol proposal
+remains draft pending affected-role review before merge. Remote replay
+dependency is cdd17647fc6f72cd374801ccf3a05ea379e63749; origin main
+01140fe inspected but not merged. Known risks:reused suites, few calibration
+episodes, bundled design changes, discount/native objective mismatch and
+stochastic exploration ceiling; no deployment or performance claim.

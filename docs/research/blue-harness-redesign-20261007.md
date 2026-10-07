@@ -119,3 +119,59 @@ replicas and all controls. This is not the eight-iteration/five-seed
 comparison, and will not select an algorithm. Download the generated
 checkpoints and replay each locally to validate the v2 execution contract
 before proposing longer training.
+
+### Fair detector comparison and discounting limitation
+
+Original and weighted HGB are now evaluated on the exact same free-agent,
+unconfirmed test rows. Macro PR-AUC is0.722771 and0.741667 respectively
+on eight reused test episodes (difference+0.018896). Per-episode paired
+differences and their conditional interval are retained in the ignored
+`redesign_ml/fair_comparison.json`; one fit per variant does not measure
+training-data/model-fit uncertainty. This does not establish defense gain,
+and the local algorithm check keeps the original scorer fixed.
+
+Training retains gamma=.99 for the current pipeline comparison, while
+evaluation sums undiscounted native rewards. Rewards are unchanged, but
+discounting still changes the optimization objective:feedback200ticks
+ahead is weighted by~0.134. A finite-horizon gamma=1 ablation is supported
+by the runner and should be tested independently before declaring
+temporal credit solved. Likewise, the .2 exploration mixture restricts
+large changes from the teacher and may limit improvement; it is a
+controlled first configuration, not an established optimum.
+
+## Completed local MAPPO/A2C pipeline check
+
+User requested small training stay local; no v2 Kaggle training kernel
+was launched. All four local runs completed under source
+8a5da51b2c7649283f60a4269540671072c27748, locked legacy runtime and
+one Torch thread. Each trained two iterations of two full-horizon
+episodes; the original scorer remained fixed. Model/scorer/source/runtime
+hashes and repeated baseline cells were validated.
+
+| Learner | Training RNG | Sampled returns on8233 (two nested policy RNGs) | Greedy diagnostic |
+|---|---:|---|---:|
+| MAPPO | 0 | -49,-68 | -69 |
+| MAPPO | 1 | -49,-68 | -95 |
+| A2C | 0 | -49,-68 | -61 |
+| A2C | 1 | -49,-68 | -93 |
+
+Controls:Lancer -110, guard -97, Sleep -2901, random -203; untrained
+teacher-mixture -49,-68. Thus every sampled learner has zero return gain
+over its matching untrained control. Greedy diagnostic is a different
+execution policy; it cannot substitute for the primary sampled result.
+Request-hash checks for seed0 show MAPPO changed the first sequence but
+kept its return; A2C matched both untrained sequences. Equal returns do
+not generally imply equal actions.
+
+Only two trained models per learner and one reused evaluation episode:
+this establishes pipeline feasibility, not an algorithm ranking or
+defense improvement. MAPPO took20policy steps per iteration, A2C one;
+rollout budgets matched, optimizer step counts did not. Before any longer
+comparison, isolate the discount/exploration choices and measure learned
+probability changes against the untrained control on more development
+episodes. Preserve the native metric and all runs.
+
+The detector's same-context weighted-minus-original macro PR-AUC interval
+is[0.01043,0.02736], conditional on eight reused test episodes and one
+fit per variant. This excludes model-fit uncertainty and says nothing
+about defensive return.
