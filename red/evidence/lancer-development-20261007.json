@@ -1,0 +1,338 @@
+{
+  "schema_version": "red-planner-development-v1",
+  "mode": "ollama",
+  "main_policy": "llm-planner",
+  "blue_policy": "hybrid_lancer_v2 (local Lancer-style no-decoy variant)",
+  "green_policy": "EnterpriseGreenAgent",
+  "topology": "native-full",
+  "seeds": [
+    7629,
+    7630,
+    7631
+  ],
+  "steps": 400,
+  "config": {
+    "model": "llama3.1:8b",
+    "endpoint": "http://127.0.0.1:11434",
+    "timeout_seconds": 60,
+    "max_requests": 36,
+    "max_output_tokens": 256,
+    "context_tokens": 8192,
+    "max_prompt_chars": 24000,
+    "history_length": 4,
+    "seed": 42
+  },
+  "planner_config": {
+    "interval": 20,
+    "max_plans_per_agent": 2
+  },
+  "model": {
+    "model": "llama3.1:8b",
+    "digest": "46e0c10c039e019119339687c3c1757cc81b9da49709a3b3924863ba87ca666e",
+    "ollama_version": "0.35.1"
+  },
+  "source_commit": "3096f068f43aa461ac3fe5e659c2e24e6aa86188",
+  "source_sha256": {
+    "red/main.py": "876c5947cdd0b407aa93c125fcf4eeaae8a44e0ac4a8db8c234aebc37508471f",
+    "red/planned_agent.py": "f91c03a4b2669e5652f9acc3834a6bc700990a52c6295893711e3931ba0ce28a",
+    "red/llm_agent.py": "c702f15bf95bd970aaf220a5ddb3d2f471b7174890a59fae0e37d4710f97987a",
+    "cage-challenge-4/CybORG/Agents/SimpleAgents/FiniteStateRedAgent.py": "d926b96dfc7c0d0574b28fefd92a2496ff5276301a19e958f1e8b6b991c0a32a",
+    "cage-challenge-4/CybORG/Simulator/Scenarios/EnterpriseScenarioGenerator.py": "be8de216e4967152e09b5df15578e67f239c85efe5cff643504fe2df2ec65645",
+    "cage-challenge-4/CybORG/Simulator/SimulationController.py": "2f59c94a5cae9cc4a7a58eba61fe2e18ebcb183445a6ddc5da00fe6384760f77",
+    "blue/core/wrapper.py": "dea1a81c42bcfe68a33ced8eef51abf0425d7efb716bf2b58245728228623d1e",
+    "blue/core/masking.py": "8d8c81d7c5d6f2aeca2b9a6b0c4d53cfb3021d2bd0a122b98fff685d0385b4bf",
+    "blue/policies/hybrid.py": "661977790ed12808b1b4dbf047508cb1f0104591464b6b33314afe07367b2bd0",
+    "blue/policies/registry.py": "5bde770dbb4f1f7321130b6a9b862d13d3e9e4abaed6fa8724dcf47c1d9769ef"
+  },
+  "prompt_version": "red-strategy-planner-v1",
+  "prompt_sha256": "fe9404476c5719890eb2084a712a339333814542d2e564ca183dd31aa28a8657",
+  "trace_sha256": "a5402b12a9592ee14fdd255b1bce6ff4ba7991e631e3f19318d545dcfb9e5e63",
+  "requests": 35,
+  "tokens": {
+    "prompt_eval_count": 46901,
+    "eval_count": 595
+  },
+  "episodes": {
+    "llm-planner": [
+      {
+        "seed": 7629,
+        "joint_steps": 399,
+        "native_blue_team_return": -676.0,
+        "active_compromised_host_ticks": 12579,
+        "active_privileged_host_ticks": 3400,
+        "peak_compromised_hosts": 54,
+        "peak_privileged_hosts": 11,
+        "final_compromised_hosts": 53,
+        "final_privileged_hosts": 11,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 79.625,
+        "plan_status_counts": {
+          "accepted": 10,
+          "pending_action": 1275,
+          "not_due": 837,
+          "invalid_focus": 2
+        },
+        "executed_action_counts": {
+          "Sleep": 1549,
+          "PrivilegeEscalate": 49,
+          "AggressiveServiceDiscovery": 121,
+          "DegradeServices": 203,
+          "ExploitRemoteService": 285,
+          "Impact": 134,
+          "DiscoverRemoteSystems": 23,
+          "DiscoverDeception": 30
+        }
+      },
+      {
+        "seed": 7630,
+        "joint_steps": 399,
+        "native_blue_team_return": -645.0,
+        "active_compromised_host_ticks": 8549,
+        "active_privileged_host_ticks": 3101,
+        "peak_compromised_hosts": 33,
+        "peak_privileged_hosts": 13,
+        "final_compromised_hosts": 32,
+        "final_privileged_hosts": 12,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 58.76600000006147,
+        "plan_status_counts": {
+          "accepted": 11,
+          "pending_action": 1071,
+          "not_due": 788
+        },
+        "executed_action_counts": {
+          "Sleep": 1598,
+          "PrivilegeEscalate": 55,
+          "DiscoverRemoteSystems": 17,
+          "DegradeServices": 209,
+          "AggressiveServiceDiscovery": 128,
+          "Impact": 160,
+          "ExploitRemoteService": 210,
+          "DiscoverDeception": 17
+        }
+      },
+      {
+        "seed": 7631,
+        "joint_steps": 399,
+        "native_blue_team_return": -719.0,
+        "active_compromised_host_ticks": 11890,
+        "active_privileged_host_ticks": 3939,
+        "peak_compromised_hosts": 43,
+        "peak_privileged_hosts": 16,
+        "final_compromised_hosts": 43,
+        "final_privileged_hosts": 11,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 60.296999999904074,
+        "plan_status_counts": {
+          "accepted": 11,
+          "pending_action": 1285,
+          "not_due": 862,
+          "invalid_focus": 1
+        },
+        "executed_action_counts": {
+          "Sleep": 1523,
+          "PrivilegeEscalate": 56,
+          "DiscoverRemoteSystems": 26,
+          "DegradeServices": 179,
+          "AggressiveServiceDiscovery": 169,
+          "Impact": 108,
+          "ExploitRemoteService": 303,
+          "DiscoverDeception": 30
+        }
+      }
+    ],
+    "scripted": [
+      {
+        "seed": 7629,
+        "joint_steps": 399,
+        "native_blue_team_return": -52.0,
+        "active_compromised_host_ticks": 11994,
+        "active_privileged_host_ticks": 3934,
+        "peak_compromised_hosts": 47,
+        "peak_privileged_hosts": 14,
+        "final_compromised_hosts": 45,
+        "final_privileged_hosts": 9,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 20.515999999945052,
+        "plan_status_counts": {},
+        "executed_action_counts": {
+          "Sleep": 1638,
+          "PrivilegeEscalate": 63,
+          "AggressiveServiceDiscovery": 191,
+          "ExploitRemoteService": 354,
+          "DiscoverRemoteSystems": 50,
+          "DegradeServices": 41,
+          "Impact": 57
+        }
+      },
+      {
+        "seed": 7630,
+        "joint_steps": 399,
+        "native_blue_team_return": -54.0,
+        "active_compromised_host_ticks": 10120,
+        "active_privileged_host_ticks": 5377,
+        "peak_compromised_hosts": 34,
+        "peak_privileged_hosts": 19,
+        "final_compromised_hosts": 32,
+        "final_privileged_hosts": 12,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 15.25,
+        "plan_status_counts": {},
+        "executed_action_counts": {
+          "Sleep": 1657,
+          "PrivilegeEscalate": 58,
+          "DiscoverRemoteSystems": 46,
+          "AggressiveServiceDiscovery": 166,
+          "ExploitRemoteService": 331,
+          "DegradeServices": 60,
+          "Impact": 76
+        }
+      },
+      {
+        "seed": 7631,
+        "joint_steps": 399,
+        "native_blue_team_return": -59.0,
+        "active_compromised_host_ticks": 13088,
+        "active_privileged_host_ticks": 5160,
+        "peak_compromised_hosts": 48,
+        "peak_privileged_hosts": 19,
+        "final_compromised_hosts": 41,
+        "final_privileged_hosts": 10,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 23.344000000040978,
+        "plan_status_counts": {},
+        "executed_action_counts": {
+          "Sleep": 1591,
+          "PrivilegeEscalate": 66,
+          "DiscoverRemoteSystems": 28,
+          "AggressiveServiceDiscovery": 199,
+          "ExploitRemoteService": 392,
+          "DegradeServices": 59,
+          "Impact": 59
+        }
+      }
+    ],
+    "tactical-only": [
+      {
+        "seed": 7629,
+        "joint_steps": 399,
+        "native_blue_team_return": -134.0,
+        "active_compromised_host_ticks": 11165,
+        "active_privileged_host_ticks": 3672,
+        "peak_compromised_hosts": 44,
+        "peak_privileged_hosts": 15,
+        "final_compromised_hosts": 44,
+        "final_privileged_hosts": 8,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 49.375,
+        "plan_status_counts": {
+          "accepted": 12,
+          "pending_action": 1215,
+          "not_due": 752
+        },
+        "executed_action_counts": {
+          "Sleep": 1635,
+          "PrivilegeEscalate": 48,
+          "AggressiveServiceDiscovery": 160,
+          "ExploitRemoteService": 324,
+          "DiscoverRemoteSystems": 30,
+          "DegradeServices": 99,
+          "Impact": 57,
+          "DiscoverDeception": 41
+        }
+      },
+      {
+        "seed": 7630,
+        "joint_steps": 399,
+        "native_blue_team_return": -116.0,
+        "active_compromised_host_ticks": 9386,
+        "active_privileged_host_ticks": 4256,
+        "peak_compromised_hosts": 33,
+        "peak_privileged_hosts": 17,
+        "final_compromised_hosts": 31,
+        "final_privileged_hosts": 11,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 17.92200000002049,
+        "plan_status_counts": {
+          "accepted": 12,
+          "pending_action": 1192,
+          "not_due": 674
+        },
+        "executed_action_counts": {
+          "Sleep": 1710,
+          "PrivilegeEscalate": 54,
+          "DiscoverRemoteSystems": 23,
+          "DegradeServices": 65,
+          "AggressiveServiceDiscovery": 146,
+          "ExploitRemoteService": 339,
+          "Impact": 24,
+          "DiscoverDeception": 33
+        }
+      },
+      {
+        "seed": 7631,
+        "joint_steps": 399,
+        "native_blue_team_return": -90.0,
+        "active_compromised_host_ticks": 12714,
+        "active_privileged_host_ticks": 4097,
+        "peak_compromised_hosts": 46,
+        "peak_privileged_hosts": 14,
+        "final_compromised_hosts": 44,
+        "final_privileged_hosts": 12,
+        "invalid_executed_actions": 0,
+        "wall_seconds": 21.95299999997951,
+        "plan_status_counts": {
+          "accepted": 12,
+          "pending_action": 1348,
+          "not_due": 755
+        },
+        "executed_action_counts": {
+          "Sleep": 1631,
+          "PrivilegeEscalate": 56,
+          "DiscoverRemoteSystems": 20,
+          "AggressiveServiceDiscovery": 137,
+          "DegradeServices": 90,
+          "ExploitRemoteService": 371,
+          "Impact": 54,
+          "DiscoverDeception": 35
+        }
+      }
+    ]
+  },
+  "paired": [
+    {
+      "seed": 7629,
+      "blue_return_delta_vs_scripted": -624.0,
+      "blue_return_delta_vs_tactical": -542.0,
+      "compromised_host_ticks_delta_vs_scripted": 585,
+      "privileged_host_ticks_delta_vs_scripted": -534
+    },
+    {
+      "seed": 7630,
+      "blue_return_delta_vs_scripted": -591.0,
+      "blue_return_delta_vs_tactical": -529.0,
+      "compromised_host_ticks_delta_vs_scripted": -1571,
+      "privileged_host_ticks_delta_vs_scripted": -2276
+    },
+    {
+      "seed": 7631,
+      "blue_return_delta_vs_scripted": -660.0,
+      "blue_return_delta_vs_tactical": -629.0,
+      "compromised_host_ticks_delta_vs_scripted": -1198,
+      "privileged_host_ticks_delta_vs_scripted": -1221
+    }
+  ],
+  "metric_semantics": {
+    "blue_return": "native shared reward counted once; lower favors Red",
+    "host_ticks": "unique hosts with active Red sessions after each tick, includes initial footholds",
+    "privileged": "active Red session with username root or SYSTEM; evaluation-only",
+    "wall_seconds": "episode runtime including inference; excludes constructor/reset"
+  },
+  "limitations": [
+    "Development seeds, not an untouched final evaluation suite",
+    "One fixed defender; does not establish general attacker superiority",
+    "Tactical-only ablation is fixed spread goal with the same executor",
+    "Mock mode contains no LLM inference",
+    "No general strongest-attacker claim"
+  ]
+}
