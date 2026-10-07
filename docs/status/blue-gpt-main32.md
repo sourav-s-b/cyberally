@@ -61,3 +61,19 @@ golden ML predictions, native simulator episode and exact runtime/version
 preflight passed. Same 18 tests passed in this clean full-lock environment.
 Package generation uses harness_prepare_main, rejects a dirty tree and checks
 all ML/requirements hashes before inserting the clean published source commit.
+
+## Accepted submission — 2026-10-07
+
+Pinned source `6942d584f15231a7f19add0a510a04f7ff3ad229`; private dataset
+`souravsreekumar02/gpt-blue-harness-main-20261007`, initial version.
+Frozen cohort SHA-256 `53d15a2bb58529ee2aab41bc949939cbf3ffd35ed6f6d9f16424397746fa85fe`.
+
+All five kernel version 1 submissions accepted and status independently checked
+RUNNING: `souravsreekumar02/gpt-blue-harness-main-seed-0` through
+`gpt-blue-harness-main-seed-4`. Kaggle generated these slugs from their titles;
+local metadata was corrected to those actual IDs without resubmitting.
+RUNNING confirms scheduling, not remote preflight or successful training.
+No completed result is available at this handoff. Next: inspect remote logs,
+verify preflight/training, retrieve all five useful artifact folders and run the
+frozen aggregator after completion. Estimated 3–4 hours per parallel shard from
+pilot throughput; older-runtime timing and queue variability remain unmeasured.

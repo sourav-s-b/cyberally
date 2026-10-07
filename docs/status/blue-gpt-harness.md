@@ -192,3 +192,8 @@ development episodes, four baselines. All runs new under one older frozen stack.
 Primary BOTH must clear Lancer AND guard; other comparisons descriptive. New
 cohort aggregation rejects incomplete or mixed shards and uses n=5, df=4, never
 160 model replicas. Clean full-lock runtime preflight and 18 tests passed.
+
+Main32 cohort submitted: five private kernel version 1 jobs, actual IDs
+`gpt-blue-harness-main-seed-0` through `-4`, all checked RUNNING.
+Experiment source pin `6942d584f15231a7f19add0a510a04f7ff3ad229`;
+see blue-gpt-main32.md for cohort hash, controls and next retrieval steps.
