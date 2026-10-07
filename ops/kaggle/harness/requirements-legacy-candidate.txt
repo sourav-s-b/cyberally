@@ -1,0 +1,16 @@
+# Compatibility candidate tested in isolation; NOT the completed pilot runtime.
+# Python 3.11 required. Refit scorer from frozen training data under these pins;
+# the NumPy 2 pilot pickle does not deserialize under NumPy 1.26.4.
+numpy==1.26.4
+scipy==1.12.0
+scikit-learn==1.7.2
+torch==2.2.0
+joblib==1.5.2
+threadpoolctl==3.6.0
+gym==0.26.2
+gymnasium==0.28.1
+PyYAML==6.0.1
+pygame==2.5.2
+networkx==3.2.1
+prettytable==3.9.0
+setuptools==80.10.2

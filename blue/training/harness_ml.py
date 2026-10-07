@@ -100,6 +100,31 @@ def metrics(y, p):
             "log_loss": float(log_loss(y, np.clip(p, 1e-7, 1-1e-7), labels=[0, 1]))}
 
 
+def episode_summary(episodes):
+    """Equal weight per episode, never per host-tick; conditional on one fit.
+
+    Paired t intervals describe episode variation in this development suite,
+    not training-seed uncertainty or independent/fresh model confirmation.
+    """
+    from scipy.stats import t
+    out = {"unit": "test episode, equally weighted", "n_episodes": len(episodes),
+           "limitation": "Conditional on one fixed training/calibration split; reused development episodes, not fresh confirmation. No row-based CI.",
+           "paired_hgb_minus_logistic": {}}
+    for key in ("pr_auc", "roc_auc", "brier", "log_loss"):
+        rows = [e for e in episodes.values() if e['hgb'][key] is not None and e['logistic'][key] is not None]
+        delta = np.asarray([e['hgb'][key]-e['logistic'][key] for e in rows])
+        if not len(delta):
+            continue
+        mean = float(delta.mean())
+        radius = float(t.ppf(.975, len(delta)-1)*delta.std(ddof=1)/np.sqrt(len(delta))) if len(delta)>1 else None
+        out['paired_hgb_minus_logistic'][key] = {
+            "n_episodes": len(delta), "mean": mean,
+            "ci95_conditional_episode_t": [mean-radius, mean+radius] if radius is not None else None,
+            "hgb_macro_mean": float(np.mean([e['hgb'][key] for e in rows])),
+            "logistic_macro_mean": float(np.mean([e['logistic'][key] for e in rows]))}
+    return out
+
+
 def fit(data_path, out, random_state=0):
     from sklearn.ensemble import HistGradientBoostingClassifier, IsolationForest
     from sklearn.isotonic import IsotonicRegression
@@ -186,6 +211,10 @@ def fit(data_path, out, random_state=0):
         m = episode[test] == seed
         report["per_test_episode"][str(seed)] = {"hgb": metrics(y[test][m], p[m]),
                                                   "logistic": metrics(y[test][m], bp[m])}
+        novelty_metrics = metrics(y[test][m], novelty[m])
+        report['per_test_episode'][str(seed)]['novelty'] = {
+            k: novelty_metrics[k] for k in ('n', 'prevalence', 'pr_auc', 'roc_auc')}
+    report['episode_summary'] = episode_summary(report['per_test_episode'])
     out.with_suffix(".json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2), flush=True)
     return report

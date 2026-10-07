@@ -15,7 +15,9 @@ cfg = json.loads(inputs[0].read_text())
 for name, digest in cfg['input_hashes'].items():
     if hashlib.sha256((data / name).read_bytes()).hexdigest() != digest:
         raise RuntimeError('input hash mismatch: ' + name)
-root = Path('/kaggle/working/repo')
+# Only experiment artifacts belong in working: Kaggle exports every file there.
+# Exporting Torch headers and the full venv caused slow/rate-limited retrieval.
+root = Path('/tmp/gpt-blue-repo')
 # Public code only; the private dataset holds weights and frozen configuration.
 subprocess.run(['git', 'clone', '--no-checkout', cfg['source_repository'], str(root)], check=True)
 subprocess.run(['git', '-C', str(root), 'checkout', '--detach', cfg['source_commit']], check=True)
@@ -24,10 +26,16 @@ if actual != cfg['source_commit']:
     raise RuntimeError('source commit mismatch')
 # Isolate Python as well as dependencies; Kaggle's default runtime is not our pin.
 subprocess.run([sys.executable, '-m', 'pip', 'install', 'uv==0.12.15'], check=True)
-subprocess.run([sys.executable, '-m', 'uv', 'venv', '--python', '3.12', '/kaggle/working/harness-env'], check=True)
-python = '/kaggle/working/harness-env/bin/python'
+profile = cfg.get('runtime_profile', 'pilot')
+profiles = {'pilot': ('3.12', 'requirements.txt'),
+            'legacy-candidate': ('3.11', 'requirements-legacy-lock.txt')}
+if profile not in profiles:
+    raise RuntimeError('unknown frozen runtime profile')
+python_version, requirements = profiles[profile]
+subprocess.run([sys.executable, '-m', 'uv', 'venv', '--python', python_version, '/tmp/gpt-blue-env'], check=True)
+python = '/tmp/gpt-blue-env/bin/python'
 subprocess.run([sys.executable, '-m', 'uv', 'pip', 'install', '--python', python,
-                '--torch-backend', 'cpu', '-r', str(root / 'ops/kaggle/harness/requirements.txt')], check=True)
+                '--torch-backend', 'cpu', '-r', str(root / 'ops/kaggle/harness' / requirements)], check=True)
 os.chdir(root)
 sys.path.insert(0, str(root))
 # Validate golden model predictions and a live simulator episode before training.
@@ -47,6 +55,8 @@ for seed in cfg['training_rng_seeds']:
                '--train-seeds', *map(str, cfg['train_episode_seeds'])]
         if (dest / 'checkpoint.pt').exists():
             cmd.append('--resume')
+        if cfg.get('diagnostics', False):
+            cmd.append('--diagnostics')
         subprocess.run(cmd, check=True)
 subprocess.run([python, '-m', 'blue.training.harness_pilot', '--config', str(data/'pilot.json'), '--output', str(output), '--scorer', str(data/'scorer.pkl')], check=True)
 print('PILOT COMPLETE: all six models evaluated; see pilot/report.json', flush=True)

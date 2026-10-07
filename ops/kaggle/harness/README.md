@@ -12,3 +12,28 @@ All six final models need common development evaluation against Lancer and the
 coverage-only policy. These are technical pilot results, not a main experiment.
 The main experiment remains conditional on pilot validation. Protected final
 seeds 7809–8200 are excluded. Artifact and runtime compatibility must pass first.
+
+Audit update: source and virtualenv now live under `/tmp`, so only pilot artifacts
+are exported from `/kaggle/working`. The completed pilot accidentally exported
+the full runtime, forcing over 100 pages of output listing before its report.
+This change applies only to future submissions; the completed run is preserved.
+
+`requirements-legacy-candidate.txt` records an isolated Python 3.11 compatibility
+candidate, not a replacement for the frozen pilot pins. NumPy 1.26.4 cannot
+deserialize the pilot detector; rebuild it from unchanged training data and
+validate golden predictions before using that candidate remotely. The generic
+Gym startup warning appears even under NumPy 1.26.4 and alone proves no failure.
+
+For a later main experiment, plan five independent shards, each retaining all
+three ML arms for ONE training RNG seed (32 iterations, four episodes each).
+Each shard needs its own frozen input/configuration and resumable output;
+aggregate all five matched contrasts only after every shard finishes. Preserve
+both Lancer and guard controls and native return. Source/model/runtime/evaluation
+suite and success criteria must be frozen before submission. No main-experiment
+configuration is launch-ready and no larger kernel has been submitted.
+
+The future runner's `runtime_profile=legacy-candidate` selects Python 3.11 and
+`requirements-legacy-lock.txt`, the complete installed compatibility-test stack.
+The shorter candidate requirements file documents intentional top-level pins.
+`diagnostics=true` enables requested-action hashes and fixed-state input checks.
+Neither option retroactively changes the completed pilot.

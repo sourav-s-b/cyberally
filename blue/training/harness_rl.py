@@ -10,6 +10,8 @@ import json
 import random
 import os
 import subprocess
+import platform
+from importlib.metadata import version as package_version
 from pathlib import Path
 
 import numpy as np
@@ -26,13 +28,16 @@ def check_seeds(seeds):
 
 
 class HarnessRecorder(mg.JointRecorder):
-    def __init__(self, actor, scorer, bonus, gen, temp, ml_inputs):
+    def __init__(self, actor, scorer, bonus, gen, temp, ml_inputs, diagnostics=False):
         super().__init__(actor, bonus, gen, temp=temp)
         self.adapter = HarnessActorHook(actor, scorer, bonus, ml_inputs)
         self.sampled_disagree = 0
+        self.diagnostics = diagnostics
+        self.sensitivity = []
 
     def reset(self):
         self.adapter.reset()
+        self.sensitivity = []
 
     def observe(self, env, agent):
         self.adapter.observe(env, agent)
@@ -45,6 +50,9 @@ class HarnessRecorder(mg.JointRecorder):
         with th.no_grad():
             residual = th.tanh(self.actor(F))
         base = th.tensor([s for s, _ in scored], dtype=th.float32)
+        if self.diagnostics:
+            from blue.harness.diagnostics import input_sensitivity
+            self.sensitivity.append(input_sensitivity(self.actor, F, base, self.bonus))
         logits = (base + self.bonus * residual) / self.temp
         mask = [1.0] * len(cands)
         idx, logp, ent = masked_choice(logits, mask, sample=True, seed_rng=self.gen)
@@ -95,14 +103,19 @@ def train(args):
                 "scorer_sha256": scorer.sha256, "scorer": scorer.path,
                 "config": vars(args), "gamma": mg.GAMMA,
                 "source_commit": source_identity(),
-                "source_status": [],
+                "source_status": subprocess.check_output(
+                    ["git", "status", "--porcelain"], text=True).splitlines(),
                 "env_kw": mg.ENV_KW, "status": "started",
+                "runtime": {"python": platform.python_version(), **{
+                    p: package_version(p) for p in (
+                    "numpy", "scipy", "torch", "scikit-learn", "gym", "gymnasium")}},
                 "objective": "native team reward; unfiltered fresh on-policy rollouts",
                 "checkpoint_semantics": "new actor geometry; legacy checkpoints incompatible"}
     # Pin actual dirty source bytes, not just HEAD.
     manifest["source_files"] = {str(p): sha256(p) for p in [
         *sorted(Path("blue/harness").glob("*.py")), Path(__file__),
-        Path(mg.__file__), Path("blue/policies/ordered.py"), Path("blue/core/wrapper.py")]}
+        Path(mg.__file__), Path("blue/training/residual.py"),
+        Path("blue/policies/ordered.py"), Path("blue/core/wrapper.py")]}
     hist = []
     start = 0
     if args.resume:
@@ -110,6 +123,10 @@ def train(args):
         keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr", "bonus", "temp", "max_age", "ml_inputs", "train_seeds")
         if any(old["config"][k] != manifest["config"][k] for k in keys) or old["source_files"] != manifest["source_files"] or old["scorer_sha256"] != scorer.sha256:
             raise ValueError("resume configuration/source/artifact drift")
+        if old["config"].get("diagnostics", False) != args.diagnostics:
+            raise ValueError("resume diagnostic configuration drift")
+        if old.get("runtime", manifest["runtime"]) != manifest["runtime"]:
+            raise ValueError("resume runtime drift")
         ck = th.load(out / "checkpoint.pt", map_location="cpu", weights_only=False)
         actor.load_state_dict(ck["actor"]); critic.load_state_dict(ck["critic"])
         opt.load_state_dict(ck["optimizer"])
@@ -118,15 +135,23 @@ def train(args):
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for iteration in range(start, args.iters):
         gen = th.Generator().manual_seed(args.seed * 100003 + iteration + 1)
-        rec = HarnessRecorder(actor, scorer, args.bonus, gen, args.temp, args.ml_inputs)
-        policy = HarnessPolicy(rec, max_age=args.max_age)
+        rec = HarnessRecorder(actor, scorer, args.bonus, gen, args.temp, args.ml_inputs,
+                              diagnostics=args.diagnostics)
+        policy = HarnessPolicy(rec, max_age=args.max_age, record_requests=args.diagnostics)
         returns, interventions = [], []
+        episode_diagnostics = []
         for e in range(args.eps_per_iter):
             seed = args.train_seeds[(iteration * args.eps_per_iter + e) % len(args.train_seeds)]
             result = mg.run_team_episode(policy, seed, args.steps, hook=rec, recorder=rec, **mg.ENV_KW)
             print(f"iteration={iteration+1} episode={e+1} seed={seed} return={result['return']}", flush=True)
             returns.append(result["return"])
             interventions.append(policy.guard_stats())
+            if args.diagnostics:
+                diagnostic = {"seed": seed, **policy.request_digest.result(),
+                              "sweep_sensitivity": rec.sensitivity}
+                episode_diagnostics.append(diagnostic)
+                print(f"request_hash={diagnostic['requested_actions_sha256']} "
+                      f"iteration={iteration+1} episode={e+1} arm={args.ml_inputs}", flush=True)
         if not rec.rows:
             raise RuntimeError("no trainable sweep decisions; no update performed")
         stats = mg.ppo_central_update(actor, critic, opt, rec.rows, bonus=args.bonus)
@@ -137,6 +162,12 @@ def train(args):
                "sampled_override_rate": rec.sampled_disagree / rec.total,
                "guard": interventions, **stats}
         hist.append(row)
+        if args.diagnostics:
+            # Per-decision sensitivity lives outside compact training history.
+            (out / f"diagnostics_{iteration+1:03d}.json").write_text(
+                json.dumps(episode_diagnostics, indent=2) + "\n")
+            row["episode_request_digests"] = [{k: v for k, v in d.items()
+                if k != "sweep_sensitivity"} for d in episode_diagnostics]
         th.save({"actor": actor.state_dict(), "critic": critic.state_dict(), "optimizer": opt.state_dict(),
                  "history": hist, "torch_rng": th.get_rng_state(), "numpy_rng": np.random.get_state(),
                  "python_rng": random.getstate()}, out / "checkpoint.tmp")
@@ -171,6 +202,7 @@ def load_hook(model_dir, scorer_path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--stop-after", type=int, default=0, help="checkpoint-boundary interruption for recovery checks")
+    ap.add_argument("--diagnostics", action="store_true", help="full request hashes and fixed-state ML input sensitivity")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--scorer", default="blue/results/gpt_harness/scorer.pkl")
     ap.add_argument("--out", required=True)

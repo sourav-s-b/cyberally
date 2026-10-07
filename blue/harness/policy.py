@@ -16,12 +16,15 @@ class HarnessPolicy(OrderedPolicy):
     ``last_request`` is a Blue-visible audit record, not a policy rationale.
     """
 
-    def __init__(self, hook=None, max_age=80):
+    def __init__(self, hook=None, max_age=80, record_requests=False):
         if not math.isfinite(max_age) or max_age <= 0:
             raise ValueError("max_age must be finite and positive")
         super().__init__(scorer=LancerValues(fruitless_decay=0.5), max_age=max_age)
         self.hook = hook
         self.last_request = None
+        self.record_requests = bool(record_requests)
+        from blue.harness.diagnostics import RequestDigest
+        self.request_digest = RequestDigest()
 
     def reset(self):
         super().reset()
@@ -29,6 +32,8 @@ class HarnessPolicy(OrderedPolicy):
         if callable(reset):
             reset()
         self.last_request = None
+        from blue.harness.diagnostics import RequestDigest
+        self.request_digest = RequestDigest()
 
     def select(self, env, agent):
         observe = getattr(self.hook, "observe", None)
@@ -53,6 +58,8 @@ class HarnessPolicy(OrderedPolicy):
                              "branch": branch, "busy": busy,
                              "pending": env._awaiting.get(agent),
                              "guard": decision.get("guard_record") if decision else None}
+        if self.record_requests:
+            self.request_digest.add(env._tick, agent, name, host)
         return action
 
 

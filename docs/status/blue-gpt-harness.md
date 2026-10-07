@@ -3,8 +3,9 @@
 Branch: `gpt-blue`. Isolated checkout:
 `/home/sourav/Projects/cyberally/worktrees/gpt-blue`.
 Base dependency: `243a6fd97dc29d59c7bfc677209d363412f6cc10`.
-Local implementation is uncommitted; no push, merge, teammate message, remote
-experiment or external deployment was performed.
+Harness published at 15b76448795b9568cc629e824fb7ddee4e5368ab; private Kaggle
+pilot completed. No merge, teammate message or external deployment performed.
+Latest measured audit: [blue-gpt-pilot-audit.md](blue-gpt-pilot-audit.md).
 
 The shared checkout remains on `blue/metric-repair-maxage`. OpenCode's
 `risk_actor.py`, `guard_check.py` and existing `trace_episode.py` were left
@@ -173,3 +174,13 @@ Gymnasium 0.28.1 and moved runtime dependencies into a single requirements.txt.
 Fresh /tmp/gpt-blue-clean-runtime (no inherited site packages) passed golden
 scorer + native simulator preflight and evaluation imports. Experiment/model/
 seed/budget/reward settings unchanged; relaunch uses a new source commit only.
+
+Audit update (2026-10-07): completed pilot manifests/weights/cells verified;
+all 12 frozen-model diagnostic replays reproduced evaluation returns. Optional
+request hashes and same-state ML sensitivity added. Eight-episode detector
+validation preserves training/calibration arrays exactly; HGB PR-AUC wins 8/8
+with episode macro 0.72794 vs 0.63107. Older NumPy/Torch candidate validated
+after separately rebuilding the scorer; stochastic training differs between
+stacks, so no runtime equivalence claim. Actual local pilot stack already
+matched Kaggle. See the audit for all tables, tests and limitations. Larger
+training remains unlaunched; next is a frozen, sharded configuration review.

@@ -64,7 +64,8 @@ def evaluate(config, output, scorer):
         pairs.append({'train_seed': seed, 'risk_minus_zero': means['risk']-means['zero'],
                       'both_minus_risk': means['both']-means['risk']})
     report = {'configuration_sha256': key, 'runs': rows, 'matched_pairs': pairs,
-              'interpretation': 'Technical pilot only; independent unit is training seed (n=2). Shared evaluation episodes are not independent model replicas. No success or significance claim.'}
+              'independent_training_seeds': len(cfg['training_rng_seeds']),
+              'interpretation': f"Descriptive evaluation; independent unit is training seed (n={len(cfg['training_rng_seeds'])}). Shared evaluation episodes are not independent model replicas. No success or significance claim."}
     (output / 'report.json').write_text(json.dumps(report, indent=2))
 
 

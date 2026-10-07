@@ -98,3 +98,17 @@ versus `zero` ML inputs, plus coverage-only and Lancer baselines. Freeze all
 settings, report all runs and analyze training-seed replication separately
 from shared environment seeds. Keep native mean return primary; report tail
 failures, detection delays and unresolved incidents as additional diagnostics.
+
+Optional diagnostics for new training runs: pass `--diagnostics` to
+`blue.training.harness_rl`. Each episode prints a full requested-action hash
+(tick, agent, action name and target, including busy Sleep ticks); iteration
+files store fixed-state logit/ranking sensitivity to zeroed ML columns. This
+does not recover old action sequences or measure action-value advantage.
+
+Audit downloaded pilot cells with `python -m blue.training.harness_audit
+--cells <cells.json> --out <audit.json>`. It requires all six models on identical
+episodes and reports both baseline contrasts without pooling training replicas.
+Inspect saved models without training with `python -m
+blue.training.harness_model_audit --model-dir <run> --scorer <scorer.pkl>
+--seeds 8226 8228 --out <diagnostic.json>`. Use the artifact's validated runtime.
+These reused episodes are mechanism diagnostics, not new performance evidence.
