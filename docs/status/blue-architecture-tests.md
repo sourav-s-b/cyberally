@@ -12,6 +12,30 @@ The comparison unit is the training RNG seed. Evaluation episodes are shared blo
 
 Known limits: the user's newer finite-Red parity result is absent from the fetched source refs, so this experiment does not claim to reproduce that incumbent. The new trainer uses full-batch PPO for every arm; its numbers are not directly comparable to older minibatch trainer results. Visible process edges may be sparse. If so, the graph comparison measures that input limitation as well as the graph architecture.
 
-Validation before the main screen: 65 focused tests passed under the locked runtime, covering action masks, host permutation, visible-only edges, GRU replay and the existing harness. A 60-step, one-iteration run exercised every architecture with the original runtime and scorer; its scores are pipeline checks, not performance estimates. No external deployment or final-seed evaluation is part of this work.
+Validation: 65 focused tests passed under the locked runtime, covering action masks, host permutation, visible-only edges, GRU replay and the existing harness. After the final configuration edit, 21 focused architecture/redesign tests passed. A 60-step, one-iteration run exercised every architecture with the original runtime and scorer; its scores are pipeline checks, not performance estimates. No external deployment or final-seed evaluation is part of this work.
 
-Next task after the screen: inspect learning divergence, visible graph edge exposure and tails before setting a longer architecture budget; use Kaggle for a longer sharded run if the local screen supports it. PR review should check that all features are Blue-visible, the graph control is parameter matched, old policy actions are exactly replayed before PPO updates, and no seed or reward protocol changes were introduced.
+## Completed local screen (2026-10-12)
+
+Training source commit `d0700553ebf87567b9e08a57e524a2706b88a10f`; exact frozen manifest and all 14 checkpoints are under ignored `blue/results/architecture_tests/full400_8x1/`. The runner completed successfully: seven actor arms × two training RNG seeds, eight 400-step training episodes/model, four shared development evaluation episodes/model. Higher return is better. The two columns below are **separate trained models**, not eight independent training replications.
+
+| Actor | Training RNG 0 | Training RNG 1 | Worst evaluation episode |
+| --- | ---: | ---: | ---: |
+| MLP 64 | −192.50 | −192.50 | −241 |
+| MLP 128 | −192.50 | −192.50 | −241 |
+| MLP 256 | −192.00 | −256.50 | −302 |
+| Attention 128 | −224.75 | −202.00 | −370 |
+| GRU 128 | −192.50 | −192.50 | −241 |
+| Graph with visible connections 128 | −192.00 | −192.00 | −239 |
+| Graph with self edges only 128 | −192.00 | −207.25 | −300 |
+
+Shared evaluation controls on the same four episodes: Lancer −133.50, coverage guard −139.00, common untrained sampled policy −192.50, Sleep −5134.75, masked random −659.00. Every trained arm remains below Lancer and the guard. The graph arm is the best of these trained runs at −192.00, only 0.50 above its untrained starting return. This does not establish a useful gain from graph structure.
+
+The four answers at this budget are limited but concrete. Increasing MLP width to 128 changes no mean return; 256 improves one training seed by 0.50 and harms the other by 64.00. Attention harms both relative to MLP 128 by 32.25 and 9.50. GRU ties MLP 128 exactly on both seeds. Visible graph connections tie the parameter-matched self-edge graph on seed 0 and improve seed 1 by 15.25, entirely because one episode (8241) scores −239 instead of −300. The graph did receive non-self Blue-visible edges during training and evaluation. Its result is an episode-specific mechanism hint, not evidence of a general topology benefit.
+
+Full action request hashes show that the networks sometimes chose different investigations even when returns matched. The 256-unit MLP and attention each differ from the 128-unit MLP on all four evaluation episodes for both training seeds; GRU differs on one episode for seed 0 and none for seed 1. No model-selection decision follows from these four reused development episodes. The analysis postprocessor suppresses confidence intervals for fewer than three training seeds; its paired seed differences are descriptive. In particular, equal means across two seeds do **not** imply zero uncertainty over environments.
+
+Targeted replay on development seed 8241 confirms the policy-influence mechanism. The MLP 128 chose a non-heuristic target in 108/594 sweep decisions; attention 128 in 80/543; visible graph 128 in 97/601. Yet the mean maximum per-decision change in action probability from the learned residual, evaluated on **the same visited states** against zero residual logits, was only 0.00044, 0.00072 and 0.00089 respectively. The mean maximum score shifts were 0.0138, 0.0206 and 0.0215. These are diagnostic replays, not additional independent evaluation episodes. They show that most non-heuristic choices at this setting come from the fixed sampling component rather than a strong learned reordering.
+
+The trained policies inherit a fixed 20% sampled exploration component and a bounded residual bonus of 0.25. At this budget their architecture differences are small relative to the untrained policy's deficit against the controls. A next diagnostic should isolate policy execution and credit assignment using the frozen checkpoints, then test a revised execution/training recipe under a new manifest before paying for wider networks or a longer Kaggle run. This screen does not reproduce the user's later finite-Red incumbent checkpoint, which was not available in the fetched source refs.
+
+Next task: diagnose the sampled policy's deficit against the guard and Lancer from the saved checkpoints, including actual learner overrides and whether the bounded residual can overcome base score gaps. If that has a testable fix, predeclare a separate longer run; use Kaggle shards for any substantial training expansion. PR review should check that all features are Blue-visible, the graph control is parameter matched, old policy actions are exactly replayed before PPO updates, and no seed or reward protocol changes were introduced. The training plan hashes the original committed runner; a later report-only change suppresses misleading two-seed t-intervals and records its own source hash separately.

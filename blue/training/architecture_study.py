@@ -278,9 +278,9 @@ def analyze(results,config,out):
     estimates={}
     def summarize(values):
         values=np.asarray(values,dtype=float);n=len(values)
-        se=values.std(ddof=1)/n**.5 if n>1 else None
+        se=values.std(ddof=1)/n**.5 if n>=3 else None
         return {'training_seed_differences':values.tolist(),'mean':float(values.mean()),'n_training_seeds':n,
-                't95':None if n<2 else [float(values.mean()-t.ppf(.975,n-1)*se),float(values.mean()+t.ppf(.975,n-1)*se)]}
+                't95':None if n<3 else [float(values.mean()-t.ppf(.975,n-1)*se),float(values.mean()+t.ppf(.975,n-1)*se)]}
     for arm in ARMS:
         for control in ('lancer','guard','untrained','mlp64'):
             ds=[]
@@ -297,7 +297,12 @@ def analyze(results,config,out):
     ds=[np.mean([c['return']-results['models'][f'graph_self128/s{rng}']['cells'][key]['return']
         for key,c in results['models'][f'graph128/s{rng}']['cells'].items()]) for rng in config['training_rng']]
     estimates['graph128-minus-graph_self128']=summarize(ds)
-    (out/'analysis.json').write_text(json.dumps({'claim':results['claim'],'contrasts':estimates},indent=2)+'\n')
+    (out/'analysis.json').write_text(json.dumps({
+        'claim':results['claim'],
+        'analysis_source_sha256':sha256(__file__),
+        'frozen_training_plan_sha256':sha256(out/'plan.json'),
+        'interval_policy':'No inferential interval for fewer than three training seeds. Evaluation episodes are shared, not independent training replications.',
+        'contrasts':estimates},indent=2)+'\n')
     print('STUDY COMPLETE',flush=True)
 
 
