@@ -170,14 +170,14 @@ def main() -> None:
             kernel_id = f"souravsreekumar02/blue-architecture-longrun-s{seed}-{group}"
             kernel = {
                 "id": kernel_id,
-                "title": f"Blue architecture long run seed {seed}, group {group}",
+                "title": f"Blue Architecture Longrun S{seed} {group.upper()}",
                 "code_file": "run.py",
                 "language": "python",
                 "kernel_type": "script",
                 "is_private": True,
                 "enable_gpu": False,
                 "enable_internet": True,
-                "dataset_sources": [{"ref": DATASET_ID}],
+                "dataset_sources": [DATASET_ID],
                 "kernel_sources": [],
                 "competition_sources": [],
                 "model_sources": [],
