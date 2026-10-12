@@ -1,8 +1,10 @@
 """Frozen full-horizon architecture screen; native reward, fresh MAPPO data.
 
-All arms share scorer, critic, protected rules, execution, optimizer recipe,
-episode seeds and budget. GRU uses complete causal sequences in every PPO epoch.
-Graph/self-graph are parameter-matched controls. All artifacts are ignored.
+All arms share scorer, critic, protected rules, optimizer recipe, episode
+seeds and budget. Training samples from the on-policy mixture; evaluation
+records greedy ranking and sampled execution separately. GRU uses complete
+causal sequences in every PPO epoch. Graph/self-graph are parameter-matched
+controls. All model artifacts are ignored.
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
 from blue.core.baselines import MaskedRandomBaseline, SleepBaseline
 from blue.harness.architectures import StudyActor, marginal, observed_edges
 from blue.harness.learning import decision_credit, tensors
+from blue.harness.numerics import stable_pick
 from blue.harness.policy import HarnessPolicy
 from blue.harness.redesign import CentralValue, RedesignHook, central_context, FEATURE_NAMES
 from blue.harness.scoring import MLScorer, sha256
@@ -29,19 +32,23 @@ from blue.training.harness_rl import check_seeds
 from blue.training.mappo_guide import ENV_KW
 
 ARMS = {'mlp64': ('mlp',64), 'mlp128': ('mlp',128), 'mlp256': ('mlp',256),
-        'attention128': ('attention',128), 'gru128': ('gru',128),
+        'mlp512': ('mlp',512), 'attention128': ('attention',128),
+        'attention256': ('attention',256), 'gru128': ('gru',128),
         'graph128': ('graph',128), 'graph_self128': ('graph',128)}
 SOURCES = ['blue/harness/architectures.py','blue/training/architecture_study.py',
            'blue/harness/redesign.py','blue/harness/learning.py','blue/harness/policy.py',
            'blue/harness/features.py','blue/harness/scoring.py','blue/core/wrapper.py',
-           'blue/core/masking.py','blue/core/obs_features.py','blue/policies/ordered.py']
+           'blue/core/masking.py','blue/core/obs_features.py','blue/policies/ordered.py',
+           'blue/training/architecture_preflight.py','blue/training/architecture_aggregate.py',
+           'ops/kaggle/architecture/runner_template.py']
 
 
 class StudyHook(RedesignHook):
-    def __init__(self, actor, critic, scorer, config, policy_seed, self_graph=False):
+    def __init__(self, actor, critic, scorer, config, policy_seed, self_graph=False,
+                 execution='sample'):
         self.critic, self.config, self.self_graph = critic, config, self_graph
         super().__init__(actor, scorer, config['bonus'], 'risk', config['temperature'],
-                         config['explore'], policy_seed, 'sample')
+                         config['explore'], policy_seed, execution)
 
     def reset(self):
         super().reset()
@@ -81,7 +88,13 @@ class StudyHook(RedesignHook):
                 self.graph_edges += int(A.sum())-len(cands)
             logits = self.actor(F,B,M,adjacency=A,memory=self.hidden_states.get(agent))
             p = marginal(logits,B,M,teacher,self.bonus,self.temperature,self.explore)
-            idx = int(torch.multinomial(p,1,generator=self.generator))
+            if self.execution == 'sample':
+                idx = int(torch.multinomial(p,1,generator=self.generator))
+            else:
+                residual = torch.tanh(logits)
+                selected = stable_pick([(s + self.bonus * float(residual[i]), h)
+                                        for i, (s, h) in enumerate(scored)])
+                idx = cands.index(selected)
             J = central_context(env,self.scorer,agent,self.cache)
             value = float(self.critic(torch.from_numpy(J)))
         self.per_agent[agent] = self.per_agent.get(agent,0)+1
@@ -180,28 +193,39 @@ def freeze(config, scorer_path):
         'runtime':runtime(),'scorer_sha256':sha256(scorer_path),'features':list(FEATURE_NAMES),
         'tests':{'capacity':['mlp64','mlp128','mlp256'],'host_comparison':['mlp128','attention128'],
                  'memory':['mlp128','gru128'],'topology':['graph_self128','graph128']},
-        'claim':f"Local architecture feasibility screen; reused development episodes, {len(config['training_rng'])} training seed(s); not final performance evidence",
+        'claim':f"Longer development architecture comparison; {len(config['training_rng_cohort'])} independent training RNG seeds; reused evaluation cohort, not held-out performance evidence",
         'uncertainty':'Average policy replicas within episode, then episodes within training seed; paired training-seed t intervals',
         'graph':'Visible local process connections only, symmetric; no hidden simulator topology',
-        'limitations':['Original scorer held fixed in locked legacy runtime','Finite Red result mentioned by user is not in cached refs',
+        'limitations':['Original scorer held fixed in locked legacy runtime','Training environment seeds are a previously used development pool',
+                       'Evaluation seeds are reused development episodes and support no final/held-out claim',
+                       'Training episode seeds 7730-7800 were clear in the structured seed audit; reserve them for this study',
                        'Full-batch PPO common to all arms; not directly comparable to previous minibatch runs',
-                       'Fixed conservative residual/exploration can constrain all architectures; no automatic widening of that bound'],
+                       'Sampled and greedy execution answer different deployment questions and are reported separately'],
         'success':'Report all models and tails; superiority needs independent replication and positive interval against both strong controls'}
 
 
 def run(args):
     torch.set_num_threads(1)
     config={'steps':args.steps,'iterations':args.iters,'eps_per_iter':args.eps_per_iter,
-        'training_rng':args.training_rng,'train_seeds':[7706,7707,7708,7709],
-        'eval_seeds':args.eval_seeds,'policy_replicas':args.policy_replicas,'arms':list(ARMS),
+        'training_rng':args.training_rng,'training_rng_cohort':args.cohort_seeds,
+        'train_seeds':args.train_seeds,
+        'eval_seeds':args.eval_seeds,'policy_replicas':args.policy_replicas,
+        'arms':args.arms,
+        'evaluation_execution_modes':['greedy-diagnostic','sample'],
         'epochs':4,'target_kl':.02,'ppo_clip':.2,'max_grad_norm':1.,'entropy_coef':0.,
         'gamma':.99,'bonus':.25,'temperature':.5,'explore':.2,'max_age':80.,
         'actor_lr':3e-4,'critic_lr':3e-4,'critic_hidden':64,'value_scale':20.,
         'env_kw':{**ENV_KW,'red_agent':args.red_agent}}
+    if args.cohort_sha256:
+        config['cohort_sha256']=args.cohort_sha256
     check_seeds(config['train_seeds']);check_seeds(config['eval_seeds'])
     if set(config['train_seeds'])&set(config['eval_seeds']):raise ValueError('train/evaluation overlap')
     if len(set(args.training_rng))!=len(args.training_rng):raise ValueError('duplicate training RNG seed')
+    if not args.arms or len(set(args.arms)) != len(args.arms) or not set(args.arms).issubset(ARMS):raise ValueError('invalid architecture shard')
+    if not set(args.training_rng).issubset(args.cohort_seeds):raise ValueError('shard RNG outside frozen cohort')
     if len(set(args.eval_seeds))!=len(args.eval_seeds):raise ValueError('duplicate evaluation episode seed')
+    if len(set(args.train_seeds))!=len(args.train_seeds):raise ValueError('duplicate training episode seed')
+    if len(set(args.cohort_seeds))!=len(args.cohort_seeds):raise ValueError('duplicate cohort RNG seed')
     if min(args.steps,args.iters,args.eps_per_iter,args.policy_replicas)<1:raise ValueError('empty budget')
     out=Path(args.out);out.mkdir(parents=True,exist_ok=True)
     plan=freeze(config,args.scorer)
@@ -219,14 +243,19 @@ def run(args):
                 results['baselines'][key]=episode(control,seed,config);save()
     # Zero output heads give exactly the same untrained marginal in every arm.
     # Cache by configuration and scorer hash in the frozen plan, not across studies.
+    results.setdefault('untrained', {})
     for seed in args.eval_seeds:
-        for rep in range(args.policy_replicas):
-            key=f'{seed}/{rep}'
-            if key not in results['untrained']:
-                hook=StudyHook(StudyActor('mlp',64),CentralValue(config['critic_hidden'],config['value_scale']),MLScorer(args.scorer),config,seed*997+rep)
-                results['untrained'][key]=episode(HarnessPolicy(hook,80,record_requests=True),seed,config,hook)
-                save()
-    for arm,(kind,hidden) in ARMS.items():
+        modes = {'sample': range(args.policy_replicas), 'greedy-diagnostic': range(1)}
+        for execution, replicas in modes.items():
+            results['untrained'].setdefault(execution, {})
+            for rep in replicas:
+                key=f'{seed}/{rep}'
+                if key not in results['untrained'][execution]:
+                    hook=StudyHook(StudyActor('mlp',64),CentralValue(config['critic_hidden'],config['value_scale']),MLScorer(args.scorer),config,seed*997+rep,execution=execution)
+                    results['untrained'][execution][key]=episode(HarnessPolicy(hook,80,record_requests=True),seed,config,hook)
+                    save()
+    for arm in config['arms']:
+        kind,hidden=ARMS[arm]
         for rng in args.training_rng:
             key=f'{arm}/s{rng}';d=out/arm/f's{rng}';d.mkdir(parents=True,exist_ok=True)
             if key in results['models']:continue
@@ -262,11 +291,13 @@ def run(args):
                     'history':hist},d/'checkpoint.tmp')
                 os.replace(d/'checkpoint.tmp',d/'checkpoint.pt')
                 print(json.dumps({'model':key,'iteration':iteration+1,'mean_training_return':np.mean([r['return'] for r in episodes]),**stats}),flush=True)
-            cells={}
-            for seed in args.eval_seeds:
-                for rep in range(args.policy_replicas):
-                    hook=StudyHook(actor,critic,scorer,config,seed*997+rep,arm=='graph_self128')
-                    cells[f'{seed}/{rep}']=episode(HarnessPolicy(hook,80,record_requests=True),seed,config,hook)
+            cells={'sample':{},'greedy-diagnostic':{}}
+            modes = {'sample': range(args.policy_replicas), 'greedy-diagnostic': range(1)}
+            for execution, replicas in modes.items():
+                for seed in args.eval_seeds:
+                    for rep in replicas:
+                        hook=StudyHook(actor,critic,scorer,config,seed*997+rep,arm=='graph_self128',execution)
+                        cells[execution][f'{seed}/{rep}']=episode(HarnessPolicy(hook,80,record_requests=True),seed,config,hook)
             results['models'][key]={'parameters':sum(p.numel() for p in actor.parameters()),
                 'checkpoint_sha256':sha256(d/'checkpoint.pt'),'training':hist,'cells':cells,'untrained':untrained}
             save();print('MODEL COMPLETE '+key,flush=True)
@@ -281,26 +312,37 @@ def analyze(results,config,out):
         se=values.std(ddof=1)/n**.5 if n>=3 else None
         return {'training_seed_differences':values.tolist(),'mean':float(values.mean()),'n_training_seeds':n,
                 't95':None if n<3 else [float(values.mean()-t.ppf(.975,n-1)*se),float(values.mean()+t.ppf(.975,n-1)*se)]}
-    for arm in ARMS:
-        for control in ('lancer','guard','untrained','mlp64'):
-            ds=[]
-            for rng in config['training_rng']:
-                model=results['models'][f'{arm}/s{rng}'];differences=[]
-                for key,cell in model['cells'].items():
-                    seed=key.split('/')[0]
-                    if control=='untrained':baseline=model['untrained'][key]['return']
-                    elif control=='mlp64':baseline=results['models'][f'mlp64/s{rng}']['cells'][key]['return']
-                    else:baseline=results['baselines'][f'{control}/{seed}']['return']
-                    differences.append(cell['return']-baseline)
-                ds.append(np.mean(differences))
-            estimates[f'{arm}-minus-{control}']=summarize(ds)
-    ds=[np.mean([c['return']-results['models'][f'graph_self128/s{rng}']['cells'][key]['return']
-        for key,c in results['models'][f'graph128/s{rng}']['cells'].items()]) for rng in config['training_rng']]
-    estimates['graph128-minus-graph_self128']=summarize(ds)
+    def per_seed(cells):
+        grouped={}
+        for key,cell in cells.items():
+            seed=key.split('/')[0]
+            grouped.setdefault(seed,[]).append(cell['return'])
+        return {seed:float(np.mean(values)) for seed,values in grouped.items()}
+    for execution in ('greedy-diagnostic','sample'):
+        controls=('lancer','guard','untrained') + (('mlp64',) if 'mlp64' in config['arms'] else ())
+        for arm in config['arms']:
+            for control in controls:
+                ds=[]
+                for rng in config['training_rng']:
+                    model=results['models'][f'{arm}/s{rng}']
+                    arm_means=per_seed(model['cells'][execution])
+                    differences=[]
+                    for seed,mean in arm_means.items():
+                        if control=='untrained':baseline=model['untrained'][execution][f'{seed}/0']['return']
+                        elif control=='mlp64':baseline=per_seed(results['models'][f'mlp64/s{rng}']['cells'][execution])[seed]
+                        else:baseline=results['baselines'][f'{control}/{seed}']['return']
+                        differences.append(mean-baseline)
+                    ds.append(np.mean(differences))
+                estimates[f'{execution}:{arm}-minus-{control}']=summarize(ds)
+        if {'graph128','graph_self128'}.issubset(config['arms']):
+            ds=[np.mean([c['return']-results['models'][f'graph_self128/s{rng}']['cells'][execution][key]['return']
+                for key,c in results['models'][f'graph128/s{rng}']['cells'][execution].items()]) for rng in config['training_rng']]
+            estimates[f'{execution}:graph128-minus-graph_self128']=summarize(ds)
     (out/'analysis.json').write_text(json.dumps({
         'claim':results['claim'],
         'analysis_source_sha256':sha256(__file__),
         'frozen_training_plan_sha256':sha256(out/'plan.json'),
+        'execution_modes':config['evaluation_execution_modes'],
         'interval_policy':'No inferential interval for fewer than three training seeds. Evaluation episodes are shared, not independent training replications.',
         'contrasts':estimates},indent=2)+'\n')
     print('STUDY COMPLETE',flush=True)
@@ -311,7 +353,11 @@ if __name__=='__main__':
     p.add_argument('--scorer',required=True);p.add_argument('--out',required=True)
     p.add_argument('--iters',type=int,default=2);p.add_argument('--eps-per-iter',type=int,default=2)
     p.add_argument('--steps',type=int,default=400);p.add_argument('--training-rng',type=int,nargs='+',default=[0,1])
-    p.add_argument('--eval-seeds',type=int,nargs='+',default=[8233,8236,8241,8229])
+    p.add_argument('--cohort-seeds',type=int,nargs='+',default=[0,1,2,3,4])
+    p.add_argument('--cohort-sha256',default='')
+    p.add_argument('--arms',choices=tuple(ARMS),nargs='+',default=list(ARMS))
+    p.add_argument('--train-seeds',type=int,nargs='+',default=list(range(7730,7801)))
+    p.add_argument('--eval-seeds',type=int,nargs='+',default=list(range(8221,8253)))
     p.add_argument('--policy-replicas',type=int,default=2)
     p.add_argument('--red-agent',choices=('discovery','finite'),default='finite')
     run(p.parse_args())

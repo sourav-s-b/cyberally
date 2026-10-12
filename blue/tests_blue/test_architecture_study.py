@@ -90,3 +90,13 @@ def test_invalid_inputs_fail_closed():
     actor=StudyActor()
     with pytest.raises(ValueError,match='empty'):
         actor(torch.zeros(2,WIDTH),torch.zeros(2),torch.zeros(2))
+
+
+@pytest.mark.parametrize(('kind','width'), [('mlp',512), ('attention',256)])
+def test_larger_capacity_candidates_forward_finite_masked_scores(kind,width):
+    actor=StudyActor(kind,width)
+    features=torch.randn(2,19,WIDTH);base=torch.randn(2,19)
+    mask=torch.ones(2,19);mask[0,-2:]=0
+    scores=actor(features,base,mask)
+    assert scores.shape==(2,19)
+    assert torch.isfinite(scores).all()
