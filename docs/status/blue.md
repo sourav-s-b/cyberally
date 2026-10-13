@@ -1,5 +1,26 @@
 # Blue program summary (general index)
 
+## Input decision audit, 2026-10-13
+
+Branch `blue/input-decision-audit` from `6b608e5` (architecture-longrun work).
+The eight reused finite-Red development episodes 8221–8228 were traced with
+the exact frozen architecture configuration and scorer. Guard-only returns
+reproduced the architecture study; raw risk ranking and a fixed freshness-
+adjusted risk ranking both underperformed guard-only on the eight-episode
+mean. The latter reduced one large loss but created others. No long training
+or final-seed evaluation was run. See
+[`blue-input-decision-audit-20261013.md`](../research/blue-input-decision-audit-20261013.md)
+for cells, mechanism evidence, artifact hashes, limitations, and the next
+decision-to-completion data-collection task. This branch adds the audit and
+opt-in diagnostic input, but does not change the frozen training policy.
+Focused tests passed; full training tests were not needed for this audit.
+
+PR review: verify only Blue-visible fields reach candidate scoring, confirm
+the privileged labels are attached after action selection, verify frozen
+hash and seed guards, and retain the two failed ranking rules as diagnostic
+rather than claiming a deployment improvement. No dependent branch migration
+or shared contract change is required.
+
 ## Next session: read `blue-handoff-20261004.md` first
 
 [`blue-handoff-20261004.md`](blue-handoff-20261004.md) is the authoritative
