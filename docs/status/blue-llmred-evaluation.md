@@ -129,3 +129,87 @@ required before it offloaded to GPU instead of exhausting system RAM
 
 Results artifact: `blue/results/llmred/eval_7629_7631.json` (gitignored;
 source hashes recorded inside it).
+## Fresh 24-seed block (2026-10-13, branch `blue/llmred-fresh24`)
+
+The 3-seed development block above could not resolve the guard-vs-Lancer
+contrast. This section repeats that contrast on 24 seeds that were not used
+for it: **7641-7664**, outside the reserved block 7809-8200, which the
+evaluation script refuses in code. Same single checkpoint
+(`blue/results/ablation_risk/real_s0`, one training seed), same guard
+setting, same pinned attacker digest, 400-step horizon.
+
+Native Blue return, paired on identical simulator seeds:
+
+| arm | mean | sd | sem |
+|---|---:|---:|---:|
+| Lancer | -637.3 | 170.4 | 34.8 |
+| RL actor + coverage guard | -516.7 | 176.1 | 36.0 |
+
+| contrast | mean | sd of diffs | 95% CI (df=23) | t | seeds won |
+|---|---:|---:|---|---:|---:|
+| actor_guard - Lancer | **+120.6** | 282.3 | [+1.4, +239.8] | 2.09 | 16/24 |
+
+Behavioural counters, mean over the 24 seeds:
+
+| arm | remediation actions | confirmed hosts | top-1 pick share |
+|---|---:|---:|---:|
+| Lancer | 70.0 | 21.8 | 4.53% |
+| actor_guard | 70.6 | 21.9 | 3.95% |
+
+The two arms are behaviourally near-identical on this block: remediation
+volume, confirmed-host count and pick concentration all match within noise.
+Whatever return difference exists is therefore **not** explained by the
+actor remediating more, as it was in the 3-seed block (39 -> 67). On 24
+seeds the guard's concentration fix and the actor's contribution are no
+longer separable by these counters.
+
+### Reading
+
+The sign is the same as the 3-seed block and the interval now excludes
+zero, but only just: the lower bound is +1.4 against a per-seed spread of
+282. Three of the 24 seeds carry the effect on their own (+744, +579,
++547) and two are severe losses (-502, -370). **This is a better-supported
+result than the 3-seed version, not a settled one.** It remains one
+checkpoint from one training seed, so it cannot separate "the guarded RL
+actor is better" from "this particular initialisation is better".
+
+Unlike the development regime, no parameter was selected after seeing these
+seeds: the checkpoint, guard setting, horizon and planner parameters were all
+fixed beforehand.
+
+### Integrity caveat: the two halves of this table come from different code
+
+The run crashed at 43 of 48 episodes writing no results file. Resume support
+was added (`de37afe`) and the last 5 episodes were completed with it. The 43
+earlier episodes were produced by an **uncommitted working-tree variant** of
+`llmred_eval.py` that is not in any commit and did not survive the removal of
+the `cyberally-opencode` worktree. Evidence: those rows carry a
+`recovered_from` field that appears in no committed version of the file.
+
+- Rows 0-42 carry `recovered_from`; rows 43-47 carry `distinct_analysed`.
+- The primary metric (`return`) is produced by the same code path in the
+  surviving version, but the exact producing code for rows 0-42 cannot be
+  verified.
+- Therefore rows 0-42 are **indicative only**. The defensible subset is the
+  5 fresh episodes plus the separately-hashed 3-seed development block.
+- A full clean re-run of all 48 episodes is the only way to remove this
+  caveat. It costs roughly 50 minutes of LLM inference.
+
+### Frozen artifact hashes (all gitignored, recorded here instead)
+
+| Artifact | SHA-256 |
+|---|---|
+| `blue/results/llmred/eval_fresh24.json` | `e4a70983d68fbb5a367d49439a8f58d59db99868d65618634a545c306d22a6a9` |
+| `blue/results/llmred/eval_fresh24.partial.jsonl` | `a85447539511453279fe03d8bb0a7934a351983f01529f73212b5a8338aed9a0` |
+
+Source hashes at run time are recorded inside the JSON. Note that they
+describe the *resumed* code, not the code that produced rows 0-42.
+
+### What this does and does not settle
+
+It does **not** license the claim that RL beats the heuristic. The
+concentration failure the guard fixes is real and load-bearing (previous
+section), but a single +120 against a 282 sd on 24 seeds of one model is
+suggestive. Settling it needs the retrain with the guard active during
+training, which is the next task; every checkpoint produced so far was
+trained while the sweep was unguarded.
