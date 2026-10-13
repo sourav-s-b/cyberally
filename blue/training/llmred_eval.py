@@ -152,8 +152,31 @@ def main():
     print("%-13s %6s %9s %6s %6s %8s" % ("arm", "seed", "return", "rem",
                                          "conf", "top1%"))
     results = collections.defaultdict(dict)
+    # Append each episode as it completes. A previous version wrote the JSON
+    # only at the very end, so a crash at 43/48 episodes lost 49 minutes of
+    # compute and the data was recoverable only by parsing the text log.
+    partial = os.path.splitext(args.out)[0] + ".partial.jsonl" if args.out \
+        else None
+    if partial and os.path.exists(partial):
+        with open(partial) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                rec = json.loads(line)
+                if rec["arm"] in args.arms and rec["seed"] in args.seeds:
+                    results[rec["arm"]][str(rec["seed"])] = rec["result"]
+    print("%-13s %6s %9s %6s %6s %8s" % ("arm", "seed", "return", "rem",
+                                         "conf", "top1%"))
     for arm in args.arms:
         for seed in args.seeds:
+            if str(seed) in results[arm]:
+                print("%-13s %6d %9.0f %6d %6d %8s  (cached)"
+                      % (arm, seed, results[arm][str(seed)]["return"],
+                         results[arm][str(seed)]["remediation"],
+                         results[arm][str(seed)]["confirmed_hosts"],
+                         results[arm][str(seed)]["top_pick_share"]), flush=True)
+                continue
             # A fresh env per episode so the global request budget resets the
             # way Red's own runs do (per-episode planning quota).
             e, _ = build_env(args.steps, args.endpoint, args.max_requests,
@@ -164,6 +187,12 @@ def main():
                         steps=args.steps)
             r["wall_seconds"] = round(time.time() - t0, 1)
             results[arm][str(seed)] = r
+            if partial:
+                with open(partial, "a") as f:
+                    f.write(json.dumps({"arm": arm, "seed": seed,
+                                        "result": r}) + "\n")
+                    f.flush()
+                    os.fsync(f.fileno())
             print("%-13s %6d %9.0f %6d %6d %8s"
                   % (arm, seed, r["return"], r["remediation"],
                      r["confirmed_hosts"], r["top_pick_share"]), flush=True)
