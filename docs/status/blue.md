@@ -21,6 +21,32 @@ hash and seed guards, and retain the two failed ranking rules as diagnostic
 rather than claiming a deployment improvement. No dependent branch migration
 or shared contract change is required.
 
+## Inspection-yield follow-up, 2026-10-13
+
+Same branch, dependent on the decision audit above. A request-to-completion
+collector now saves pre-request Blue-visible data and observed `Analyse`
+results in separate episode JSONL files; privileged Red-session truth lives
+in a distinct diagnostic file. Twenty-four frozen finite-Red episodes were
+collected locally, with 12/4/8 whole-episode train/validation/reused-dev
+partitions. A fixed gradient-boosted predictor of new confirmations on
+ordinary selectable sweep decisions reached 0.866 episode-macro PR-AUC on
+the eight reused development episodes, versus 0.735 for the existing
+compromise-risk score on that different target. Three public-objective and
+evidence-age consequence proxies added only +0.001 PR-AUC (4/8 episodes
+better), so they are not promoted to the actor. This is selected-action
+prediction, not a return improvement or counterfactual host ranking.
+
+Full methods, per-partition counts, artifact hashes and limitations:
+[`blue-inspection-yield-20261013.md`](../research/blue-inspection-yield-20261013.md).
+The next Blue task is a broader, pre-registered training-data policy to
+observe more legal investigation choices, followed by a paired *policy*
+comparison. No long Kaggle run, final-seed evaluation, shared contract
+change or dependent branch migration occurred. Focused tests and live
+episode/file-integrity checks passed. PR review should focus on the action
+request/completion join, label isolation, sweep-only fit filter, whole-
+episode partition guard, and noncausal interpretation of the consequence
+proxies.
+
 ## Next session: read `blue-handoff-20261004.md` first
 
 [`blue-handoff-20261004.md`](blue-handoff-20261004.md) is the authoritative
