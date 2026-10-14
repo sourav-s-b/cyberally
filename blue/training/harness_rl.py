@@ -163,7 +163,14 @@ def train(args):
     start = 0
     if args.resume:
         old = json.loads((out / "manifest.json").read_text())
-        keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr", "bonus", "temp", "max_age", "ml_inputs", "train_seeds")
+        # The objective is (native reward) + (shaping term) on (attacker).
+        # Resuming with a different attacker or shaping setting would continue
+        # training toward a different objective under the old weights, so all
+        # of these must match or the run is refused outright.
+        keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr",
+                "bonus", "temp", "max_age", "ml_inputs", "train_seeds",
+                "red_agent", "state_shaping", "state_shaping_weight",
+                "state_shaping_cap")
         if any(old["config"][k] != manifest["config"][k] for k in keys) or old["source_files"] != manifest["source_files"] or old["scorer_sha256"] != scorer.sha256:
             raise ValueError("resume configuration/source/artifact drift")
         if old["config"].get("diagnostics", False) != args.diagnostics:
@@ -206,8 +213,22 @@ def train(args):
         stats = mg.ppo_central_update(actor, critic, opt, rec.rows, bonus=args.bonus)
         if not all(np.isfinite(v) for v in stats.values()):
             raise RuntimeError("nonfinite PPO update")
+        # The pilot calibrates the ratio under the default heuristic policy.
+        # The learned actor can visit different states, so the ratio is
+        # re-measured here on every real training episode and recorded as a
+        # diagnostic: if |added|/|native| drifts far from the pilot value, the
+        # shaped term is no longer a modifier of the objective.
+        shape_ratio = [
+            (abs(sr - r) / abs(r))
+            for r, sr in zip(returns, shaped_returns) if r
+        ] if args.state_shaping != "off" else []
         row = {"iteration": iteration + 1, "returns": returns,
                "shaped_returns": shaped_returns,
+               "mean_shaping_ratio": (float(np.mean(shape_ratio))
+                                      if shape_ratio else None),
+               "mean_shaping_added": (float(np.mean(
+                   [sr - r for r, sr in zip(returns, shaped_returns)]))
+                   if args.state_shaping != "off" else None),
                "decisions": rec.total, "greedy_agreement": rec.agree / rec.total,
                "sampled_override_rate": rec.sampled_disagree / rec.total,
                "guard": interventions, **stats}

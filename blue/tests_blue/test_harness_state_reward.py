@@ -349,6 +349,49 @@ def test_lancer_baseline_is_precomputed_and_never_written_by_a_model_job():
     assert "no precomputed Lancer baseline" in script
 
 
+def test_resume_refuses_an_objective_change():
+    """The objective is (native reward + shaping) on (attacker). Resuming a
+    shaped run with `--state-shaping off`, or with a different attacker,
+    would keep training under the old weights toward a different objective."""
+    src = _tree("blue", "training", "harness_rl.py")
+    tree = ast.parse(src)
+    fn = next(n for n in ast.walk(tree)
+              if isinstance(n, ast.FunctionDef) and n.name == "train")
+    body = ast.unparse(fn)
+    for key in ("red_agent", "state_shaping", "state_shaping_weight",
+                "state_shaping_cap"):
+        # ast.unparse normalises quotes, so match the bare key in the tuple
+        assert key in body, key
+    # the keys tuple must be part of the drift check
+    assert "resume configuration/source/artifact drift" in body
+
+
+def test_training_records_the_shaping_ratio_per_iteration():
+    """The pilot calibrates the ratio under the heuristic policy; the learned
+    actor visits different states, so the ratio is re-measured while training."""
+    src = _tree("blue", "training", "harness_rl.py")
+    assert "mean_shaping_ratio" in src
+    assert "mean_shaping_added" in src
+
+
+def test_launcher_runs_python_in_the_foreground_of_the_pooled_job():
+    """A `nohup ... &` *inside* the pooled job makes the tracked job exit at
+    once, so throttle() counts nothing and every model starts concurrently."""
+    script = (ROOT / "scripts" / "blue_state_shaping_run.sh").read_text()
+    assert "exec setsid" in script
+    code = "\n".join(l for l in script.splitlines()
+                      if not l.strip().startswith("#"))
+    assert "nohup" not in code, (
+        "nohup inside a pooled job makes the tracked job exit immediately; "
+        "use `exec setsid` so the job lives as long as python does")
+    allowed = ("(", ">", "train_one", "eval_one")
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.endswith("&") and not stripped.startswith("#"):
+            assert stripped.startswith(allowed), (
+                "only the pool's own job may be backgrounded: %r" % stripped)
+
+
 def test_launcher_limits_concurrency():
     """train/eval must keep at most N jobs alive, not detach everything."""
     script = (ROOT / "scripts" / "blue_state_shaping_run.sh").read_text()

@@ -146,8 +146,14 @@ train_one() {  # attacker arm train_seed
   local shaping=off
   [ "$arm" = shaped ] && shaping=both
   echo "  launch: attacker=$attacker arm=$arm seed=$tseed shaping=$shaping"
+  # Run Python in the FOREGROUND of this subshell. An earlier version used
+  # `nohup ... &` *inside* the pooled job, so the job the pool tracked exited
+  # immediately while python kept running detached -- throttle() counted
+  # nothing and every model started at once. `setsid` alone still detaches
+  # from the controlling terminal (new session, so closing the shell does not
+  # SIGHUP it) while keeping the job alive for throttle() to count.
   # shellcheck disable=SC2086
-  ( cd "$WT" && setsid nohup env PYTHONPATH="$WT" \
+  ( cd "$WT" && exec setsid env PYTHONPATH="$WT" \
       OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
       "$PY" -m blue.training.harness_rl \
         --out "$dir" --seed "$tseed" \
@@ -159,7 +165,7 @@ train_one() {  # attacker arm train_seed
         --state-shaping "$shaping" \
         --state-shaping-weight 0.05 --state-shaping-cap 20.0 \
         --scorer "$SCORER" \
-        > "$dir.log" 2>&1 < /dev/null & )
+        > "$dir.log" 2>&1 < /dev/null ) &
 }
 
 # Keep at most $1 detached training jobs alive at once.
@@ -200,8 +206,10 @@ eval_one() {  # readout_attacker arm train_seed
     echo "  skip (exists): $attacker/$arm/s$tseed"; return 0
   fi
   echo "  launch: readout=$attacker arm=$arm seed=$tseed"
+  # Foreground python in a setsid session; see train_one for why the trailing
+  # `&` must live here (the pool) and not inside (the job).
   # shellcheck disable=SC2086
-  ( cd "$WT" && setsid nohup env PYTHONPATH="$WT" \
+  ( cd "$WT" && exec setsid env PYTHONPATH="$WT" \
       OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
       "$PY" -m blue.training.harness_eval \
         --model-dir "$dir" --arms actor lancer \
@@ -210,7 +218,7 @@ eval_one() {  # readout_attacker arm train_seed
         --lancer-cache "$OUT/eval/$attacker/lancer.json" \
         --read-only-lancer-cache \
         --out "$tag" \
-        > "$tag.log" 2>&1 < /dev/null & )
+        > "$tag.log" 2>&1 < /dev/null ) &
 }
 
 do_eval() {  # workers
