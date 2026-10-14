@@ -36,8 +36,12 @@ def main():
     ap.add_argument("--red-agent", default="finite")
     ap.add_argument("--state-shaping", default="both",
                     choices=("off", "detection", "confirm", "both"))
-    ap.add_argument("--weight", type=float, default=1.0)
-    ap.add_argument("--cap", type=float, default=0.5)
+    ap.add_argument("--weight", type=float, default=0.05,
+                    help="must match harness_rl's default; a pilot "
+                         "that measures a different config is "
+                         "worse than no pilot")
+    ap.add_argument("--cap", type=float, default=20.0,
+                    help="safety net on raw debt, not magnitude")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -65,8 +69,13 @@ def main():
         shaped = result["shaped_return"]
         added = (shaped - native) if hook is not None else 0.0
         ratio = abs(added) / abs(native) if native else float("inf")
+        # A penalty pinned at its cap on every tick is a near-constant offset
+        # and carries no gradient information: identical totals across seeds
+        # is the signature. Report it rather than letting it look calibrated.
+        saturated = abs(added) >= args.weight * args.cap * result["ticks"] - 1e-6
         rows.append({"seed": seed, "native": native, "shaped": shaped,
                      "added": added, "ratio": ratio,
+                     "saturated": saturated, "ticks": result["ticks"],
                      "coverage": result["coverage"]})
         print("seed=%d native=%+.1f shaped=%s added=%+.1f ratio=%.2f"
               % (seed, native, "%+.1f" % shaped if hook else "n/a",
@@ -83,17 +92,29 @@ def main():
           % statistics.mean(r["added"] for r in rows))
     print("mean |added|/|native| ratio: %.2f  (unsafe above %.1f)"
           % (mean_ratio, UNSAFE_RATIO))
-    verdict = ("UNSAFE: the shaped term dominates native return; PPO would be "
-               "optimising debt, not defence"
-               if mean_ratio > UNSAFE_RATIO else
-               "OK: shaped term is a modifier, not a replacement")
+    if mean_ratio > UNSAFE_RATIO:
+        verdict = ("UNSAFE: the shaped term dominates native return; PPO would "
+                   "be optimising debt, not defence")
+    elif all(r["saturated"] for r in rows):
+        verdict = ("SATURATED: the penalty hit its cap on every tick of every "
+                   "episode, so the signal is a constant offset and carries no "
+                   "information. Lower the cap's effect or raise it.")
+    elif len(rows) > 1 and len({round(r["added"], 6) for r in rows}) == 1:
+        verdict = ("FLAT: identical shaping totals across seeds suggests the "
+                   "signal is saturated or degenerate; check the cap.")
+    else:
+        verdict = "OK: shaped term is a modifier, not a replacement"
     print("verdict: " + verdict)
+    for r in rows:
+        print("  seed=%d ticks=%d saturated=%s added=%.3f"
+              % (r["seed"], r["ticks"], r["saturated"], r["added"]))
 
     if args.out:
         os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
         with open(args.out, "w") as f:
             json.dump({"config": vars(args), "rows": rows,
                        "mean_ratio": mean_ratio,
+                       "all_saturated": all(r["saturated"] for r in rows),
                        "unsafe_ratio": UNSAFE_RATIO,
                        "verdict": verdict}, f, indent=2)
         print("wrote", args.out)

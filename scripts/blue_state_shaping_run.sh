@@ -45,6 +45,14 @@
 # overwrite an existing run directory, so re-running skips completed models.
 set -euo pipefail
 
+# Detach this launcher ONCE, before doing anything. Children inherit the new
+# session, so a closed terminal cannot SIGHUP a training run, and every pooled
+# job below can stay in the foreground where throttle() can actually count it.
+if [ -z "${BLUE_SHAPING_DETACHED:-}" ]; then
+  export BLUE_SHAPING_DETACHED=1
+  exec setsid "$0" "$@"
+fi
+
 REPO=/home/sourav/projects/cyberally
 WT=/home/sourav/projects/cyberally/worktrees/gpt-blue
 PY="$REPO/.venv-train/bin/python"
@@ -146,14 +154,15 @@ train_one() {  # attacker arm train_seed
   local shaping=off
   [ "$arm" = shaped ] && shaping=both
   echo "  launch: attacker=$attacker arm=$arm seed=$tseed shaping=$shaping"
-  # Run Python in the FOREGROUND of this subshell. An earlier version used
-  # `nohup ... &` *inside* the pooled job, so the job the pool tracked exited
-  # immediately while python kept running detached -- throttle() counted
-  # nothing and every model started at once. `setsid` alone still detaches
-  # from the controlling terminal (new session, so closing the shell does not
-  # SIGHUP it) while keeping the job alive for throttle() to count.
+  # Plain FOREGROUND python inside the pooled job, so the job the pool tracks
+  # lives exactly as long as training does.
+  #
+  # Two earlier attempts were wrong, and both silently disabled throttling:
+  #   `nohup ... &` inside the job   -> tracked job exits at once
+  #   `exec setsid ...` inside the job -> setsid forks, parent exits at once
+  # Detachment is done once, for the whole launcher, at the top of this file.
   # shellcheck disable=SC2086
-  ( cd "$WT" && exec setsid env PYTHONPATH="$WT" \
+  ( cd "$WT" && env PYTHONPATH="$WT" \
       OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
       "$PY" -m blue.training.harness_rl \
         --out "$dir" --seed "$tseed" \
@@ -168,25 +177,35 @@ train_one() {  # attacker arm train_seed
         > "$dir.log" 2>&1 < /dev/null ) &
 }
 
-# Keep at most $1 detached training jobs alive at once.
-throttle() {
-  local limit=$1
-  while [ "$(jobs -rp | wc -l)" -ge "$limit" ]; do
-    wait -n 2>/dev/null || sleep 5
-  done
+# Run the task list with a real concurrency limit.
+#
+# `jobs -rp` / `wait -n` were tried and DO NOT WORK in a non-interactive shell
+# with job control disabled: `jobs -rp` under-reports, throttle() never
+# blocked, and every model started at once. An xargs -P pool bounds the count
+# in the child processes themselves, which does not depend on job control.
+pool() {  # workers, then task lines of "verb a b c"
+  local workers=$1; shift
+  printf '%s\n' "$@" | xargs -P "$workers" -n 4 "$0" __run
 }
 
-do_train() {  # workers
-  local workers=${1:-3}
+do_train() {  # workers [attacker-filter]
+  local workers=${1:-3} only=${2:-all}
   [ "$workers" -ge 1 ] || { echo "workers must be >= 1" >&2; exit 2; }
-  echo "training with at most $workers concurrent job(s)"
+  if [ "$only" != all ]; then
+    case " $ATTACKERS " in
+      *" $only "*) ;;
+      *) echo "unknown attacker filter: $only" >&2; exit 2 ;;
+    esac
+  fi
+  echo "training with at most $workers concurrent job(s); attackers: $only"
+  local tasks=()
   while read -r kind a arm s; do
     [ "$kind" = TRAIN ] || continue
-    throttle "$workers"
-    train_one "$a" "$arm" "$s" &
+    [ "$only" = all ] || [ "$a" = "$only" ] || continue
+    tasks+=("train $a $arm $s")
   done < <(emit_models)
-  echo "waiting for training jobs to finish..."
-  wait
+  [ ${#tasks[@]} -eq 0 ] && { echo "nothing to train"; return 0; }
+  pool "$workers" "${tasks[@]}"
   echo "training complete"
 }
 
@@ -206,10 +225,10 @@ eval_one() {  # readout_attacker arm train_seed
     echo "  skip (exists): $attacker/$arm/s$tseed"; return 0
   fi
   echo "  launch: readout=$attacker arm=$arm seed=$tseed"
-  # Foreground python in a setsid session; see train_one for why the trailing
-  # `&` must live here (the pool) and not inside (the job).
+  # Foreground python; see train_one for why the trailing `&` must live here
+  # (the pool) and not inside (the job).
   # shellcheck disable=SC2086
-  ( cd "$WT" && exec setsid env PYTHONPATH="$WT" \
+  ( cd "$WT" && env PYTHONPATH="$WT" \
       OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
       "$PY" -m blue.training.harness_eval \
         --model-dir "$dir" --arms actor lancer \
@@ -232,12 +251,12 @@ do_eval() {  # workers
     fi
   done
   echo "evaluating with at most $workers concurrent job(s)"
+  local tasks=()
   while read -r _ a arm s; do
-    throttle "$workers"
-    eval_one "$a" "$arm" "$s" &
+    tasks+=("eval $a $arm $s")
   done < <(emit_models)
-  echo "waiting for evaluation jobs to finish..."
-  wait
+  [ ${#tasks[@]} -eq 0 ] && { echo "nothing to evaluate"; return 0; }
+  pool "$workers" "${tasks[@]}"
   echo "evaluation complete"
 }
 
@@ -273,9 +292,20 @@ do_pilot() {
 
 cmd=${1:-plan}
 case "$cmd" in
+  __run)
+    # Hidden worker entry point used by the xargs pool. It re-enters the
+    # detached script, so the detach guard above applies and job control is
+    # irrelevant.
+    shift
+    case "${1:-}" in
+      train) train_one "$2" "$3" "$4" ;;
+      eval)  eval_one "$2" "$3" "$4" ;;
+      *) echo "unknown worker task: $*" >&2; exit 2 ;;
+    esac
+    ;;
   plan)   do_plan ;;
   pilot)  do_pilot "${2:-finite}" ;;
-  train)  mkdir -p "$OUT"; do_train "${2:-3}" ;;
+  train)  mkdir -p "$OUT"; do_train "${2:-3}" "${3:-all}" ;;
   lancer) mkdir -p "$OUT/eval"; lancer_base "${2:?attacker required}" ;;
   eval)   mkdir -p "$OUT/eval"; do_eval "${2:-3}" ;;
   models) emit_models ;;

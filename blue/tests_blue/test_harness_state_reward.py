@@ -381,6 +381,18 @@ def test_launcher_runs_python_in_the_foreground_of_the_pooled_job():
     assert "exec setsid" in script
     code = "\n".join(l for l in script.splitlines()
                       if not l.strip().startswith("#"))
+    assert 'exec setsid "$0" "$@"' in code, (
+        "the launcher must detach itself exactly once, before the pool runs")
+    assert code.count("setsid") == 1, (
+        "setsid must appear exactly once: inside a pooled job it forks and "
+        "the tracked job exits immediately, disabling the throttle")
+    # Concurrency is bounded by xargs -P, not by jobs/wait -n: with job control
+    # disabled in a non-interactive shell `jobs -rp` under-reports and the
+    # throttle never blocks. Observed on the real matrix: 6 concurrent
+    # trainings with a stated limit of 3.
+    assert "xargs -P" in code
+    assert "wait -n" not in code
+    assert "jobs -rp" not in code
     assert "nohup" not in code, (
         "nohup inside a pooled job makes the tracked job exit immediately; "
         "use `exec setsid` so the job lives as long as python does")
