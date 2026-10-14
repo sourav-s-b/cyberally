@@ -91,9 +91,10 @@ def make_policy(arm, args):
     raise ValueError("unknown policy arm")
 
 
-def episode(policy, seed, steps, trace_path):
+def episode(policy, seed, steps, trace_path, red_agent="discovery"):
     from blue.training.risk_data import true_compromised
-    env = CC4MARLEnv(seed=seed, steps=steps, **mg.ENV_KW)
+    from blue.training.harness_rl import env_kwargs
+    env = CC4MARLEnv(seed=seed, steps=steps, **env_kwargs(red_agent))
     env.reset(seed=seed)
     policy.reset()
     pipe = BlueFeatures()
@@ -169,13 +170,28 @@ def main():
     ap.add_argument("--legacy-model", default="blue/results/ablation_risk/real_s0")
     ap.add_argument("--model-dir", default=None)
     ap.add_argument("--out", default="blue/results/gpt_harness/diagnostic")
+    ap.add_argument("--lancer-cache", default=None,
+                    help="shared Lancer baseline cache, keyed by attacker "
+                         "and seed list. Reuse is refused if the requested "
+                         "configuration differs from the cached one.")
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="evaluation attacker. Scoring under 'finite' is "
+                         "the discriminative readout; 'discovery' reproduces "
+                         "the historical main32 cells")
     args = ap.parse_args()
     check_seeds(args.seeds)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "report.json").exists() or (out / "frozen_config.json").exists():
         raise FileExistsError("use a new evaluation directory")
-    report = {"version": VERSION, "config": vars(args), "env_kw": mg.ENV_KW,
+    from blue.training.harness_rl import env_kwargs
+    report = {"version": VERSION, "config": vars(args),
+              "env_kw": env_kwargs(args.red_agent),
+              "red_agent": args.red_agent,
+              "reward": "native only; state shaping is training-only and is "
+                        "never imported or applied here",
               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               "claim": "diagnostic mechanism check; no held-out performance claim", "cells": {}}
     report["source_files"] = {str(p): sha256(p) for p in [
@@ -191,11 +207,42 @@ def main():
     if "actor" in args.arms:
         report["artifacts_before_run"][args.model_dir + "/actor.th"] = sha256(Path(args.model_dir) / "actor.th")
     (out / "frozen_config.json").write_text(json.dumps(report, indent=2) + "\n")
+    # The Lancer baseline is deterministic and identical for every model, so
+    # recomputing it per model would burn 24 episodes x N models for nothing.
+    # The cache is keyed by attacker and seed list, and is refused if the
+    # requested configuration does not match what produced it.
+    lancer_cache = {}
+    if args.lancer_cache:
+        cache_path = Path(args.lancer_cache)
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text())
+            key = {"red_agent": args.red_agent, "steps": args.steps,
+                   "seeds": sorted(args.seeds)}
+            if cached.get("key") != key:
+                raise SystemExit(
+                    "lancer cache was produced under a different "
+                    "configuration: %s != %s" % (cached.get("key"), key))
+            lancer_cache = cached["returns"]
+            print(f"lancer: reusing {len(lancer_cache)} cached episodes from "
+                  f"{cache_path}", flush=True)
+
     for arm in args.arms:
         for seed in args.seeds:
-            policy, artifact = make_policy(arm, args)
-            result = episode(policy, seed, args.steps, out / f"{arm}_{seed}.jsonl")
-            result["artifact_sha256"] = artifact
+            if arm == "lancer" and str(seed) in lancer_cache:
+                result = lancer_cache[str(seed)]
+            else:
+                policy, artifact = make_policy(arm, args)
+                result = episode(policy, seed, args.steps,
+                                 out / f"{arm}_{seed}.jsonl",
+                                 red_agent=args.red_agent)
+                result["artifact_sha256"] = artifact
+                if arm == "lancer" and args.lancer_cache:
+                    lancer_cache[str(seed)] = result
+                    Path(args.lancer_cache).write_text(json.dumps(
+                        {"key": {"red_agent": args.red_agent,
+                                 "steps": args.steps,
+                                 "seeds": sorted(args.seeds)},
+                         "returns": lancer_cache}, indent=1) + "\n")
             report["cells"].setdefault(arm, {})[str(seed)] = result
             (out / "progress.json").write_text(json.dumps(report, indent=2) + "\n")
             print(f"arm={arm} seed={seed} return={result['return']:+.0f}", flush=True)

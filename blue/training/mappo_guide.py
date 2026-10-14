@@ -214,7 +214,7 @@ class JointRecorder:
 
 
 def run_team_episode(policy, seed, steps, hook=None, recorder=None,
-                     **env_kw):
+                     reward_hook=None, **env_kw):
     """Joint rollout. Returns per-tick team rewards plus the forced-vs-
     sampled split. Hook calls are sampled actor decisions; everything else
     is forced heuristic behavior, split into:
@@ -224,7 +224,23 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     - verification: rule-2 VERIFY re-analysis (non-hook Analyse);
     - idle: Sleep/Monitor with nothing pending and nothing legal.
     ``agent in env._awaiting`` is the agent's own outstanding action and
-    is Blue-visible."""
+    is Blue-visible.
+
+    ``reward_hook`` (default None) is an optional TRAINING-ONLY reward
+    shaper, called as ``reward_hook(env=env, tick=tick, native=r)`` and
+    returning the per-tick reward used for learning. It exists so a shaped
+    signal can reach the PPO update without contaminating reporting:
+
+      - ``"return"`` in the returned dict is ALWAYS the sum of the native
+        simulator reward, identical with or without a hook. Every existing
+        caller and every historical number keeps its meaning.
+      - ``"shaped_return"`` is the shaped sum, and is only meaningful when
+        a hook was supplied.
+      - the recorder is closed on the shaped series, because returns-to-go
+        are part of the learning signal, not part of the score.
+
+    With ``reward_hook=None`` the behaviour is byte-identical to before.
+    """
     from blue.core.baselines import decode_index
     from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
     env = CC4MARLEnv(seed=seed, steps=steps, **env_kw)
@@ -235,6 +251,7 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
         recorder._policy_ref = policy
         recorder.mark_episode()
     rewards = []
+    native_rewards = []
     analysed = set()
     n_hosts = sum(len(env.hostnames[a]) for a in BLUE_AGENTS)
     cats = {"urgent": 0, "verification": 0, "lockout_sleep": 0, "idle": 0}
@@ -260,7 +277,11 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
             else:
                 cats["idle"] += 1
         _, rew, terminated, truncated, _ = env.step(actions)
-        rewards.append(float(rew[0]))
+        native = float(rew[0])
+        native_rewards.append(native)
+        # Shaping is training-only and never reaches "return" below.
+        rewards.append(native if reward_hook is None else
+                       float(reward_hook(env=env, tick=tick, native=native)))
         n_ticks += 1
         for agent in BLUE_AGENTS:
             name, host = decode_index(env, agent, actions[agent])
@@ -272,7 +293,9 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
         recorder.close_episode(rewards)
     coverage = len(analysed) / max(n_hosts, 1)
     n_forced = sum(cats.values())
-    return {"seed": seed, "return": float(sum(rewards)),
+    return {"seed": seed, "return": float(sum(native_rewards)),
+            "shaped_return": (float(sum(rewards))
+                              if reward_hook is not None else None),
             "coverage": coverage, "ticks": n_ticks,
             "n_actor": n_actor, "n_forced": n_forced,
             "forced_cats": dict(cats),

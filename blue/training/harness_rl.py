@@ -76,6 +76,38 @@ def build_actor(hidden=64):
     return build_nets(feat_dim=len(ACTOR_NAMES), hidden=hidden)[0]
 
 
+def env_kwargs(red_agent):
+    """Training env kwargs for the requested attacker.
+
+    ``mg.ENV_KW`` pins ``red_agent="discovery"``. The main-line LLM-Red work
+    showed that regime cannot punish a broken investigation policy, so it is
+    not a valid optimisation target on its own. The attacker is therefore an
+    explicit, recorded choice rather than a constant.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    if red_agent not in RED_AGENTS:
+        raise ValueError("unknown red_agent %r; known: %s"
+                         % (red_agent, sorted(RED_AGENTS)))
+    kw = dict(mg.ENV_KW)
+    kw["red_agent"] = red_agent
+    return kw
+
+
+def build_reward_hook(args):
+    """Training-only state shaping, or None when the arm is unshaped.
+
+    None keeps the rollout byte-identical to the historical native-reward
+    path, so an unshaped control arm is not silently reshaped.
+    """
+    if args.state_shaping == "off":
+        return None
+    from blue.harness.state_reward import make_reward_hook
+    return make_reward_hook(term=args.state_shaping,
+                            weight=args.state_shaping_weight,
+                            cap=args.state_shaping_cap,
+                            horizon=args.steps)
+
+
 def source_identity():
     pin = Path("snapshot.json")
     if pin.exists():
@@ -105,17 +137,28 @@ def train(args):
                 "source_commit": source_identity(),
                 "source_status": subprocess.check_output(
                     ["git", "status", "--porcelain"], text=True).splitlines(),
-                "env_kw": mg.ENV_KW, "status": "started",
+                "env_kw": env_kwargs(args.red_agent), "status": "started",
                 "runtime": {"python": platform.python_version(), **{
                     p: package_version(p) for p in (
                     "numpy", "scipy", "torch", "scikit-learn", "gym", "gymnasium")}},
-                "objective": "native team reward; unfiltered fresh on-policy rollouts",
+                "objective": ("native team reward reported; "
+                              + ("state-shaped PPO signal" if args.state_shaping != "off"
+                                 else "unfiltered fresh on-policy rollouts")),
+                "state_shaping": {
+                    "term": args.state_shaping if args.state_shaping != "off" else None,
+                    "weight": args.state_shaping_weight,
+                    "cap": args.state_shaping_cap,
+                    "training_only": True,
+                    "evaluation_uses": "native",
+                },
+                "red_agent": args.red_agent,
                 "checkpoint_semantics": "new actor geometry; legacy checkpoints incompatible"}
     # Pin actual dirty source bytes, not just HEAD.
     manifest["source_files"] = {str(p): sha256(p) for p in [
         *sorted(Path("blue/harness").glob("*.py")), Path(__file__),
         Path(mg.__file__), Path("blue/training/residual.py"),
         Path("blue/policies/ordered.py"), Path("blue/core/wrapper.py")]}
+    reward_hook = build_reward_hook(args)
     hist = []
     start = 0
     if args.resume:
@@ -138,13 +181,19 @@ def train(args):
         rec = HarnessRecorder(actor, scorer, args.bonus, gen, args.temp, args.ml_inputs,
                               diagnostics=args.diagnostics)
         policy = HarnessPolicy(rec, max_age=args.max_age, record_requests=args.diagnostics)
-        returns, interventions = [], []
+        returns, shaped_returns, interventions = [], [], []
         episode_diagnostics = []
         for e in range(args.eps_per_iter):
             seed = args.train_seeds[(iteration * args.eps_per_iter + e) % len(args.train_seeds)]
-            result = mg.run_team_episode(policy, seed, args.steps, hook=rec, recorder=rec, **mg.ENV_KW)
-            print(f"iteration={iteration+1} episode={e+1} seed={seed} return={result['return']}", flush=True)
+            result = mg.run_team_episode(policy, seed, args.steps, hook=rec,
+                                         recorder=rec,
+                                         reward_hook=reward_hook,
+                                         **env_kwargs(args.red_agent))
+            print(f"iteration={iteration+1} episode={e+1} seed={seed} "
+                  f"return={result['return']} "
+                  f"shaped={result['shaped_return']}", flush=True)
             returns.append(result["return"])
+            shaped_returns.append(result["shaped_return"])
             interventions.append(policy.guard_stats())
             if args.diagnostics:
                 diagnostic = {"seed": seed, **policy.request_digest.result(),
@@ -158,6 +207,7 @@ def train(args):
         if not all(np.isfinite(v) for v in stats.values()):
             raise RuntimeError("nonfinite PPO update")
         row = {"iteration": iteration + 1, "returns": returns,
+               "shaped_returns": shaped_returns,
                "decisions": rec.total, "greedy_agreement": rec.agree / rec.total,
                "sampled_override_rate": rec.sampled_disagree / rec.total,
                "guard": interventions, **stats}
@@ -217,6 +267,20 @@ def main():
     ap.add_argument("--temp", type=float, default=0.5)
     ap.add_argument("--max-age", type=float, default=80)
     ap.add_argument("--ml-inputs", choices=("both", "risk", "zero"), default="both")
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="training attacker. 'discovery' reproduces the "
+                         "main32 checkpoints; 'finite' is the bounded "
+                         "attacker that can punish a broken sweep")
+    ap.add_argument("--state-shaping", default="off",
+                    choices=("off", "detection", "confirm", "both"),
+                    help="TRAINING-ONLY state-based shaping. 'off' is the "
+                         "unshaped control and is byte-identical to the "
+                         "historical native-reward path. Evaluation always "
+                         "scores native reward regardless.")
+    ap.add_argument("--state-shaping-weight", type=float, default=1.0)
+    ap.add_argument("--state-shaping-cap", type=float, default=10.0)
     train(ap.parse_args())
 
 
