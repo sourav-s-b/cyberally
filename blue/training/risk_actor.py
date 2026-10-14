@@ -155,6 +155,23 @@ def build_actor(hidden=64):
     return actor
 
 
+def env_kwargs(red_agent):
+    """Training/eval env kwargs for the requested attacker.
+
+    ``mappo_guide.ENV_KW`` hardcodes ``red_agent="discovery"``. The LLM-Red
+    evaluation showed that regime cannot punish a broken investigation policy,
+    so it is not a valid optimisation target. The attacker is therefore an
+    explicit choice, recorded in the manifest, rather than a constant.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    if red_agent not in RED_AGENTS:
+        raise ValueError("unknown red_agent %r; known: %s"
+                         % (red_agent, sorted(RED_AGENTS)))
+    kw = dict(mg.ENV_KW)
+    kw["red_agent"] = red_agent
+    return kw
+
+
 def cmd_train(args):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
@@ -178,17 +195,26 @@ def cmd_train(args):
     os.makedirs(args.out, exist_ok=True)
     hist = []
     cycle = list(args.train_seeds)
+    # The guard is part of the policy being trained, not an evaluation-time
+    # add-on. It was hardcoded False here while --sweep-guard was honoured
+    # only in cmd_eval, so every checkpoint the project owns was fitted in
+    # the unguarded regime that the LLM-Red evaluation identified as
+    # invalid: the learner may re-pick the same host every tick, which is
+    # the agent-3 trap. Training and evaluating in the same regime is
+    # required for the checkpoint to match the policy it is scored as.
+    train_guard = args.sweep_guard == "strict"
     for it in range(1, args.iters + 1):
         gen = th.Generator().manual_seed(args.seed * 100003 + it)
         rec = RiskRecorder(actor, args.bonus, gen, temp=args.temp,
                             risk=risk, min_proba=args.train_min_proba)
         pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
-                            guard=False)
+                            guard=train_guard)
         rets = []
         for e in range(args.eps_per_iter):
             seed = cycle[(it * args.eps_per_iter + e) % len(cycle)]
             r = mg.run_team_episode(pol, seed, args.steps, hook=rec,
-                                    recorder=rec, **mg.ENV_KW)
+                                    recorder=rec,
+                                    **env_kwargs(args.red_agent))
             rets.append(r["return"])
         st = mg.ppo_central_update(actor, critic, opt, rec.rows,
                                    bonus=args.bonus)
@@ -208,6 +234,14 @@ def cmd_train(args):
                    "risk_model": (RISK_MODEL if args.risk_ablation == "real"
                                   else "ZERO (ablation: no risk input)"),
                    "risk_ablation": args.risk_ablation,
+                   "sweep_guard": args.sweep_guard,
+                   "trained_with_guard": train_guard,
+                   "red_agent": args.red_agent,
+                   "seed": args.seed,
+                   "iters": args.iters,
+                   "eps_per_iter": args.eps_per_iter,
+                   "lr": args.lr,
+                   "steps": args.steps,
                    "temp": args.temp,
                    "train_min_proba": args.train_min_proba,
                    "train_seeds": args.train_seeds, "hist": hist}, f,
@@ -322,7 +356,7 @@ def cmd_eval(args):
             if name == "greedy":
                 hook = RiskGreedyHook(actor, args.bonus, risk)
             r = mg.run_team_episode(pol, seed, args.steps, hook=hook,
-                                    **mg.ENV_KW)
+                                    **env_kwargs(args.red_agent))
             out.setdefault(name, {})[seed] = r["return"]
             print(f"{name:6s} seed={seed} {r['return']:+.0f}", flush=True)
     base = out["lancer"]
@@ -338,6 +372,7 @@ def cmd_eval(args):
     with open(args.out, "w") as f:
         json.dump({"cells": out, "summary": summ,
                    "risk_ablation": args.risk_ablation,
+                   "red_agent": args.red_agent,
                    "sweep_guard": args.sweep_guard,
                    "risk_model": (RISK_MODEL if args.risk_ablation == "real"
                                   else "ZERO (ablation: no risk input)"),
@@ -363,6 +398,13 @@ def main():
                     help="record a decision for PPO only if the pick's "
                          "risk proba >= this (0 = train on all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="attacker. 'discovery' reproduces every historical "
+                         "Blue number but cannot punish a broken "
+                         "investigation policy; 'finite' is the bounded "
+                         "attacker the LLM-Red work requires as a floor")
     ap.add_argument("--sweep-guard", choices=("off", "strict"),
                     default="off",
                     help="coverage guard on the learner sweep. off = the "

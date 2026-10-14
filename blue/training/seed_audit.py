@@ -51,6 +51,13 @@ DECLARED_RESERVED = {
 SKIP_DIRS = {".git", "__pycache__", ".venv", ".venv-train", "third_party",
              ".cache", "node_modules"}
 
+# Vendored third-party trees. `blue/results/gpt_harness/*/lib/python3.x/
+# site-packages` is a full virtualenv checked into the results directory; its
+# test fixtures (sympy, wcwidth, numpy) put thousands of integers in exactly
+# the positions this tool reads as seeds. Scanning them produced 5125 phantom
+# "used" seeds below 7000 and would have wrongly condemned a clean block.
+SKIP_PATH_PARTS = ("site-packages", "dist-packages", ".eggs")
+
 # This file quotes seed numbers in its docstring and its reserved-block
 # table, so scanning it would mark those seeds as consumed by itself.
 SELF = os.path.basename(__file__)
@@ -148,6 +155,8 @@ def tracked_files(exts):
             continue
         if any(rel.startswith(d + "/") for d in SKIP_DIRS):
             continue
+        if any(part in rel.split("/") for part in SKIP_PATH_PARTS):
+            continue
         if os.path.basename(rel) == SELF:
             continue
         if os.path.splitext(rel)[1] in exts:
@@ -168,6 +177,8 @@ def untracked_seed_files(exts):
     files = []
     for rel in out.stdout.splitlines():
         if not rel or any(d in rel.split("/")[0] for d in SKIP_DIRS):
+            continue
+        if any(part in rel.split("/") for part in SKIP_PATH_PARTS):
             continue
         if os.path.basename(rel) == SELF or rel == ".gitignore":
             continue
@@ -214,13 +225,26 @@ def reserved_conflicts(lo, hi):
 
 
 def main():
+    global SEED_LO, SEED_HI
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", type=int, nargs=2, metavar=("LO", "HI"),
                     help="report whether LO..HI is free, and who used it")
     ap.add_argument("--free-blocks", type=int, default=32,
                     help="list free runs of at least N seeds")
     ap.add_argument("--dump-used", help="write the used-seed map here")
+    ap.add_argument("--seed-lo", type=int, default=SEED_LO,
+                    help="lowest value treated as a seed (default %d). "
+                         "Must be widened before auditing a block outside "
+                         "the default window, or every seed in it will "
+                         "silently read as free." % SEED_LO)
+    ap.add_argument("--seed-hi", type=int, default=SEED_HI,
+                    help="highest value treated as a seed (default %d)"
+                         % SEED_HI)
     args = ap.parse_args()
+
+    if args.seed_lo > args.seed_hi:
+        ap.error("--seed-lo must not exceed --seed-hi")
+    SEED_LO, SEED_HI = args.seed_lo, args.seed_hi
 
     used = build_used()
     if args.dump_used:
