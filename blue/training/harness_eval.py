@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -170,6 +171,10 @@ def main():
     ap.add_argument("--legacy-model", default="blue/results/ablation_risk/real_s0")
     ap.add_argument("--model-dir", default=None)
     ap.add_argument("--out", default="blue/results/gpt_harness/diagnostic")
+    ap.add_argument("--read-only-lancer-cache", action="store_true",
+                    help="never write the shared Lancer baseline; fail if a "
+                         "seed is missing. Use for concurrent model jobs so "
+                         "only the dedicated lancer step writes it.")
     ap.add_argument("--lancer-cache", default=None,
                     help="shared Lancer baseline cache, keyed by attacker "
                          "and seed list. Reuse is refused if the requested "
@@ -212,6 +217,13 @@ def main():
     # The cache is keyed by attacker and seed list, and is refused if the
     # requested configuration does not match what produced it.
     lancer_cache = {}
+    if args.lancer_cache and args.read_only_lancer_cache \
+            and not Path(args.lancer_cache).exists():
+        raise SystemExit(
+            "Lancer baseline %s does not exist. Compute it first "
+            "(scripts/blue_state_shaping_run.sh lancer <attacker>); a model "
+            "job must never be the writer of the shared baseline."
+            % args.lancer_cache)
     if args.lancer_cache:
         cache_path = Path(args.lancer_cache)
         if cache_path.exists():
@@ -237,12 +249,21 @@ def main():
                                  red_agent=args.red_agent)
                 result["artifact_sha256"] = artifact
                 if arm == "lancer" and args.lancer_cache:
+                    if args.read_only_lancer_cache:
+                        raise SystemExit(
+                            "lancer cache is read-only and missing seed %s; "
+                            "recompute the baseline instead of writing it "
+                            "from a concurrent model job" % seed)
                     lancer_cache[str(seed)] = result
-                    Path(args.lancer_cache).write_text(json.dumps(
+                    # Write atomically: a partially written baseline would be
+                    # silently paired against every model that reads it.
+                    tmp = cache_path.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(
                         {"key": {"red_agent": args.red_agent,
                                  "steps": args.steps,
                                  "seeds": sorted(args.seeds)},
                          "returns": lancer_cache}, indent=1) + "\n")
+                    os.replace(tmp, cache_path)
             report["cells"].setdefault(arm, {})[str(seed)] = result
             (out / "progress.json").write_text(json.dumps(report, indent=2) + "\n")
             print(f"arm={arm} seed={seed} return={result['return']:+.0f}", flush=True)

@@ -131,6 +131,10 @@ EOF
 
 # ----------------------------------------------------------------- train ----
 
+# Start one training job. Returns immediately; the caller throttles with
+# `throttle`, which keeps at most $WORKERS jobs alive. An earlier version
+# launched every assigned model detached and immediately, so "3 shards"
+# actually meant 9 concurrent jobs and the time estimate was fiction.
 train_one() {  # attacker arm train_seed
   local attacker=$1 arm=$2 tseed=$3
   local dir; dir=$(model_dir "$attacker" "$arm" "$tseed")
@@ -153,20 +157,31 @@ train_one() {  # attacker arm train_seed
         --train-seeds $TRAIN_SEEDS \
         --red-agent "$attacker" \
         --state-shaping "$shaping" \
-        --state-shaping-weight 1.0 --state-shaping-cap 10.0 \
+        --state-shaping-weight 0.05 --state-shaping-cap 20.0 \
         --scorer "$SCORER" \
         > "$dir.log" 2>&1 < /dev/null & )
 }
 
-do_train() {  # shards shard-index
-  local shards=$1 mine=$2 n=0
+# Keep at most $1 detached training jobs alive at once.
+throttle() {
+  local limit=$1
+  while [ "$(jobs -rp | wc -l)" -ge "$limit" ]; do
+    wait -n 2>/dev/null || sleep 5
+  done
+}
+
+do_train() {  # workers
+  local workers=${1:-3}
+  [ "$workers" -ge 1 ] || { echo "workers must be >= 1" >&2; exit 2; }
+  echo "training with at most $workers concurrent job(s)"
   while read -r kind a arm s; do
     [ "$kind" = TRAIN ] || continue
-    if [ $((n % shards)) -eq "$mine" ]; then
-      train_one "$a" "$arm" "$s"
-    fi
-    n=$((n + 1))
+    throttle "$workers"
+    train_one "$a" "$arm" "$s" &
   done < <(emit_models)
+  echo "waiting for training jobs to finish..."
+  wait
+  echo "training complete"
 }
 
 # ------------------------------------------------------------------ eval ----
@@ -178,10 +193,9 @@ eval_one() {  # readout_attacker arm train_seed
     echo "  MISSING (not trained yet): $dir"; return 0
   fi
   local tag="$OUT/eval/$attacker/$arm/s$tseed"
-  # One shared Lancer baseline per (attacker, seed list). The cache refuses
-  # reuse if the configuration differs, so a mismatched pairing fails loudly
-  # instead of fabricating a contrast.
-  mkdir -p "$OUT/eval/$attacker"
+  # The shell opens "$tag.log" BEFORE harness_eval can mkdir its own --out,
+  # so the log's parent must exist here or the redirect fails outright.
+  mkdir -p "$OUT/eval/$attacker/$arm"
   if [ -f "$tag/report.json" ]; then
     echo "  skip (exists): $attacker/$arm/s$tseed"; return 0
   fi
@@ -194,28 +208,69 @@ eval_one() {  # readout_attacker arm train_seed
         --seeds $EVAL_SEEDS --steps "$STEPS" --max-age "$MAX_AGE" \
         --red-agent "$attacker" --scorer "$SCORER" \
         --lancer-cache "$OUT/eval/$attacker/lancer.json" \
+        --read-only-lancer-cache \
         --out "$tag" \
         > "$tag.log" 2>&1 < /dev/null & )
 }
 
-do_eval() {  # shards shard-index
-  local shards=$1 mine=$2 n=0
-  while read -r _ a arm s; do
-    if [ $((n % shards)) -eq "$mine" ]; then
-      eval_one "$a" "$arm" "$s"
+do_eval() {  # workers
+  local workers=${1:-3}
+  # Baselines are precomputed, never written concurrently. See lancer_base.
+  for a in $ATTACKERS; do
+    if [ ! -f "$OUT/eval/$a/lancer.json" ]; then
+      echo "ERROR: no precomputed Lancer baseline for $a."
+      echo "       run:  $0 lancer $a"
+      return 1
     fi
-    n=$((n + 1))
+  done
+  echo "evaluating with at most $workers concurrent job(s)"
+  while read -r _ a arm s; do
+    throttle "$workers"
+    eval_one "$a" "$arm" "$s" &
   done < <(emit_models)
+  echo "waiting for evaluation jobs to finish..."
+  wait
+  echo "evaluation complete"
+}
+
+# Precompute one Lancer baseline per attacker. Must run BEFORE `eval`, and
+# one attacker at a time: concurrent writers to a shared cache file can
+# interleave and produce a truncated or mixed baseline, which would then be
+# silently paired against every model.
+lancer_base() {  # attacker
+  local attacker=$1
+  local cache="$OUT/eval/$attacker/lancer.json"
+  if [ -f "$cache" ]; then
+    echo "  skip (exists): $attacker baseline"; return 0
+  fi
+  mkdir -p "$OUT/eval/$attacker"
+  echo "  lancer baseline: attacker=$attacker ($(wc -w <<<"$EVAL_SEEDS") episodes)"
+  ( cd "$WT" && env PYTHONPATH="$WT" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+      "$PY" -m blue.training.harness_eval \
+        --arms lancer --seeds $EVAL_SEEDS --steps "$STEPS" \
+        --max-age "$MAX_AGE" --red-agent "$attacker" --scorer "$SCORER" \
+        --lancer-cache "$cache" --out "$OUT/eval/$attacker/lancer" )
 }
 
 # ------------------------------------------------------------------ main ----
 
+do_pilot() {
+  local attacker=${1:-finite}
+  mkdir -p "$OUT"
+  ( cd "$WT" && PYTHONPATH="$WT" OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+      "$PY" -m blue.training.harness_shape_pilot \
+        --seeds 7706 7707 --red-agent "$attacker" --state-shaping both \
+        --out "$OUT/pilot_shape_$attacker.json" )
+}
+
 cmd=${1:-plan}
 case "$cmd" in
-  plan)  do_plan ;;
-  train) mkdir -p "$OUT"; do_train "${2:-1}" "${3:-0}" ;;
-  eval)  mkdir -p "$OUT/eval"; do_eval "${2:-1}" "${3:-0}" ;;
+  plan)   do_plan ;;
+  pilot)  do_pilot "${2:-finite}" ;;
+  train)  mkdir -p "$OUT"; do_train "${2:-3}" ;;
+  lancer) mkdir -p "$OUT/eval"; lancer_base "${2:?attacker required}" ;;
+  eval)   mkdir -p "$OUT/eval"; do_eval "${2:-3}" ;;
   models) emit_models ;;
-  *) echo "usage: $0 {plan|train <shards> <idx>|eval <shards> <idx>}" >&2
+  *) echo "usage: $0 {plan|pilot|train <workers>|lancer <attacker>|eval <workers>}" >&2
      exit 2 ;;
 esac

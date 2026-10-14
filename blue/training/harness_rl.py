@@ -279,8 +279,15 @@ def main():
                          "unshaped control and is byte-identical to the "
                          "historical native-reward path. Evaluation always "
                          "scores native reward regardless.")
-    ap.add_argument("--state-shaping-weight", type=float, default=1.0)
-    ap.add_argument("--state-shaping-cap", type=float, default=10.0)
+    ap.add_argument("--state-shaping-weight", type=float, default=0.05,
+                    help="magnitude of the shaped penalty; measured "
+                         "so a full episode adds roughly the "
+                         "same order as native return")
+    ap.add_argument("--state-shaping-cap", type=float, default=20.0,
+                    help="safety ceiling on RAW debt, not on the "
+                         "penalty. Must stay above typical debt (~8) or the "
+                         "signal is silently truncated and a -10 zone "
+                         "becomes indistinguishable from a -5 zone")
     train(ap.parse_args())
 
 

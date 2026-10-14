@@ -140,25 +140,35 @@ def test_shaping_is_a_bounded_penalty_not_a_bonus():
             self._compromised_set = lambda: set(compromised)
             self.trackers = {"blue_agent_0": _Tracker(tracker_state)}
 
-    hook = make_reward_hook("both", weight=1.0, horizon=400, cap=10.0)
+    hook = make_reward_hook("both", weight=0.05, horizon=400, cap=20.0)
     z = "operational_zone_a_subnet_user_host_%d"
 
     # 40 undetected compromised hosts in the critical zone: severity 1.0 each,
     # saturating the cap. native -5 -> -15, never lower.
     bad = {z % i: "UNKNOWN" for i in range(40)}
-    assert hook(env=_Env(bad, bad), tick=200, native=-5.0) == pytest.approx(-15.0)
+    # raw debt 40 saturates the cap at 20 -> penalty 1.0, never above it
+    assert hook(env=_Env(bad, bad), tick=200, native=-5.0) == pytest.approx(-6.0)
 
     # Nothing wrong anywhere: the term is exactly zero, never a bonus.
     assert hook(env=_Env({}, {}), tick=200, native=-5.0) == pytest.approx(-5.0)
 
-    # Detected but not yet remediated: detection debt clears, confirm debt
-    # remains, at the same severity.
+    # Detected but not remediated: detection debt clears, confirm debt remains.
     one = {z % 0: "CONFIRMED"}
-    assert hook(env=_Env(one, one), tick=200, native=0.0) == pytest.approx(-1.0)
+    assert hook(env=_Env(one, one), tick=200, native=0.0) == pytest.approx(-0.05)
 
-    # Same host after remediation moves to VERIFY: both terms clear.
+    # Remediated but NOT verified: the debt persists. Completion is not
+    # verification, so the policy is not paid for a fix it never checked.
     done = {z % 0: "VERIFY"}
-    assert hook(env=_Env(done, done), tick=200, native=0.0) == pytest.approx(0.0)
+    assert hook(env=_Env(done, done), tick=200, native=0.0) == pytest.approx(-0.05)
+
+    # Verified clean: the host has left the privileged compromised set AND
+    # Blue's tracker has resolved it. Both terms clear.
+    clear = {z % 0: "UNKNOWN"}
+    assert hook(env=_Env(set(), clear), tick=200, native=0.0) == pytest.approx(0.0)
+
+    # A false negative -- actually still compromised but Blue believes it is
+    # clean -- still owes detection debt. That is the whole point of the term.
+    assert hook(env=_Env(clear, clear), tick=200, native=0.0) == pytest.approx(-0.05)
 
 
 def test_detection_debt_only_charges_the_phase_the_schedule_says_is_critical():
@@ -175,12 +185,12 @@ def test_detection_debt_only_charges_the_phase_the_schedule_says_is_critical():
             self._compromised_set = lambda: set(compromised)
             self.trackers = {"blue_agent_0": _Tracker({})}
 
-    hook = make_reward_hook("detection", weight=1.0, horizon=400, cap=10.0)
+    hook = make_reward_hook("detection", weight=0.05, horizon=400, cap=20.0)
     host = "operational_zone_a_subnet_user_host_0"
     # tick 200 -> phase 1 (bounds 134, 267)
-    assert hook(env=_Env(200, {host}), tick=200, native=0.0) == pytest.approx(-1.0)
+    assert hook(env=_Env(200, {host}), tick=200, native=0.0) == pytest.approx(-0.05)
     # tick 300 -> phase 2, where that zone is only worth -1
-    assert hook(env=_Env(300, {host}), tick=300, native=0.0) == pytest.approx(-0.1)
+    assert hook(env=_Env(300, {host}), tick=300, native=0.0) == pytest.approx(-0.005)
 
 
 def test_hook_rejects_malformed_configuration():
@@ -232,6 +242,122 @@ def test_documented_privilege_boundary():
     assert "risk_data" not in shaping and "true_compromised" not in shaping
 
 # --- the Lancer baseline cache is a correctness hazard, so pin it ----------
+
+def test_verify_state_still_owes_debt_until_observed_verification():
+    """Action completion is not verification.
+
+    `BlueZoneTracker.note_remediation_result` sets a host to VERIFY the moment
+    Remove/Restore completes. If confirm_debt counted only CONFIRMED, the
+    entire debt would vanish at completion and the policy would be paid for
+    finishing a fix it never checked -- the wrapper's standing warning that a
+    successful Remove does not prove a host is clean.
+    """
+    from blue.harness.state_reward import confirm_debt, detection_debt
+
+    class _Tracker:
+        def __init__(self, state):
+            self.state = state
+
+    class _Env:
+        _tick = 200
+
+        def __init__(self, compromised, tracker_state):
+            self._compromised_set = lambda: set(compromised)
+            self.trackers = {"blue_agent_0": _Tracker(tracker_state)}
+
+    host = "operational_zone_a_subnet_user_host_0"
+    # Remediated but not verified: debt persists.
+    v = _Env({host}, {host: "VERIFY"})
+    assert confirm_debt(v, 400) == pytest.approx(1.0)
+    assert detection_debt(v, 400) == pytest.approx(0.0)
+    # Verified clean (UNKNOWN after empty analyses): debt clears.
+    c = _Env({host}, {host: "UNKNOWN"})
+    assert confirm_debt(c, 400) == pytest.approx(0.0)
+    # Still detected and not remediated.
+    d = _Env({host}, {host: "CONFIRMED"})
+    assert confirm_debt(d, 400) == pytest.approx(1.0)
+
+
+def test_severity_resolution_survives_the_cap():
+    """A cap below typical debt would make a -10 zone and a -5 zone cost the
+    same, silently destroying the signal the severity weighting provides."""
+    from blue.harness.state_reward import make_reward_hook
+
+    class _Tracker:
+        def __init__(self, state):
+            self.state = state
+
+    class _Env:
+        _tick = 200
+
+        def __init__(self, compromised):
+            self._compromised_set = lambda: set(compromised)
+            self.trackers = {"blue_agent_0": _Tracker({})}
+
+    hook = make_reward_hook("detection", weight=0.05, horizon=400, cap=20.0)
+    crit = "operational_zone_a_subnet_user_host_0"      # severity 1.0 in phase 1
+    mid = "restricted_zone_a_subnet_user_host_0"        # severity 0.3 in phase 1
+    cheap = "contractor_network_subnet_user_host_0"     # severity 0.0 in phase 2
+
+    p_crit = hook(env=_Env({crit}), tick=200, native=0.0)
+    p_mid = hook(env=_Env({mid}), tick=200, native=0.0)
+    p_cheap = hook(env=_Env({cheap}), tick=200, native=0.0)
+    assert p_crit < p_mid < p_cheap
+    assert p_crit == pytest.approx(-0.05)
+    assert p_mid == pytest.approx(-0.015)
+
+    # Ten critical hosts must cost more than one, i.e. the cap is not binding.
+    ten = {f"operational_zone_a_subnet_user_host_{i}" for i in range(10)}
+    assert hook(env=_Env(ten), tick=200, native=0.0) == pytest.approx(-0.5)
+
+
+def test_confirm_debt_is_blue_visible_not_privileged():
+    """confirm_debt must not consult the compromise bit."""
+    src = _tree("blue", "harness", "state_reward.py")
+    body = src.split("def confirm_debt", 1)[1].split("def make_reward_hook", 1)[0]
+    assert "_compromised_set" not in body
+    assert "get_true_state" not in body
+
+
+def test_shaping_cap_default_keeps_the_term_below_native_magnitude():
+    """A per-tick cap that accumulates past the native return inverts the
+    objective. Measured on a real episode, cap 10 gives ratio 17.6 (unsafe);
+    cap 0.5 gives 1.10."""
+    src = _tree("blue", "harness", "state_reward.py")
+    assert 'def make_reward_hook(term="both", weight=0.05, horizon=400, cap=20.0)' \
+        in src
+    assert "17.6" in src and "0.91" in src, (
+        "the docstring must record the measured ratios that justify the "
+        "defaults, so they can be re-derived rather than trusted"
+    )
+    pilot = _tree("blue", "training", "harness_shape_pilot.py")
+    assert "UNSAFE_RATIO" in pilot
+    assert "harness_shape_pilot" in _tree("scripts", "blue_state_shaping_run.sh") \
+        or "harness_shape_pilot" in (ROOT / "scripts" /
+                                     "blue_state_shaping_run.sh").read_text()
+
+
+def test_lancer_baseline_is_precomputed_and_never_written_by_a_model_job():
+    """Concurrent writers can interleave and produce a truncated baseline,
+    which would then be silently paired against every model."""
+    src = _tree("blue", "training", "harness_eval.py")
+    assert "--read-only-lancer-cache" in src
+    assert "os.replace(tmp, cache_path)" in src, "cache write must be atomic"
+    assert "only the dedicated lancer step writes it" in src
+    script = (ROOT / "scripts" / "blue_state_shaping_run.sh").read_text()
+    assert "read-only-lancer-cache" in script
+    assert "no precomputed Lancer baseline" in script
+
+
+def test_launcher_limits_concurrency():
+    """train/eval must keep at most N jobs alive, not detach everything."""
+    script = (ROOT / "scripts" / "blue_state_shaping_run.sh").read_text()
+    assert "throttle()" in script
+    assert "wait -n" in script
+    # the log's parent must be created: the shell opens the redirect before
+    # harness_eval can mkdir its own --out
+    assert 'mkdir -p "$OUT/eval/$attacker/$arm"' in script
+
 
 def test_lancer_cache_refuses_a_mismatched_configuration():
     """A cached baseline from a different attacker or seed list is a wrong

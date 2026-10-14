@@ -15,16 +15,31 @@ while native return got worse. Both runs degraded.
 
 These terms are functions of STATE, not of action counts:
 
-  ``detection_debt``  per tick, severity x (hosts Red has compromised that
-                      Blue has not yet had CONFIRMED). Reduced only by
-                      investigating the right host soon enough.
-  ``confirm_debt``    per tick, severity x (hosts Blue has CONFIRMED and not
-                      yet remediated).
+``detection_debt``  per tick, severity x (hosts Red has compromised that
+                      Blue has not observed as compromised yet).
+  ``confirm_debt``    per tick, severity x (hosts Blue has CONFIRMED or is
+                      VERIFYing, i.e. detected but not yet resolved).
 
 Neither can be farmed by acting more: you cannot clear debt without changing
 the state that creates it. The harness hook chooses which host to Analyse and
 nothing else -- remediation and verification are owned by fixed rules -- so
 these two terms are exactly the levers it controls.
+
+WHY VERIFY STILL OWES DEBT
+``BlueZoneTracker.note_remediation_result`` sets a host to VERIFY the moment
+Remove/Restore *completes*. Completion is not verification: the attacker may
+still be present. The project's standing rule is that action completion,
+observed verification and privileged truth are three distinct facts, and that
+a successful Remove does not prove a host is clean. Counting only CONFIRMED
+here would let the whole debt vanish at remediation completion and reward the
+policy for finishing a fix it never checked -- the exact failure mode the
+wrapper warns about when it refuses to treat a cleared host as clean. VERIFY
+persists the debt until a verification Analyse actually resolves it (to
+CONFIRMED, or to UNKNOWN after two empty analyses).
+
+Debt is read from Blue's own tracker, so both terms stay Blue-visible: neither
+consults privileged state. The privileged compromise bit appears only in
+``detection_debt``, which is the one term that cannot be computed without it.
 
 Severities come from the **public** CC4 phase schedule, not from privileged
 state. The only privileged read is the compromise bit, obtained through
@@ -106,23 +121,49 @@ def detection_debt(env, horizon):
 
 
 def confirm_debt(env, horizon):
-    """Severity-weighted hosts Blue has confirmed and not yet remediated."""
+    """Severity-weighted hosts Blue has detected but not yet resolved.
+
+    Includes VERIFY on purpose. VERIFY means remediation *completed*, not that
+    the host was observed clean, so the debt persists until a verification
+    Analyse resolves the state. Excluding it would reward finishing a fix
+    without checking it.
+
+    Deliberately Blue-visible only: no privileged compromise bit is consulted
+    here, so a false-positive confirmation still costs the policy its budget.
+    """
     phase = mission_phase(env._tick, horizon)
     total = 0.0
     for tracker in env.trackers.values():
         for host, state in tracker.state.items():
-            if state == "CONFIRMED":
+            if state in ("CONFIRMED", "VERIFY"):
                 total += zone_severity(host, phase)
     return total
 
 
-def make_reward_hook(term="both", weight=1.0, horizon=400, cap=10.0):
+def make_reward_hook(term="both", weight=0.05, horizon=400, cap=20.0):
     """Training-only per-tick reward shaper.
 
     Returns ``hook(env=..., tick=..., native=...) -> float``. The added term
     is a *penalty* (never a bonus), bounded by ``cap``, and scaled by the
     published severity so a host in a cheap zone is not worth the same
     attention as one in the phase's critical zone.
+
+    Two knobs, deliberately separated:
+
+    ``weight`` sets the MAGNITUDE. Measured on a real finite-Red episode
+    (native -181): weight 0.05 adds -164 across 400 ticks (ratio 0.91),
+    weight 0.08 adds -262 (ratio 1.45), weight 1.0 with cap 10 added -3178
+    (ratio 17.6 -- PPO would have been optimising debt, not defence).
+
+    ``cap`` is a SAFETY NET on the raw debt, not the magnitude knob. Typical
+    raw debt is about 8 (roughly eight severity-1.0 hosts undetected), so a
+    cap below that would silently truncate the signal: at cap 0.5 a single
+    critical host and forty critical hosts both cost the same, collapsing the
+    distinction between a -10 zone and a -5 zone. Default 20 is high enough
+    that it rarely binds.
+
+    Use ``blue.training.harness_shape_pilot`` to re-measure before changing
+    either; it exits non-zero if |added|/|native| exceeds 3.0.
     """
     if term not in TERMS:
         raise ValueError("unknown shaping term %r; known: %s"
