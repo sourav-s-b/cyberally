@@ -1,0 +1,60 @@
+{
+  "study_id": "blue-specialist-c0-audit-20261018",
+  "status": "frozen-development-only",
+  "purpose": "screen finite-Red Lancer+age-80 non-investigation branches for repeated observable and actionable problems; this is not a policy comparison",
+  "red_agent": "finite",
+  "steps": 400,
+  "seeds": [
+    8287, 8288, 8289, 8290, 8291, 8292, 8293,
+    8294, 8295, 8296, 8297, 8298, 8299, 8300
+  ],
+  "seed_audit": {
+    "result": "free at freeze time; 8285-8286 excluded after short preflight smokes",
+    "checked_range": [8285, 8300],
+    "checked_before_adding_this_config": true,
+    "excluded_preflight_smoke": {
+      "8285": 30,
+      "8286": 35
+    },
+    "protected_ranges_excluded": [
+      [7809, 8200],
+      [8301, 8400],
+      [8401, 9999]
+    ]
+  },
+  "policy": {
+    "type": "LancerValues",
+    "fruitless_decay": 0.5,
+    "max_age": 80,
+    "native_reward": true
+  },
+  "observations": {
+    "blue_feature_version": "blue-harness-v1",
+    "privileged_labels_in_policy_or_trace": false,
+    "store_decision_candidate_features": true,
+    "store_simulator_valid_action_indices": true
+  },
+  "screening_criteria": {
+    "coverage_miss": {
+      "definition": "at least one owned host has no completed Analyse by episode end",
+      "episodes_required": 4
+    },
+    "recovery_failure": {
+      "definition": "a completed Remove or Restore reports simulator result FALSE",
+      "episodes_required": 4,
+      "actionable_choice_required": true
+    },
+    "verification_opportunity": {
+      "definition": "a completed verification Analyse leaves Blue belief VERIFY or UNKNOWN while at least two distinct eligible verification hosts were present at that decision",
+      "minimum_events": 32,
+      "episodes_required": 7
+    },
+    "decision": "A criterion only earns a follow-up development study; it is not evidence that the current policy is inferior. If multiple criteria qualify, do not train until one target and objective are frozen separately."
+  },
+  "limits": [
+    "No training or held-out performance claim",
+    "No seed overrides; use a new study config for another block",
+    "Unresolved belief is not a clean-host label or proof of policy failure",
+    "Simulator action completion and Blue belief are reported separately"
+  ]
+}

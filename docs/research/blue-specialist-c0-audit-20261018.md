@@ -46,4 +46,35 @@ Keep the current rule and manager fixed. Before choosing a second specialist, a 
 
 First freeze the development seed block and a testable observable failure criterion. If the collector finds no repeated failure with an actionable choice and trustworthy target, stop C0 without training. If it does, select exactly one specialist and test it alone with the manager and other rules frozen before testing composition. Do not use seeds 8253–8284 or 8401–8432 for this diagnosis or selection.
 
+### Frozen C0 collection
+
+The adjacent 16-seed block **8285–8300** was checked with
+`blue.training.seed_audit --check 8285 8300` before adding the allocation to
+the source tree. It was free and did not overlap the declared protected ranges
+7809–8200, 8301–8400, or 8401+. The exact configuration is
+[`specialist-c0-audit-20261018.json`](../../blue/configs/specialist-c0-audit-20261018.json).
+Two seeds (8285 and 8286) were used for short collector smokes and are excluded
+from the study. The frozen study block is **8287–8300**, one 400-tick finite-Red
+Lancer+age-80 episode per seed (14 total), with no policy updates. This block
+is a development diagnostic, not a held-out comparison.
+
+The frozen screen advances a branch only to a separate objective/design review:
+
+- **Coverage:** a host has no completed investigation at episode end in at
+  at least 4 of 14 episodes.
+- **Recovery:** Remove/Restore completes with simulator result `FALSE` despite
+  at least two rule-candidate actions, in at least 4 episodes.
+- **Verification:** a completed verification Analyse leaves Blue belief at
+  `VERIFY` or `UNKNOWN` while at least two verification hosts were candidates,
+  with at least 32 such events across at least 7 episodes.
+
+Meeting a screen is not proof that the current rule is inferior and does not
+authorize training. If multiple branches meet it, choose only one after a
+separate objective is written and reviewed. The read-only collector is
+`blue.training.harness_specialist_c0`; its outputs contain Blue-visible feature
+rows, the branch candidate set, simulator-valid action indices, proposal and
+executed request, completion/result, next Blue-visible features, reward, and
+episode boundary. It writes no privileged state. It refuses to overwrite an
+artifact directory and has no seed override.
+
 No simulator run, training, held-out evaluation, policy change, or contract change was made for this audit. Validation was a read-only pass over the six frozen reports and 144 actor traces; the privileged companion traces were excluded.

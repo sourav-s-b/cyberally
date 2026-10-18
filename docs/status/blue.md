@@ -14,12 +14,22 @@ verification often leaves Blue belief unresolved, but do not establish a
 mistake or supply eligible alternatives for recovery/verification decisions.
 No second specialist was selected and no training/evaluation was launched.
 
-Validation: read-only inspection of the six frozen reports and actor JSONL
-traces; privileged companion files were excluded. No simulator tests apply to
-this documentation/data audit. Next: freeze a separate development seed block
-and observable failure criterion, then add the missing action-alternative and
-proposal/execution fields to a collector. Train only if that collector shows a
-repeated actionable failure with a trustworthy target.
+Follow-up prep: structured seed audit found 8285–8300 unused and outside
+declared protected blocks. Smoke-only prefixes on 8285–8286 are excluded; the
+frozen collection uses 8287–8300 (14 full episodes). The development-only screen and exact criteria are
+frozen in `blue/configs/specialist-c0-audit-20261018.json`. Added opt-in
+candidate-choice metadata to `OrderedPolicy` and a no-label collector at
+`blue.training.harness_specialist_c0`; it records proposals, legal masks,
+eligible choices, Blue-visible features, completions, next features, rewards,
+and episode boundaries. No privileged state enters the collector.
+
+Validation: initial C0 evidence pass used six frozen reports and 144 actor
+traces; privileged companions were excluded. Collector plan and 35-tick finite
+Red smoke passed in `.venv-train`; `test_max_age_guard.py`: 32 passed;
+specialist-screen and ordered-parity tests: 5 passed. The 14-episode collection
+on 8287–8300 is not yet launched. Next: freeze these source changes on
+`blue/finite-red-check`, run the bounded collector, then apply the predeclared
+screen. Do not train from a signal alone.
 
 ## Next session: read `blue-handoff-20261004.md` first
 

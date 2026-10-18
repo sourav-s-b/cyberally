@@ -17,13 +17,15 @@ class HarnessPolicy(OrderedPolicy):
     """
 
     def __init__(self, hook=None, max_age=80, record_requests=False,
-                 candidate_audit_agent=None):
+                 candidate_audit_agent=None, record_choices=False):
         if not math.isfinite(max_age) or max_age <= 0:
             raise ValueError("max_age must be finite and positive")
-        super().__init__(scorer=LancerValues(fruitless_decay=0.5), max_age=max_age)
+        super().__init__(scorer=LancerValues(fruitless_decay=0.5),
+                         max_age=max_age, record_choices=record_choices)
         self.hook = hook
         self.last_request = None
         self.record_requests = bool(record_requests)
+        self.record_all_choices = bool(record_choices)
         self.candidate_audit_agent = candidate_audit_agent
         self.last_candidate_audit = None
         from blue.harness.diagnostics import RequestDigest
@@ -42,6 +44,8 @@ class HarnessPolicy(OrderedPolicy):
     def select(self, env, agent):
         self.last_candidate_audit = None
         self.record_decisions = agent == self.candidate_audit_agent
+        self.record_choices = (self.record_all_choices
+                               or agent == self.candidate_audit_agent)
         if hasattr(self.hook, "last_candidate_audit"):
             self.hook.last_candidate_audit = None
         observe = getattr(self.hook, "observe", None)
@@ -59,13 +63,24 @@ class HarnessPolicy(OrderedPolicy):
                   "pending_wait" if busy else
                   "remediation" if name in ("Remove", "Restore") else
                   "verification" if name == "Analyse" else "idle")
-        if decision is not None and name != "Analyse":
+        if (decision is not None and decision.get("selected_action")
+                and (decision["selected_action"] != name
+                     or decision.get("selected_host") != host)):
+            raise RuntimeError("policy decision record differs from selection")
+        if (decision is not None
+                and decision.get("branch") in {
+                    "sweep_max_age", "sweep_scorer", "sweep_hook",
+                    "order_fn", "parity_cursor"}
+                and name != "Analyse"):
             raise RuntimeError("investigation hook reached remediation")
         self.last_request = {"tick": env._tick, "agent": agent,
                              "action": name, "host": host,
                              "branch": branch, "busy": busy,
                              "pending": env._awaiting.get(agent),
-                             "guard": decision.get("guard_record") if decision else None}
+                             "guard": decision.get("guard_record") if decision else None,
+                             "proposal": {"action": name, "host": host},
+                             "selection_rule": (decision.get("selection_rule")
+                                                if decision else None)}
         if (agent == self.candidate_audit_agent and decision
                 and decision.get("scores")):
             scored = decision["scores"]
