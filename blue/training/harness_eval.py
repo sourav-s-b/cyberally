@@ -14,7 +14,8 @@ from pathlib import Path
 
 import numpy as np
 
-from blue.core.baselines import decode_index
+from blue.core.baselines import (MaskedRandomBaseline, SleepBaseline,
+                                 decode_index)
 from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
 from blue.harness.features import BlueFeatures, NAMES, VERSION
 from blue.harness.policy import HarnessPolicy, MLRankingHook
@@ -64,19 +65,32 @@ def penalty_events(env):
     return events
 
 
-def make_policy(arm, args):
+def make_policy(arm, args, seed=0):
+    if arm == "sleep":
+        return SleepBaseline(), None
+    if arm == "masked_random":
+        return MaskedRandomBaseline(seed=seed), None
     if arm == "lancer":
         return OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5)), None
     if arm == "guard":
-        return HarnessPolicy(max_age=args.max_age), None
+        return HarnessPolicy(max_age=args.max_age,
+                             candidate_audit_agent=args.candidate_audit_agent), None
     if arm == "ml":
         scorer = MLScorer(args.scorer)
         return HarnessPolicy(MLRankingHook(scorer), args.max_age), scorer.sha256
     if arm == "actor":
-        hook, manifest = load_hook(args.model_dir, args.scorer)
+        sample = args.actor_mode == "sampled"
+        sampling_seed = (args.sample_seed_base + seed * 37) if sample else None
+        hook, manifest = load_hook(args.model_dir, args.scorer,
+                                   candidate_audit_agent=args.candidate_audit_agent,
+                                   sample=sample, sample_seed=sampling_seed)
+        if sample:
+            # Include training RNG identity without using simulator randomness.
+            hook.generator.manual_seed(sampling_seed + manifest["config"]["seed"] * 100003)
         if args.max_age != manifest["config"]["max_age"] or args.steps != manifest["config"]["steps"]:
             raise ValueError("actor evaluation must use its frozen harness/horizon")
-        return HarnessPolicy(hook, args.max_age), manifest["actor_sha256"]
+        return HarnessPolicy(hook, args.max_age,
+                             candidate_audit_agent=args.candidate_audit_agent), manifest["actor_sha256"]
     if arm in ("legacy", "legacy_guard"):
         import torch as th
         from blue.training import risk_actor as ra
@@ -125,6 +139,9 @@ def episode(policy, seed, steps, trace_path, red_agent="discovery"):
                                   "request": request,
                                   "features": ([float(x) if np.isfinite(x) else None for x in row]
                                                if row is not None else None)}
+                candidate_audit = getattr(policy, "last_candidate_audit", None)
+                if candidate_audit is not None:
+                    records[agent]["candidate_audit"] = copy.deepcopy(candidate_audit)
             _, reward, terminated, truncated, _ = env.step(actions)
             reward = float(reward[0])
             total += reward
@@ -154,7 +171,8 @@ def episode(policy, seed, steps, trace_path, red_agent="discovery"):
     result = {"return": total, "ticks": env._tick, "repair_requests": repairs,
               "max_analyses_one_host": max(analyses.values(), default=0),
               "completed_ages": {a: completed_investigation_age_summary(env, a) for a in BLUE_AGENTS},
-              "guard": policy.guard_stats(), "blue_trace": str(trace_path),
+              "guard": getattr(policy, "guard_stats", lambda: {})(),
+              "blue_trace": str(trace_path),
               "privileged_diagnostic": str(privileged_path)}
     env.close()
     return result
@@ -163,13 +181,17 @@ def episode(policy, seed, steps, trace_path, red_agent="discovery"):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seeds", type=int, nargs="+", default=[8241, 8229])
-    ap.add_argument("--arms", nargs="+", choices=("lancer", "guard", "ml", "legacy", "legacy_guard", "actor"),
+    ap.add_argument("--arms", nargs="+", choices=("lancer", "sleep", "masked_random", "guard", "ml", "legacy", "legacy_guard", "actor"),
                     default=["lancer", "legacy", "legacy_guard", "ml"])
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--max-age", type=float, default=80)
     ap.add_argument("--scorer", default="blue/results/gpt_harness/scorer.pkl")
     ap.add_argument("--legacy-model", default="blue/results/ablation_risk/real_s0")
     ap.add_argument("--model-dir", default=None)
+    ap.add_argument("--actor-mode", choices=("greedy", "sampled"), default="greedy")
+    ap.add_argument("--sample-seed-base", type=int, default=900000)
+    ap.add_argument("--candidate-audit-agent", choices=BLUE_AGENTS, default=None,
+                    help="record Blue-visible sweep candidate scores and counterfactual ranks for one agent")
     ap.add_argument("--out", default="blue/results/gpt_harness/diagnostic")
     ap.add_argument("--read-only-lancer-cache", action="store_true",
                     help="never write the shared Lancer baseline; fail if a "
@@ -186,6 +208,10 @@ def main():
                          "the discriminative readout; 'discovery' reproduces "
                          "the historical main32 cells")
     args = ap.parse_args()
+    if args.actor_mode == "sampled" and any(a != "actor" for a in args.arms):
+        raise SystemExit("sampled actor mode requires only the actor arm")
+    if args.candidate_audit_agent and any(a not in ("actor", "guard") for a in args.arms):
+        raise SystemExit("candidate audit is supported only for actor and guard arms")
     check_seeds(args.seeds)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -201,7 +227,8 @@ def main():
               "claim": "diagnostic mechanism check; no held-out performance claim", "cells": {}}
     report["source_files"] = {str(p): sha256(p) for p in [
         Path(__file__), *sorted(Path("blue/harness").glob("*.py")),
-        Path("blue/training/harness_rl.py"), Path("blue/core/wrapper.py"),
+        Path("blue/training/harness_rl.py"),
+        Path("blue/training/harness_anchor.py"), Path("blue/core/wrapper.py"),
         Path("blue/policies/ordered.py")]}
     report["artifacts_before_run"] = {}
     if any(a in args.arms for a in ("legacy", "legacy_guard")):
@@ -243,7 +270,7 @@ def main():
             if arm == "lancer" and str(seed) in lancer_cache:
                 result = lancer_cache[str(seed)]
             else:
-                policy, artifact = make_policy(arm, args)
+                policy, artifact = make_policy(arm, args, seed=seed)
                 result = episode(policy, seed, args.steps,
                                  out / f"{arm}_{seed}.jsonl",
                                  red_agent=args.red_agent)

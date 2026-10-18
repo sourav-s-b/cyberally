@@ -34,8 +34,8 @@ def main():
     ap.add_argument("--seeds", type=int, nargs="+", default=[7706, 7707])
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--red-agent", default="finite")
-    ap.add_argument("--state-shaping", default="both",
-                    choices=("off", "detection", "confirm", "both"))
+    ap.add_argument("--state-shaping", default="confirm",
+                    choices=("off", "confirm"))
     ap.add_argument("--weight", type=float, default=0.05,
                     help="must match harness_rl's default; a pilot "
                          "that measures a different config is "

@@ -13,17 +13,9 @@ per-action terms, and a dense term mixed with a sparse true signal biases the
 gradient toward farming the term: shaped training return climbed -435 -> -68
 while native return got worse. Both runs degraded.
 
-These terms are functions of STATE, not of action counts:
-
-``detection_debt``  per tick, severity x (hosts Red has compromised that
-                      Blue has not observed as compromised yet).
-  ``confirm_debt``    per tick, severity x (hosts Blue has CONFIRMED or is
-                      VERIFYing, i.e. detected but not yet resolved).
-
-Neither can be farmed by acting more: you cannot clear debt without changing
-the state that creates it. The harness hook chooses which host to Analyse and
-nothing else -- remediation and verification are owned by fixed rules -- so
-these two terms are exactly the levers it controls.
+The only optional term retained here is ``confirm_debt``: severity-weighted
+Blue tracker state for hosts Blue has CONFIRMED or is VERIFYing. The primary
+finite-Red comparison uses native reward with shaping off.
 
 WHY VERIFY STILL OWES DEBT
 ``BlueZoneTracker.note_remediation_result`` sets a host to VERIFY the moment
@@ -37,15 +29,12 @@ wrapper warns about when it refuses to treat a cleared host as clean. VERIFY
 persists the debt until a verification Analyse actually resolves it (to
 CONFIRMED, or to UNKNOWN after two empty analyses).
 
-Debt is read from Blue's own tracker, so both terms stay Blue-visible: neither
-consults privileged state. The privileged compromise bit appears only in
-``detection_debt``, which is the one term that cannot be computed without it.
+Debt is read only from Blue's own tracker. Evaluation labels and privileged
+compromise state are not available to this module.
 
-Severities come from the **public** CC4 phase schedule, not from privileged
-state. The only privileged read is the compromise bit, obtained through
-``CC4MARLEnv._compromised_set()``, which the wrapper already documents as
-reward-channel only. Nothing here may be read by an actor, a mask or a
-feature builder.
+Severities come from the **public** CC4 phase schedule. This module is only
+called by the trainer's reward hook; it is not imported by actors, masks,
+feature builders or the evaluator.
 
 Evaluation must never use this module. ``harness_eval`` scores native reward
 only, and a test enforces that it does not import this file. The shaped
@@ -58,7 +47,7 @@ import math
 
 VERSION = "blue-harness-state-reward-v1"
 
-TERMS = ("detection", "confirm", "both")
+TERMS = ("confirm",)
 
 # The CC4 phase schedule splits the horizon three ways, remainder assigned to
 # the earlier phases. Mirrors blue/harness/features.py exactly so the shaping
@@ -112,14 +101,6 @@ def _confirmed(env):
     return out
 
 
-def detection_debt(env, horizon):
-    """Severity-weighted hosts Red has compromised and Blue has not confirmed."""
-    phase = mission_phase(env._tick, horizon)
-    confirmed = _confirmed(env)
-    return sum(zone_severity(h, phase) for h in env._compromised_set()
-               if h not in confirmed)
-
-
 def confirm_debt(env, horizon):
     """Severity-weighted hosts Blue has detected but not yet resolved.
 
@@ -140,13 +121,16 @@ def confirm_debt(env, horizon):
     return total
 
 
-def make_reward_hook(term="both", weight=0.05, horizon=400, cap=20.0):
+def make_reward_hook(term="confirm", weight=0.05, horizon=400, cap=20.0):
     """Training-only per-tick reward shaper.
 
     Returns ``hook(env=..., tick=..., native=...) -> float``. The added term
     is a *penalty* (never a bonus), bounded by ``cap``, and scaled by the
     published severity so a host in a cheap zone is not worth the same
     attention as one in the phase's critical zone.
+
+    This is optional research shaping. The finite-Red primary experiment sets
+    ``--state-shaping off``; no privileged simulator labels are read here.
 
     Two knobs, deliberately separated:
 
@@ -174,11 +158,7 @@ def make_reward_hook(term="both", weight=0.05, horizon=400, cap=20.0):
         raise ValueError("cap must be finite and positive")
 
     def hook(env, tick, native):
-        debt = 0.0
-        if term in ("detection", "both"):
-            debt += detection_debt(env, horizon)
-        if term in ("confirm", "both"):
-            debt += confirm_debt(env, horizon)
+        debt = confirm_debt(env, horizon)
         if not math.isfinite(debt):
             raise ValueError("non-finite shaped debt")
         return native - weight * min(debt, cap)

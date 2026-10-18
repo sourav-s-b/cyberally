@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "status": "draft_not_launchable",
+  "confirmation": "blue/results/finite_red_dagger_bc_confirm_20261018",
+  "common": {
+    "model_seeds": [0, 1, 2, 3, 4],
+    "train_episode_seeds": [],
+    "validation_episode_seeds": [],
+    "evaluation_episode_seeds": [],
+    "evaluation_episodes": 32,
+    "steps": 400,
+    "max_workers": 3,
+    "reward": "native",
+    "controls": ["lancer", "guard", "sleep", "masked_random"],
+    "source_freeze_required": true,
+    "seed_audit_required": true,
+    "promotion": {
+      "primary_paired_95ci_lower_bound": 0,
+      "minimum_useful_gain": null,
+      "allowed_p10_regression": null,
+      "allowed_coverage_regression": null
+    }
+  },
+  "tracks": {
+    "oec": {
+      "method_label": "OEC-inspired expert suffix imitation; not a paper reproduction",
+      "arms": ["bc_continuation", "dagger_continuation", "expert_suffix"],
+      "initialization": "same frozen BC checkpoint within each model seed",
+      "episodes_per_model_per_arm": 5,
+      "switch_tick": 200,
+      "suffix_labels_only": true,
+      "primary_comparison": "expert_suffix minus bc_continuation",
+      "evaluation_episode_jobs": 608,
+      "blockers": ["confirmation_verdict", "label_budget_hypothesis", "collector_and_trainer", "training_label_budget", "fresh_seed_audit", "numerical_tail_gates"]
+    },
+    "posterior": {
+      "available_episode_regimes": ["discovery", "finite", "verbose", "random", "sleep"],
+      "mid_episode_switch_supported": false,
+      "arms": ["fixed_regime_policy", "domain_randomized_policy", "posterior_conditioned_policy"],
+      "blockers": ["new_regime_separation_evidence", "belief_contract_review", "belief_dataset", "trainer", "fresh_seed_audit", "numerical_tail_gates"]
+    },
+    "hierarchy": {
+      "manager": "fixed_rules",
+      "investigator": "BC_if_confirmation_passes_otherwise_Lancer",
+      "second_specialist": null,
+      "arms": ["B", "I", "S", "IS"],
+      "primary_comparison": "IS minus B",
+      "evaluation_episode_jobs_including_three_extra_controls": 608,
+      "blockers": ["confirmation_verdict", "observable_failure_case", "second_specialist_dataset", "specialist_implementation", "interface_checks", "fresh_seed_audit", "numerical_tail_gates"]
+    }
+  }
+}

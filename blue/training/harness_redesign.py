@@ -20,6 +20,7 @@ import torch
 
 from blue.harness.redesign import VERSION, FEATURE_NAMES, CentralValue, RedesignHook, SetActor, central_context
 from blue.harness.learning import decision_credit, update
+from blue.harness.guided import GuidePrefixHook
 from blue.harness.policy import HarnessPolicy
 from blue.harness.scoring import MLScorer, sha256
 from blue.training import mappo_guide as mg
@@ -66,11 +67,35 @@ def runtime():
 
 
 def provenance():
-    files=['blue/harness/redesign.py','blue/harness/learning.py','blue/harness/calibration.py','blue/harness/numerics.py',
+    files=['blue/harness/redesign.py','blue/harness/learning.py','blue/harness/guided.py','blue/harness/calibration.py','blue/harness/numerics.py',
         'blue/harness/features.py','blue/harness/scoring.py','blue/harness/policy.py',
         'blue/training/harness_redesign.py','blue/training/mappo_guide.py',
         'blue/core/wrapper.py','blue/policies/ordered.py']
     return {p:sha256(p) for p in files}
+
+
+def env_kwargs(red_agent):
+    """Return the pinned wrapper settings with an explicit Red variant."""
+    from blue.core.wrapper import RED_AGENTS
+    if red_agent not in RED_AGENTS:
+        raise ValueError(f"unknown red agent {red_agent!r}")
+    options = dict(mg.ENV_KW)
+    options["red_agent"] = red_agent
+    return options
+
+
+def resolve_guide_prefix_schedule(schedule, iters, steps):
+    """Validate a nonincreasing per-iteration guide-prefix schedule."""
+    values = tuple(schedule)
+    if len(values) == 1:
+        values = values * iters
+    if len(values) != iters:
+        raise ValueError('guide-prefix schedule must have one value or one per iteration')
+    if any(isinstance(v, bool) or int(v) != v or v < 0 or v > steps for v in values):
+        raise ValueError('guide-prefix ticks must be integers within the episode horizon')
+    if any(b > a for a, b in zip(values, values[1:])):
+        raise ValueError('guide-prefix schedule must be nonincreasing')
+    return tuple(int(v) for v in values)
 
 
 def train(args):
@@ -78,6 +103,8 @@ def train(args):
     check_seeds(args.train_seeds)
     if len(set(args.train_seeds))!=len(args.train_seeds) or min(args.iters,args.eps_per_iter,args.steps)<1:
         raise ValueError('invalid budget/seeds')
+    args.guide_prefix_schedule = list(resolve_guide_prefix_schedule(
+        args.guide_prefix_schedule, args.iters, args.steps))
     torch.manual_seed(args.seed);np.random.seed(args.seed);random.seed(args.seed)
     scorer=MLScorer(args.scorer); actor=SetActor(args.hidden);critic=CentralValue(args.hidden,args.value_scale)
     actor_opt=torch.optim.Adam(actor.parameters(),lr=args.lr)
@@ -86,7 +113,7 @@ def train(args):
     config={k:v for k,v in vars(args).items() if k not in ('out','resume','stop_after','mode','eval_seeds','model_dir','policy_replicas')}
     manifest={'version':VERSION,'features':list(FEATURE_NAMES),'config':config,
         'source_commit':source_identity(),'source_files':provenance(),'runtime':runtime(),
-        'env_kw':mg.ENV_KW,'scorer_sha256':scorer.sha256,'status':'started',
+        'env_kw':env_kwargs(args.red_agent),'scorer_sha256':scorer.sha256,'status':'started',
         'semantics':'restricted CTDE investigation scheduling; native finite-task reward; same teacher-mixture sampling in training and primary evaluation; no V-based gate'}
     hist=[]
     if (out/'manifest.json').exists():
@@ -103,18 +130,28 @@ def train(args):
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     for iteration in range(len(hist),args.iters):
         rec=Recorder(actor,critic,scorer,args,iteration)
-        policy=HarnessPolicy(rec,max_age=args.max_age,record_requests=True)
+        guide_ticks=args.guide_prefix_schedule[iteration]
+        guide_hook=GuidePrefixHook(rec,guide_ticks)
+        policy=HarnessPolicy(guide_hook,max_age=args.max_age,record_requests=True)
         episodes=[]
         for e in range(args.eps_per_iter):
             seed=args.train_seeds[(iteration*args.eps_per_iter+e)%len(args.train_seeds)]
             # Explicit independent episode sampling seeds survive same-seed resets.
             rec.policy_seed=args.seed*100003+iteration*1009+e+1
-            result=mg.run_team_episode(policy,seed,args.steps,hook=rec,recorder=rec,**mg.ENV_KW)
-            episodes.append({**result,'requests':policy.request_digest.result(),'guard':policy.guard_stats()})
+            result=mg.run_team_episode(policy,seed,args.steps,hook=guide_hook,recorder=rec,
+                                       **manifest['env_kw'])
+            episodes.append({**result,'guide_prefix_ticks':guide_ticks,
+                'guide_decisions':guide_hook.guide_decisions,
+                'learner_decisions':guide_hook.learner_decisions,
+                'requests':policy.request_digest.result(),'guard':policy.guard_stats()})
         stats=update(actor,critic,actor_opt,critic_opt,rec.rows,args.algorithm,args.bonus,
             args.temp,args.explore,args.epochs,args.minibatch,args.clip,args.entropy_coef,
             args.target_kl,args.max_grad_norm,args.critic_epochs)
-        hist.append({'iteration':iteration+1,'episodes':episodes,'sampled_override_rate':rec.sampled_disagree/max(rec.total,1),**stats})
+        hist.append({'iteration':iteration+1,'episodes':episodes,
+            'guide_prefix_ticks':guide_ticks,
+            'guide_fraction':sum(r['guide_decisions'] for r in episodes)/max(
+                sum(r['guide_decisions']+r['learner_decisions'] for r in episodes),1),
+            'sampled_override_rate':rec.sampled_disagree/max(rec.total,1),**stats})
         torch.save({'actor':actor.state_dict(),'critic':critic.state_dict(),
             'actor_optimizer':actor_opt.state_dict(),'critic_optimizer':critic_opt.state_dict(),
             'history':hist,'torch_rng':torch.get_rng_state(),'numpy_rng':np.random.get_state(),
@@ -171,11 +208,12 @@ class ExecutionAudit:
         pass
 
 
-def evaluation_episode(policy, seed, steps):
+def evaluation_episode(policy, seed, steps, red_agent):
     # Without a recorder the legacy runner labels every choice "forced".
     audit = ExecutionAudit(policy.hook) if policy.hook is not None else None
     policy.hook = audit
-    return mg.run_team_episode(policy, seed, steps, hook=audit, recorder=audit, **mg.ENV_KW)
+    return mg.run_team_episode(policy, seed, steps, hook=audit, recorder=audit,
+                               **env_kwargs(red_agent))
 
 
 def evaluate(args):
@@ -193,25 +231,27 @@ def evaluate(args):
         c=m['config']
         if seed in c['train_seeds'] or args.steps!=c['steps']:raise ValueError('train/eval overlap or horizon drift')
         results['model_manifest']=m
+        red_agent=c.get('red_agent','discovery')
         controls={'lancer':OrderedPolicy(scorer=LancerValues(fruitless_decay=.5)),
                   'guard':HarnessPolicy(max_age=c['max_age'])}
         from blue.core.baselines import SleepBaseline,MaskedRandomBaseline
         controls.update(sleep=SleepBaseline(),random=MaskedRandomBaseline(seed=seed))
         for name,control in controls.items():
-            results['baselines'].setdefault(name,{})[str(seed)]=mg.run_team_episode(control,seed,args.steps,**mg.ENV_KW)
+            results['baselines'].setdefault(name,{})[str(seed)]=mg.run_team_episode(
+                control,seed,args.steps,**env_kwargs(red_agent))
         mixture=[]
         for replica in range(args.policy_replicas):
             policy,m=load(args.model_dir,args.scorer,seed*997+replica)
             # Exactly zero residual: same sampling and feature path, no learned correction.
             with torch.no_grad():
                 for parameter in policy.hook.actor.parameters():parameter.zero_()
-            mixture.append(evaluation_episode(policy,seed,args.steps))
+            mixture.append(evaluation_episode(policy,seed,args.steps,red_agent))
         results['baselines'].setdefault('untrained-mixture',{})[str(seed)]=mixture
         for execution in ('sample','greedy-diagnostic'):
             cells=[]
             for replica in range(args.policy_replicas if execution=='sample' else 1):
                 policy,m=load(args.model_dir,args.scorer,seed*997+replica,execution)
-                cell=evaluation_episode(policy,seed,args.steps)
+                cell=evaluation_episode(policy,seed,args.steps,red_agent)
                 cells.append({**cell,'policy_seed':seed*997+replica,'requests':policy.request_digest.result(),'guard':policy.guard_stats()})
             results['cells'].setdefault(execution,{})[str(seed)]=cells
         (d/'report.json').write_text(json.dumps(results,indent=2)+'\n')
@@ -222,6 +262,7 @@ def parser():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('mode',choices=('train','eval'))
     p.add_argument('--algorithm',choices=('mappo','a2c'),default='mappo')
+    p.add_argument('--red-agent',choices=('discovery','finite','verbose','random','sleep'),default='discovery')
     p.add_argument('--scorer',default='blue/results/gpt_harness/legacy_candidate/scorer.pkl')
     p.add_argument('--out',required=True);p.add_argument('--model-dir')
     p.add_argument('--seed',type=int,default=0);p.add_argument('--train-seeds',type=int,nargs='+',default=[7706,7707,7708,7709])
@@ -231,6 +272,8 @@ def parser():
     for name,default in [('lr',3e-4),('critic-lr',3e-4),('bonus',.25),('temp',.5),('max-age',80.),('gamma',.99),('gae-lambda',1.),('explore',.2),('clip',.2),('entropy-coef',0.),('target-kl',.02),('max-grad-norm',1.),('value-scale',20.)]:
         p.add_argument('--'+name,type=float,default=default)
     p.add_argument('--ml-inputs',choices=('zero','risk','both'),default='risk')
+    p.add_argument('--guide-prefix-schedule',type=int,nargs='+',default=[0],
+                   help='nonincreasing guide ticks by iteration; one value repeats')
     p.add_argument('--resume',action='store_true')
     return p
 
