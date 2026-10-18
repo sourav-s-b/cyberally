@@ -45,5 +45,13 @@ frames/
 /*.pdf
 /research-notes/
 /worktrees/
+
+# First-review deck stays local, including Windows download metadata
+/First_Review.pptx
+/First_Review.pptx:Zone.Identifier
 .DS_Store
 Thumbs.db
+ignore-*
+
+# Local demo runner, not part of the committed harness
+/demo.sh
