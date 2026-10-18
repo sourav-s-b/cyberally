@@ -1,5 +1,26 @@
 # Blue program summary (general index)
 
+## Hierarchical specialist C0 audit (2026-10-18)
+
+Working branch: `blue/finite-red-check`, current base/deliverable commit before
+this audit: `c8ecf3c` (`blue: complete finite Red specialist evaluation`). The
+read-only C0 trace audit is documented in
+[`blue-specialist-c0-audit-20261018.md`](../research/blue-specialist-c0-audit-20261018.md)
+and summarized in the [follow-up execution card](../research/blue-followup-execution-card.md).
+The audited artifacts record source commit
+`2f44db117d98791103fd99329005f7d56f84ffe9` and contain six fixed models × 24
+finite-Red development episodes (seeds 7665–7688). They show no coverage gap;
+verification often leaves Blue belief unresolved, but do not establish a
+mistake or supply eligible alternatives for recovery/verification decisions.
+No second specialist was selected and no training/evaluation was launched.
+
+Validation: read-only inspection of the six frozen reports and actor JSONL
+traces; privileged companion files were excluded. No simulator tests apply to
+this documentation/data audit. Next: freeze a separate development seed block
+and observable failure criterion, then add the missing action-alternative and
+proposal/execution fields to a collector. Train only if that collector shows a
+repeated actionable failure with a trustworthy target.
+
 ## Next session: read `blue-handoff-20261004.md` first
 
 [`blue-handoff-20261004.md`](blue-handoff-20261004.md) is the authoritative
