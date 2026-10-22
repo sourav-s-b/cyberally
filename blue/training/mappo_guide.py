@@ -499,8 +499,16 @@ def cmd_train(args):
             if r["forced_cats"].get("guide"):
                 cat_sum["guide"] = cat_sum.get("guide", 0) \
                     + r["forced_cats"]["guide"]
-        stats = ppo_central_update(actor, critic, opt, rec.rows,
-                                   bonus=args.bonus)
+        if rec.rows:
+            stats = ppo_central_update(actor, critic, opt, rec.rows,
+                                       bonus=args.bonus)
+        else:
+            # Guide window covered every episode with zero learner
+            # decisions: nothing to update on. Log it and skip the PPO
+            # pass instead of failing on an empty stack.
+            print("no learner decisions (guide window covered all "
+                  "episodes); skipping PPO update", flush=True)
+            stats = {"kl": 0.0}
         agree = rec.agree / max(rec.total, 1)
         n_forced_tot = sum(cat_sum.values())
         forced_frac = n_forced_tot / max(n_forced_tot + n_actor_tot, 1)
@@ -614,8 +622,13 @@ def eval_arms(model_dir, hidden, bonus):
 
 def cmd_eval(args):
     from blue.core.baselines import MaskedRandomBaseline
+    env_kw = dict(ENV_KW)
+    env_kw["red_agent"] = getattr(args, "red_agent", "discovery")
+    wanted = list(getattr(args, "eval_arms", None)
+                  or ["learned", "lancer", "sleep", "random"])
     results = {}
-    arms = eval_arms(args.model_dir, args.hidden, args.bonus)
+    arms = [a for a in eval_arms(args.model_dir, args.hidden, args.bonus)
+            if a[0] in wanted]
     for name, pol, hook in arms:
         for seed in args.eval_seeds:
             if name == "random":
@@ -623,12 +636,14 @@ def cmd_eval(args):
                 # seed order. Seeded by the episode seed for repeatability.
                 pol = MaskedRandomBaseline(seed=int(seed))
             r = run_team_episode(pol, seed, args.steps, hook=hook,
-                                 **ENV_KW)
+                                 **env_kw)
             results.setdefault(name, {})[seed] = r
             print(f"{name:8s} seed={seed} return={r['return']:+7.1f} "
                   f"cov={r['coverage']:.2f}", flush=True)
     contrasts = {}
     for other in ("lancer", "sleep", "random"):
+        if "learned" not in results or other not in results:
+            continue
         sa, sb = set(results["learned"]), set(results[other])
         shared = sorted(sa & sb)
         d = [results["learned"][s]["return"]
@@ -692,6 +707,9 @@ def main():
     ap.add_argument("--phase3-model",
                     default="blue/results/scorer_mlp.npz")
     ap.add_argument("--model-dir", default=None)
+    ap.add_argument("--eval-arms", nargs="+", default=None,
+                    help="subset of learned/lancer/sleep/random to "
+                         "evaluate (default: all four)")
     ap.add_argument("--out", default="blue/results/mappo_guide1")
     cli = ap.parse_args()
     if cli.mode == "train":

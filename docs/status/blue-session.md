@@ -1,5 +1,52 @@
 # Blue session update
 
+## OP2 pre-training prep complete (2026-10-22, user: training starts later)
+
+All machinery up to (but not including) the training launch is committed;
+user explicitly deferred the training runs. G1 re-measure was running in
+the background (setsid-detached) through this step and was NOT restarted.
+
+- **Cross-stack eval trap fixed** in `cmd_eval` (`blue/training/
+  mappo_guide.py`): it evaluated with the module-level `ENV_KW`
+  (hardcoded `red_agent: discovery`) instead of the `--red-agent` flag —
+  a trained-on-`finite` policy would have been scored against the WRONG
+  red. Fix: eval builds `env_kw` from the flag (default discovery
+  preserves old behavior). Found the same class of issue once before the
+  freeze; the fix predates any real dev-eval.
+- **`--eval-arms learned`** added to `cmd_eval` (default unchanged: all
+  four arms). The frozen analysis needs only the `learned` cells (guard
+  control comes from the G1 report); skipping the 3 baseline arms × 20
+  seeds × 6 models saves ~3 h.
+- **Empty-buffer training guard** in `cmd_train`: with the guide window
+  covering all episodes (smoke with steps=8, h0=5) there are zero learner
+  rows and `ppo_central_update` crashed on `np.stack([])`. Now logs
+  "no learner decisions…" and skips the update. Real runs (400 steps)
+  unaffected.
+- **`blue/training/op2_dev_analysis.py`** COMMITTED (this is the fixed
+  analysis frozen prereg names): reads G1 guard cells + any number of
+  cmd_eval JSONs, computes per-seed mean across rng dirs, paired
+  per-seed percentile bootstrap (10000 resamples, `default_rng(20261022)`),
+  gate point TAU=0.0 plus CI-cross-zero flag; verified on synthetic data
+  (expected signs and zeroes recovered; first version had an aggregation
+  bug — list of per-row dicts — producing n=0, fixed and re-smoked).
+- **`blue/training/op2_pipeline.sh`** added: train (6 SEQUENTIAL runs:
+  3 jsrl + 3 noguide; resume via --resume-from if a run crashed
+  mid-way; matches the frozen prereg config verbatim — no annealing,
+  min-coverage 0.0, seeds by --seed, train 8433–8444, steps/iters/eps
+  per prereg) → eval (learned arm only, 20 dev seeds, red finite) →
+  analyze (op2_dev_analysis vs G1 guard). Run detached with setsid.
+  bash -n clean; NOT executed on real seeds (training deferred).
+- Validated: test_jsrl_guide + test_mappo_guide + test_eval_parallel
+  22 passed; tiny train+eval smoke under red finite produced sane
+  manifest/eval JSONs; `git diff --check` clean.
+
+State / next: when the user says go —
+`blue/training/op2_pipeline.sh all` detached; the G1 report gate is
+checked first (dev_analysis would fail loudly on missing/empty report
+cells). Report numbers go to
+`blue/results/op2_jsrl_guide_v1/dev_analysis.json`; seeding rule and
+confirm-block mechanics unchanged from the freeze.
+
 ## OP2 frozen: JSRL shrinking-guide implementation + prereg freeze (2026-10-22)
 
 Branch `blue/contract-suite`, base `7ac8886`, user chose sequential execution:
