@@ -1,5 +1,23 @@
 # Blue session update
 
+## G1 gate result: complete, PASSED (2026-10-22)
+
+`blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json` — 4 arms × 20
+dev seeds (8445–8464), 400 steps, red `finite`, max_age 80.0, all returns
+finite. git_commit `41d18ad423e1` (current HEAD);
+`env_info_sha256 82d05804b3a1d58b…` — this fills the freeze JSON's
+`wrapper_env_info_sha256` slot via the referenced report.
+
+Means (native returns): **guard −127.80**, lancer −144.25, random
+−722.70, sleep −4189.10. Paired: lancer −16.45 vs guard (max-age rescue
+over plain lancer), random −594.9, sleep −4061.3.
+
+G1 gate check → PASSED (report present, complete, finite). **Training
+remains deferred by the user**; `blue/training/op2_pipeline.sh all`
+(detached) is the exact resume point. Dev-window 8445–8464 has now been
+consumed once by the G1 re-measure (allocated role: control evaluation,
+per freeze) — the paired dev eval after training reuses the same window.
+
 ## OP2 pre-training prep complete (2026-10-22, user: training starts later)
 
 All machinery up to (but not including) the training launch is committed;
