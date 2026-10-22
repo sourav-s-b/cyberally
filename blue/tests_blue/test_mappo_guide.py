@@ -5,6 +5,7 @@ simulator-only run skips them instead of failing.
 """
 
 import numpy as np
+import os
 import pytest
 
 torch = pytest.importorskip("torch", reason="mappo guide needs torch")
@@ -211,6 +212,8 @@ def test_resume_continues_from_saved_state(tmp_path):
         min_coverage=0.0, min_agree=0.0, max_kl=10.0,
         phase3_model="blue/results/scorer_mlp.npz",
         resume_from=None, out=str(tmp_path / "a"))
+    if not os.path.exists(a.phase3_model):
+        pytest.skip(f"gitignored artifact absent: {a.phase3_model}")
     mg.cmd_train(a)
     with open(tmp_path / "a" / "pilot_manifest.json") as f:
         m1 = json.load(f)

@@ -12,12 +12,24 @@ These tests fail if:
   - FEAT_DIM changes between arms (breaks the Phase-3 body load and
     silently changes the architecture under test).
 """
+import os
 import numpy as np
 import pytest
 
 torch = pytest.importorskip("torch")
 
 from blue.training import risk_actor as ra  # noqa: E402
+
+
+def _require_artifacts(*paths):
+    """Skip (with reason) when gitignored trained artifacts are absent.
+
+    These tests load blue/results/ checkpoints that stay out of Git by
+    policy; in a fresh worktree the honest status is skip, not failure.
+    """
+    missing = [p for p in paths if not os.path.exists(p)]
+    if missing:
+        pytest.skip("gitignored artifact(s) absent: " + ", ".join(missing))
 
 
 class _FakeEnv(object):
@@ -71,6 +83,7 @@ def test_ablation_actually_changes_the_features():
 
 
 def test_risk_factory_selects_the_right_model():
+    _require_artifacts("blue/results/risk_model_v2.pkl")
     real = ra._risk("real")
     zero = ra._risk("zero")
     assert isinstance(zero, ra.ZeroRisk)
@@ -83,6 +96,7 @@ def test_risk_factory_selects_the_right_model():
 
 def test_feature_dim_is_15_in_both_arms():
     """Shape must not drift between arms or the Phase-3 body cannot load."""
+    _require_artifacts("blue/results/scorer_mlp.npz")
     actor = ra.build_actor(hidden=64)
     first = None
     for name, p in actor.named_parameters():
