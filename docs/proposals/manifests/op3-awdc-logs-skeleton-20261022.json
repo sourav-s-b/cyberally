@@ -1,0 +1,48 @@
+{
+  "run_id": "op3-awdc-logs-8433-20261022",
+  "status": "SKELETON-PRE-registration (not frozen; no run yet). Freezing rule: parameters below are final BEFORE any run; freeze adds source-file shas and a git commit; nothing may change after data-collection starts.",
+  "family": "Offline RL extractor on collected logs (AWDC-style advantage-weighted extraction; BC init with masking-aware policy class)",
+  "citations": {
+    "primary": "AWAC arXiv 2006.09359 (advantage-weighted actor-critic: offline critic + advantage-weighted actor extraction, no rollouts needed for the offline stage); ReBRAC arXiv 2305.09836 (10-unseen-seed eval protocol); CQL arXiv 2006.04779 (Q lower-bounding only if critic replacement is used)",
+    "seed_variance_context": "Implicit BC arXiv 2109.00137 (explicit BC extracted-unstable at our scale); ReBRAC protocol runs",
+    "negative_turbine_context": "historical IQL in this repo evaluated at -96 held-out vs round-robin -85.1 (docs: research audit 2026-10-03) and has FQE/retraction history; this attempt differs via masking-aware JSON-class actor and verifiable eval protocol. NO claim today of expected positive result."
+  },
+  "hypothesis": {
+    "H1_dev": "The offline-extracted policy reaches mean native return >= guard minus TAU_PREREG = 1.0 on dev seeds (paired, 20 seeds). H0: mean paired difference to guard < -1.0. Success test is against GUARD, not against the logging heuristic alone.",
+    "H2_secondary": "Extraction variance across BC-init RNG seeds (the 'extraction lottery') is bounded: report per-RNG-seed spread as a secondary estimate; no confirm gate rides on H2."
+  },
+  "data": {
+    "gate_G1_obs_contract": "CRITICAL: existing transition logs (blue/results/offline_logs_14{,b,strong,full}.npz obs dim 872/policy era) do NOT match the current wrapper obs contract (510 per-agent features, 155 actions, from get_env_info()). NO current-contract transition logs exist in any checkout (verified 2026-10-22: only scorer row npz bc_demos_rr lack rewards). Therefore op3 REQUIRES a fresh behaviour-logging pass under the current wrapper. Minimum recipe: 60-120 episodes per logging heuristic (lancer-like round-robin and guard and sleep 1) on train seeds list, native rewards recorded, npz keys {obs,actions,rewards,masks,lengths,meta{seeds}}, manifest with source-file shas. No conversion of legacy 872-dim logs is attempted (unproven; conversion risk higher than re-collecting cost).",
+    "no_privileged_features": "logged obs must be byte-identical to get_obs() at that tick from Blue-visible channels only; verified by per-host presence and mask/spy checks like OP1's contract tests",
+    "budget_cap": "logging wallclock cap 3h; extraction CPU wallclock cap 4h"
+  },
+  "method_prereg": {
+    "actor": "masking-aware JSON/factorized-policy class from blue/policies/ registered; BC init on logged actions; then AWDC extraction: advantage-weighted regression on logged actions where advantage from offline-fitted Q, per-agent masks enforced at sampling; NO fresh rollouts during updates; NO on-policy replay into a PPO/MAPPO update (AGENTS.md rule)",
+    "critic": "per-agent-state-per-action Q fitted offline by conservative regression (CQL-style lower-bound); lr fixed; ensembles E=2 skipped for primary arm (variant sensitivity only)",
+    "iterations": "single offline pass; NO online stage in this prereg; the online fine-tune would need a new prereg",
+    "eval_checkpoints": "BC-init, AWDC-1, AWDC-2, AWDC-final; reported individually with paired stats"
+  },
+  "seed_ledger_audit_passed": "8433-8500 FREE per blue.training.seed_audit --check 8433 8500 (68 seeds)",
+  "seed_allocation_prereg": {
+    "train_and_rollouts": "8433-8444 (12)",
+    "dev_eval": "8445-8464 (20)",
+    "spare": "8465-8480 (16)",
+    "confirm_gate_opened_only": "8481-8500 (20); audit again immediately before opening",
+    "rule": "identical window split to op2 prereg; training seeds never overlap any eval set; no post-hoc reassignment"
+  },
+  "metrics_prereg": ["native_return", "worst_per_tick_reward", "sleep_fraction", "policy_action_distribution_entropy"],
+  "stats_prereg": "paired per-seed percentile bootstrap n=10000 rng_seed 20261022, vs frozen guard measured on the dev window; control identity = 'guard' frozen script; ReBRAC-style reporting mean +/- std over at least 10 eval seeds & never single-seed claims",
+  "gates_prereg": [
+    "G0: cold-contract audit green on the frozen commit before any run",
+    "G1: logging-pass npz keys + one-shape check (obs per-agent width == get_env_info() obs_size_per_agent, actions within masks) verified on the first logged episode before the logging batch runs",
+    "G2: BC-init sanity: deterministic eval on 20 dev seeds; if mean BC >= mean guard by more than +1 then the logging recipe leaks (investigate before any offline RL stage; the sane expectation is lightly-behind, not ahead)"
+  ],
+  "stop_rules_prereg": [
+    "no logging recipe or actor/critic config change mid-run",
+    "if BC-init fails G2, abort the offline stage; report logging-recipe defect; no relaxed continuation",
+    "running out of logging budget without full npz: report partial data size with manifest; do not pad with multiple runs of the same seeds"
+  ],
+  "reporting_rules_prereg": "negatives reported as negatives; historical IQL numbers remain historical (not a fresh baseline); confirm block opens only on the prereg gate",
+  "op1_dependencies_passed": true,
+  "compute_note": "sim logging CPU + extraction CPU (.venv; no torch needed for BC policy class, torch needed for critic); total ~7h cap"
+}

@@ -67,6 +67,18 @@ ALGO = ("heuristic-guided MAPPO for investigation scheduling: shared "
         "PPO-clip, decentralized greedy execution")
 
 
+def guide_steps_for_iter(it, h0, decay, floor):
+    """JSRL shrinking guide window: H_i = max(h0 * decay**(i-1), floor).
+
+    ``it`` is 1-based. h0 falsy (None/0) disables the guide (returns 0).
+    Guide-window ticks use the frozen guide policy; the sampler hook is
+    bypassed there, so guide decisions never become PPO rows.
+    """
+    if not h0:
+        return 0
+    return int(max(float(h0) * (float(decay) ** (it - 1)), float(floor)))
+
+
 def git_commit():
     try:
         return subprocess.check_output(
@@ -214,7 +226,7 @@ class JointRecorder:
 
 
 def run_team_episode(policy, seed, steps, hook=None, recorder=None,
-                     **env_kw):
+                     guide_policy=None, guide_steps=0, **env_kw):
     """Joint rollout. Returns per-tick team rewards plus the forced-vs-
     sampled split. Hook calls are sampled actor decisions; everything else
     is forced heuristic behavior, split into:
@@ -224,13 +236,22 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     - verification: rule-2 VERIFY re-analysis (non-hook Analyse);
     - idle: Sleep/Monitor with nothing pending and nothing legal.
     ``agent in env._awaiting`` is the agent's own outstanding action and
-    is Blue-visible."""
+    is Blue-visible.
+    ``guide_policy``/``guide_steps`` (JSRL): during the first
+    ``guide_steps`` ticks the frozen guide policy selects; its hook is
+    left None and the recorder rows are unaffected (no PPO rows for
+    guide decisions). Guide ticks are counted in ``n_guide`` and logged
+    under forced_cats["guide"] so guide/actor accounting stays auditable.
+    """
     from blue.core.baselines import decode_index
     from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
     env = CC4MARLEnv(seed=seed, steps=steps, **env_kw)
     env.reset(seed=seed)
     policy.reset()
     policy.hook = hook  # None = reference behavior (never contaminated)
+    if guide_policy is not None:
+        guide_policy.reset()
+        guide_policy.hook = None
     if recorder is not None:
         recorder._policy_ref = policy
         recorder.mark_episode()
@@ -238,14 +259,20 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     analysed = set()
     n_hosts = sum(len(env.hostnames[a]) for a in BLUE_AGENTS)
     cats = {"urgent": 0, "verification": 0, "lockout_sleep": 0, "idle": 0}
-    n_actor, n_ticks = 0, 0
+    n_actor, n_ticks, n_guide = 0, 0, 0
     for tick in range(1, steps + 1):
+        guiding = guide_policy is not None and tick <= guide_steps
+        chooser = guide_policy if guiding else policy
         actions = {}
         for a in BLUE_AGENTS:
             before = (recorder.per_agent.get(a, 0)
                       if recorder is not None else 0)
-            act = int(policy.select(env, a))
+            act = int(chooser.select(env, a))
             actions[a] = act
+            if guiding:
+                n_guide += 1
+                cats["guide"] = cats.get("guide", 0) + 1
+                continue
             if (recorder is not None
                     and recorder.per_agent.get(a, 0) > before):
                 n_actor += 1
@@ -275,6 +302,7 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     return {"seed": seed, "return": float(sum(rewards)),
             "coverage": coverage, "ticks": n_ticks,
             "n_actor": n_actor, "n_forced": n_forced,
+            "n_guide": n_guide,
             "forced_cats": dict(cats),
             "n_decisions": (len(recorder.rows) if recorder is not None
                             else 0)}
@@ -386,10 +414,23 @@ def cmd_train(args):
     th.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
+    args.guide_h0 = getattr(args, "guide_h0", None)
+    args.guide_decay = getattr(args, "guide_decay", 0.6)
+    args.guide_floor = getattr(args, "guide_floor", 10)
+    args.guide_max_age = getattr(args, "guide_max_age", 80.0)
+    args.red_agent = getattr(args, "red_agent", "discovery")
     actor, _pooled_value = build_nets(hidden=args.hidden)
     critic = build_central_critic(hidden=args.hidden)
     opt = th.optim.Adam(list(actor.parameters())
                         + list(critic.parameters()), lr=args.lr)
+    guide_policy = None
+    if args.guide_h0:
+        guide_policy = OrderedPolicy(
+            scorer=LancerValues(fruitless_decay=0.5),
+            max_age=args.guide_max_age)
+        guide_policy.hook = None
+    env_kw = dict(ENV_KW)
+    env_kw["red_agent"] = args.red_agent
     start_it, hist = 1, []
     resumed = None
     if args.resume_from:
@@ -435,19 +476,29 @@ def cmd_train(args):
         policy = OrderedPolicy(
             scorer=LancerValues(fruitless_decay=0.5), guard=False)
         ep_rets, ep_covs = [], []
+        guide_steps_i = guide_steps_for_iter(
+            it, args.guide_h0, args.guide_decay, args.guide_floor)
         cat_sum = {"urgent": 0, "verification": 0, "lockout_sleep": 0,
                    "idle": 0}
         n_actor_tot = 0
+        n_guide_tot = 0
         for e in range(args.eps_per_iter):
             seed = seed_cycle[(it * args.eps_per_iter + e)
                               % len(seed_cycle)]
             r = run_team_episode(policy, seed, args.steps, hook=rec,
-                                 recorder=rec, **ENV_KW)
+                                 recorder=rec,
+                                 guide_policy=guide_policy,
+                                 guide_steps=guide_steps_i,
+                                 **env_kw)
             ep_rets.append(r["return"])
             ep_covs.append(r["coverage"])
             n_actor_tot += r["n_actor"]
+            n_guide_tot += r["n_guide"]
             for k in cat_sum:
                 cat_sum[k] += r["forced_cats"][k]
+            if r["forced_cats"].get("guide"):
+                cat_sum["guide"] = cat_sum.get("guide", 0) \
+                    + r["forced_cats"]["guide"]
         stats = ppo_central_update(actor, critic, opt, rec.rows,
                                    bonus=args.bonus)
         agree = rec.agree / max(rec.total, 1)
@@ -460,6 +511,8 @@ def cmd_train(args):
                "mean_coverage": float(np.mean(ep_covs)),
                "agree": agree, "n_decisions": len(rec.rows),
                "n_actor": n_actor_tot,
+               "n_guide": n_guide_tot,
+               "guide_steps": int(guide_steps_i),
                "forced_cats": cat_sum,
                "forced_frac": round(forced_frac, 4),
                "mean_ent": round(mean_ent, 4), "temp": round(temp, 4),
@@ -497,6 +550,14 @@ def cmd_train(args):
         "mode": "train",
         "iters_done": len(hist),
         "train_seeds": list(args.train_seeds),
+        "guide": {"enabled": bool(args.guide_h0),
+                  "h0": args.guide_h0, "decay": args.guide_decay,
+                  "floor": args.guide_floor,
+                  "max_age": args.guide_max_age,
+                  "policy": ("OrderedPolicy(LancerValues(fruitless_decay="
+                             "0.5), max_age=...) hook=None" if guide_policy
+                             else None)},
+        "red_agent": args.red_agent,
         "bonus": args.bonus, "hidden": args.hidden,
         "lr": args.lr, "seed": args.seed,
         "temperature": args.temperature,
@@ -605,6 +666,22 @@ def main():
     ap.add_argument("--temp-end", type=float, default=None,
                     help="linear anneal target at the last iter "
                          "(default: no anneal)")
+    ap.add_argument("--guide-h0", type=int, default=None,
+                    help="JSRL guide window at iteration 1 in ticks; "
+                         "omit to disable the guide entirely (default)")
+    ap.add_argument("--guide-decay", type=float, default=0.6,
+                    help="per-iteration geometric decay of the guide "
+                         "window")
+    ap.add_argument("--guide-floor", type=int, default=10,
+                    help="minimum guide window in ticks")
+    ap.add_argument("--guide-max-age", type=float, default=80.0,
+                    help="frozen guide policy: RegularOrderedPolicy with "
+                         "LancerValues scorer + max-age coverage guard of "
+                         "this many ticks")
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite"),
+                    help="red agent family; 'finite' is the finite-state "
+                         "red set used by the finite-red pilots")
     ap.add_argument("--resume-from", default=None,
                     help="pilot out dir to resume: reloads actor/critic/ "
                          "opt/RNG state and continues after its iters_done")

@@ -1,5 +1,230 @@
 # Blue session update
 
+## OP2 frozen: JSRL shrinking-guide implementation + prereg freeze (2026-10-22)
+
+Branch `blue/contract-suite`, base `7ac8886`, user chose sequential execution:
+OP2 (JSRL) first, then OP3 (offline RL). Everything below is on this branch;
+OP3 has NOT started.
+
+Implementation (all code changed on the branch, tests green before commit):
+
+- **Guide mechanism** in `blue/training/mappo_guide.py`:
+  `guide_steps_for_iter(it, h0, decay, floor) -> max(h0·decay^(it-1), floor)`
+  (1-based, h0 falsy disables); `run_team_episode(..., guide_policy=None,
+  guide_steps=0)` switches per-tick between guide and learner when the tick
+  is inside the window, attributing guide ticks to `n_guide` +
+  `forced_cats["guide"]` while keeping the recorder clean (no PPO rows from
+  guide decisions). Guide is `OrderedPolicy(scorer=LancerValues(
+  fruitless_decay=0.5), max_age=80.0)`, hook stays None. `cmd_train`
+  constructs the guide, schedules per-iteration windows, threads
+  `red_agent` into the env kwargs, logs per-iter rows with `n_guide` /
+  `guide_steps` and pins a `guide` block plus `red_agent` in
+  `pilot_manifest.json`. CLI flags: `--guide-h0` (None=off) /
+  `--guide-decay` 0.6 / `--guide-floor` 10 / `--guide-max-age` 80.0 /
+  `--red-agent` discovery|finite; older callers missing the new attrs
+  default via getattr (backward compatible, red discovery preserved).
+- **Re-specified arms (recorded in the freeze)**: the skeleton's guard
+  reference came from the finite_red_anchor pilot stack (`blue/harness`
+  + `gpt_harness/scorer.pkl`, source commit 2f44db1). This tip has no
+  `blue/harness`, so guide AND control were re-specified branch-native as
+  the same policy family — ordered lancer + max-age-80 coverage guard,
+  red `finite`. Performance numbers cross-stack (guard −150.21, lancer
+  −151.79 on 7665–7688) are context only; the dev-window guard re-measure
+  (G1) is the control used for gating.
+- **`blue/training/harness_guide_remeasure.py`**: committed G1 runner.
+  Guard/lancer/sleep/random arms over the dev window (8445–8464), 400
+  steps, red `finite`, native returns only, with git provenance and
+  `env_info_sha256`; report written to
+  `blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json`.
+- **`blue/tests_blue/test_jsrl_guide.py`**: schedule monotonicity/floor +
+  disabled-identity (byte-equal episode without guide kwargs) +
+  full-window zero-PPO-rows + post-window row attribution (rows carry
+  `env._tick >= 2`, i.e. only decisions after the window) + cmd_train
+  manifest pins (guide block, red_agent, per-iter `guide_steps` 5 → 3).
+  Note: `env._tick` is 0-based at decision time (loop tick − 1), so
+  assertions compare against `env._tick`, not the loop index.
+
+Validation this step:
+
+- `test_jsrl_guide.py` + `test_mappo_guide.py` + `test_zone_priority.py` +
+  `test_response_variants.py` + `test_legacy_ordering_gate.py`: 23 passed.
+- G0 re-check at this state: `test_contract_cold.py` 8/8 (13.9 s).
+- `git diff --check` clean; all three manifest JSONs parse.
+- Fix-ups during testing: `hidden=64` needed in tests (phase3 body width),
+  `n_guide`/`forced_cats` asserted against `r["ticks"]` (the native
+  scenario can end one tick early vs `steps`), getattr defaults in
+  `cmd_train`.
+
+Freeze record:
+
+- Frozen prereg:
+  `docs/proposals/manifests/op2-jsrl-guide-8433-final.json`
+  (status FROZEN-PRE-RUN; seeds 8433–8444 train / 8445–8464 dev / spare
+  8465–8480 / confirm 8481–8500 gate-opened-only; curriculum
+  H_i = max(200·0.6^(i−1), 10); rng seeds 0/1/2; stats rule per the
+  conventions doc; source shas recorded for wrapper/baselines/masking/
+  ordered/mappo_guide/residual/scorer/harness_remeasure + the two test
+  files; `.venv-train/bin/python` sha; G1 report path).
+- Seed audit re-run immediately before the freeze —
+  `--check 8433 8500` → FREE (68 seeds, unchanged from the first audit).
+- G1 re-measure launched detached (setsid) after the first attempt was
+  killed by a tool timeout (process-group kill; nohup insufficient —
+  use `setsid nohup ... &` for any run expected to outlive one tool call).
+
+State / next task:
+
+- When `guard_remeasure/report.json` exists (4×20 cells), G1 gate checks
+  completes and the three training runs launch (`--seed 0/1/2`,
+  `--train-seeds 8433..8444`, `--iters 12 --eps-per-iter 4 --steps 400`,
+  guide flags per freeze, `--red-agent finite`, out
+  `blue/results/op2_jsrl_guide_v1/jsrl_s{0,1,2}`), sequential/one process.
+- Then dev eval (8445–8464) vs G1 guard with the frozen stats rule; the
+  8481–8500 block needs a fresh seed audit before opening.
+- OP3 stays second: fresh behaviour-logging pass on train seeds before
+  any extraction (per its skeleton).
+
+## OP2/OP3 prereg skeletons + seed audit (2026-10-22)
+
+Branch `blue/contract-suite` (same worktree). Docs-only, no runs launched.
+Deliverables: seed audit, two pre-registration skeleton JSONs, one conventions
+doc:
+
+- **Seed audit**: `python -m blue.training.seed_audit --check 8433 8500` —
+  **FREE, no recorded consumption** (68 seeds; 112 used seeds found from
+  structured sources). This is the last audited-free window.
+- **Skeletons** (docs/proposals/manifests/, both parse-clean, explicitly
+  mark status "skeleton, not frozen"):
+  `op2-jsrl-guide-skeleton-20261022.json` — JSRL shrinking-horizon guide
+  warm-start (guard as frozen guide, H_i = max(200·0.6^i, 10), mappo_guide
+  harness, 4 arms incl. no-guide ablation, ≤6 h torch CPU); needs nothing new
+  except a guide-injection point in the rollout loop.
+  `op3-awdc-logs-skeleton-20261022.json` — masking-aware offline extraction
+  (BC init + AWAC-family advantage-weighted extraction with CQL-style
+  critic, no online stage); **the prereg's central data finding: no
+  transition logs exist under the current wrapper obs contract**
+  (offline_logs_14* are 872-dim legacy-obs; bc_demos_rr lack rewards; only
+  scorer-row npz are current-era) so OP3 requires a fresh behaviour-logging
+  pass (60–120 eps on train seeds, ≤3 h) before extraction (≤4 h); legacy
+  872-dim conversion explicitly rejected; historical IQL numbers stay
+  historical.
+- **Conventions doc** `docs/research/op2-op3-prereg-skeletons-20261022.md`:
+  shared seed allocation (train 8433–8444 / dev 8445–8464 / spare
+  8465–8480 / confirm-on-gate 8481–8500 — the margin experiment's
+  confirm-block-only-on-gate-pass pattern), stats rule (paired per-seed
+  bootstrap n=10000 rng_seed=20261022, ReBRAC-style multi-seed reporting),
+  gates G0 (cold-contract audit green at frozen commit) / G1 / G2, and the
+  explicit freeze checklist (source shas + `get_env_info()` hash, commit
+  before first rollout, fresh seed_audit immediately before opening 8481+).
+
+Validation: docs-only diff — `git diff --check` clean; both JSONs parsed
+successfully; no tests run (none required; no code touched in this step).
+PR checklist: three new doc files; no code change in this step; no schema,
+reward, or topology change; no dependent branches. The freeze checklist must
+be executed before any run launches; if the user freezes OP2 first, the
+guide-injection implementation lands on this branch and is tested before
+freeze. Next concrete task: user picks OP2 / OP3 / sequential-both; the
+freeze checklist then produces the committed frozen prereg files.
+
+## Training-test triage (2026-10-22)
+
+Branch `blue/contract-suite` (same worktree as the OP1 audit). The 7
+pre-existing failures on tip `7ac8886` were diagnosed; two distinct root
+causes, both fixed on this branch. Full suite via `.venv-train`:
+**279 passed, 1 skipped, 0 failed in 11:00** (baseline was 264/7/1 + the 8
+new cold-contract tests).
+
+1. `test_eval_parallel.py` (4 failures: pool_matches_serial,
+   cross_worker_determinism, spawn_matches_serial,
+   pool_result_cache_serves_identical) — real code defect:
+   `blue/policies/eval_parallel.py:205` calls `mp.get_context(start_method)`
+   but `multiprocessing` was never imported here, so `run_pool` crashes on
+   ANY cache miss (fresh worktrees have an empty `blue/.cache/`; the
+   author's machine was served pre-populated cache hits, hiding the bug).
+   Fix is one line: `import multiprocessing as mp` with the other stdlib
+   imports. All 7 tests in that file now pass in 30.7 s.
+2. `test_risk_ablation.py::test_risk_factory_selects_the_right_model` (missing
+   `blue/results/risk_model_v2.pkl` via `RiskPriority`),
+   `test_risk_ablation.py::test_feature_dim_is_15_in_both_arms` (missing
+   `blue/results/scorer_mlp.npz` via `build_actor`) and
+   `test_mappo_guide.py::test_resume_continues_from_saved_state` (same
+   scorer artifact via `phase3_model`) — not code defects: both artifacts are
+   gitignored trained checkpoints, present in the main checkout (verified:
+   those 3 tests pass there, `-p no:cacheprovider --basetemp=/tmp/opencode/...`
+   with no cache writes) and absent in any fresh worktree.
+   Fix on this branch, two parts: explicit skip-guards with reasons
+   (`_require_artifacts` in `test_risk_ablation.py`; inline skip in
+   `test_mappo_guide.py`) so fresh worktrees report "gitignored artifact(s)
+   absent" as a skip instead of a FileNotFoundError; and untracked copies of
+   the two artifacts into this worktree's `blue/results/` so this machine
+   still exercises them fully (not committed — this is local-only state and
+   that is intentional).
+
+Behavioral note for review: the skip-guards change failure→skip semantics for
+3 artifact-backed tests in artifact-less environments. This is the honest
+status (a fresh clone cannot run load-tests for weights it does not have),
+but reviewers should confirm they prefer explicit skips over failures there;
+alternative is a documented no-guard policy. No production/runtime code
+outside `eval_parallel.py` imports changed; no schema/reward/topology change;
+no seed block consumed.
+
+Validation: `pytest blue/tests_blue/test_risk_ablation.py
+test_mappo_guide.py test_eval_parallel.py test_contract_cold.py -q` — 31
+passed in 57.8 s; then full `pytest blue/tests_blue -q` — 279 passed,
+1 skipped, 11:00. `git diff --check` clean. Dependent branches: none, but
+`main` and any worktree-based flow inherit the `eval_parallel.py` crash on
+cache miss — that fix should ride the next Blue PR; teams with populated
+`blue/.cache/` were silently unaffected. Next concrete task: OP2/OP3 choice
+(pre-registration + seed-audit 8433–8499), now unblocked since the harness
+test suite is green.
+
+## OP1 wrapper cold-contract audit (2026-10-22)
+
+Branch `blue/contract-suite` (worktree `worktrees/contract`), based at `7ac8886`
+(same tip as `blue/web-research-20261022`; user selected OP1 from that research
+report's one-pagers). Deliverable: `blue/tests_blue/test_contract_cold.py` —
+8 tests, 17.4 s, all passing, running the **unmodified native scenario**
+(native red agent, no mock substitution), unlike `test_foundation.py` which
+mocks red/green for determinism.
+
+What the audit establishes on this tip (OP1 acceptance check from
+`docs/research/web-research-20261022.md`): every enabled mask slot decodes to
+an owned host that the simulator action space supports, for all 5 agents at
+every step of full native episodes (no slot for a non-existent host);
+masked-random policy actions are always masked-in; seed 7629 reproduces the
+native episode byte-identically across two runs (actions, rewards, terminal
+flags, pre-step state); off-mask choices are coerced to Sleep and never become
+pending; extreme indices (1e6, -3) do not crash or corrupt; concurrent pending
+Analyse actions across all 5 agents attribute to their own (agent, host) pair;
+a successful Remove enters VERIFY (never CLEAN), historical artifacts are not
+kept as current measurements, and the follow-up Analyse is a distinct
+observed-verification fact; privileged reads (`_compromised_set`,
+`count_compromised`) leave `get_state()` bytes unchanged and agree on counts;
+the native horizon end reports `terminated=True, truncated=False` with
+`info["episode_limit"]` truthful and rejects further steps until reset; reset
+clears all pending state. No reserved seed block consumed (seed 7629 is the
+already-spent baseline seed); no code outside the test file changed.
+
+Pre-existing failures found while baselining this tip (unchanged by this
+work; 7 of 272 suite tests, all torch/training-harness, not wrapper-contract):
+4x `test_eval_parallel.py` (pool_matches_serial, cross_worker_determinism,
+spawn_matches_serial, pool_result_cache_serves_identical);
+`test_mappo_guide.py::test_resume_continues_from_saved_state`;
+`test_risk_ablation.py` (risk_factory_selects_the_right_model,
+feature_dim_is_15_in_both_arms). 264 passed, 1 skipped, 10:49 full-suite
+baseline. These need diagnosis before OP2/OP3 training work relies on them.
+
+Validation: `pytest blue/tests_blue/test_contract_cold.py` — 8 passed
+(OPENBLAS_NUM_THREADS=1, `.venv-train` python, PYTHONPATH=repo root);
+`git diff --check` clean. PR checklist: single new test file, no
+runtime/config/schema/reward change, no dependent branch changes; the 7
+pre-existing failures live in `blue/training/` code and should be triaged
+where that code is being changed, not here. Risks: native-red determinism
+assertions depend on scenario identity — if the simulator snapshot changes,
+the byte-identical episode test is the first thing that should flag it (this
+is intended). Next concrete task: triage the 7 pre-existing training-test
+failures, or proceed to OP2/OP3 pre-registration + seed-audit of 8433–8499
+(user decision pending).
+
 ## Research audit (2026-10-03)
 
 Branch `blue/mappo-training` at `a6eab7e`; exact main dependency
