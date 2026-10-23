@@ -55,7 +55,8 @@ ALPHA_CONSERV = 0.1
 TAU_W = 1.0
 W_CLIP = (0.0, 20.0)
 K_CONSERV = 8
-Q_EPOCHS = 40
+Q_EPOCHS = 12
+TD_SUB_FRAC = 0.33  # deterministic TD-row subsample once per rng seed
 BC_EPOCHS = 3
 AWDC_LR = 1e-4
 BUDGET_S = 4 * 3600
@@ -209,6 +210,11 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--rng-seed", type=int, default=0)
     ap.add_argument("--cpu-threads", type=int, default=2)
+    ap.add_argument("--reuse-bc-eval", default=None,
+                    help="path of a completed deterministic BC eval JSON "
+                         "to copy into the out dir instead of re-running "
+                         "the 20 dev episodes (only valid when the BC "
+                         "train recipe and rng seed are unchanged)")
     cli = ap.parse_args()
     torch.set_num_threads(cli.cpu_threads)
     torch.manual_seed(cli.rng_seed)
@@ -241,7 +247,14 @@ def main():
             opt.step()
         print(f"BC epoch {ep + 1}: loss {float(loss):.4f} "
               f"({time.time() - t0:.0f}s)", flush=True)
-    eval_dev(actor, os.path.join(cli.out, "eval_bc.json"))
+    if cli.reuse_bc_eval:
+        import shutil
+        os.makedirs(cli.out, exist_ok=True)
+        shutil.copyfile(cli.reuse_bc_eval,
+                        os.path.join(cli.out, "eval_bc.json"))
+        print("BC eval reused from", cli.reuse_bc_eval, flush=True)
+    else:
+        eval_dev(actor, os.path.join(cli.out, "eval_bc.json"))
 
     # ---- conservative critic fit -------------------------------------
     s = torch.from_numpy(flat["s"])                            # (T,4335)
@@ -259,10 +272,11 @@ def main():
     dj = torch.from_numpy(np.repeat(flat["dones"], N_AG).astype(np.float32))
     critic = Critic()
     optq = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    row_idx = rng_np.permutation(n_rows)[: int(n_rows * TD_SUB_FRAC)]
     for ep in range(Q_EPOCHS):  # freeze: fitted-Q sweeps, freeze params
-        perm = rng_np.permutation(n_rows)
-        for b0 in range(0, n_rows, 2048):
-            b = torch.from_numpy(perm[b0:b0 + 2048])
+        perm = rng_np.permutation(len(row_idx))
+        for b0 in range(0, len(row_idx), 2048):
+            b = torch.from_numpy(row_idx[perm[b0:b0 + 2048]])
             tgt = rj[b] + GAMMA * (1.0 - dj[b]) * \
                 q_max_samples(critic, nextx[b], nextag[b], dev_m[b],
                               K_CONSERV)

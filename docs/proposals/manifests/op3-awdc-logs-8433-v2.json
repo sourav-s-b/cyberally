@@ -1,0 +1,27 @@
+{
+  "run_id": "op3-awdc-logs-8433-v2",
+  "status": "FROZEN-PRE-RUN (extraction v2; logging untouched, log npz byte-hash unchanged)",
+  "supersedes": "docs/proposals/manifests/op3-awdc-logs-8433-frozen.json (v1 hibernates the LOGGING recipe and gates unchanged)",
+  "defect_record": {
+    "what": "extraction v1 (run op3-awdc-logs-8433-20261022, extract_s0) aborted before the critic finished fitting: fitted-Q epoch 1 measured 561 s -> 40 epochs ~6.2 h > the frozen 4 h budget; per the frozen stop rule the run aborted with partial results (BC-init eval only). No AWDC checkpoint or final eval was produced.",
+    "root_cause": "underestimated critic cost at freeze: 8 random-masked samples + data rows through a 4356->128 network at 286k rows per epoch.",
+    "acquisition_carried": "BC-init v1 data is deterministic (same recipe + rng seed) and is REUSED in v2 for rng seed 0 only, via --reuse-bc-eval (file extract_s0/eval_bc.json); provenance recorded in each manifest."
+  },
+  "formal_g2_record_v1": {
+    "bc_init_dev_mean": -4189.10,
+    "guard_dev_mean": -127.80,
+    "gate": "G2 leak-gate: PASSES (BC far BEHIND guard; no forward leak). Noted observation: BC mean equals the sleep-arm mean to 2 decimals — the greedy BC-extracted actor degenerates to Sleep on the sleep-token-heavy log mixture; the AWDC weighting stage is the preregistered mechanism expected to counter this, and the checkpoint evals will show whether it does."
+  },
+  "changed_config_v2": {
+    "q_epochs": 12,
+    "td_subsample_frac": 0.33,
+    "note": "TD fit subsamples a deterministic 33% of agent-rows ONCE per rng seed (drawn before the sweep), 12 epochs instead of 40; critic-forward cost ratio (12 x 0.33)/(40 x 1.0) ~ 0.1 = 10x cheaper than v1's 40 full-row epochs; everything else carried per the v1 freeze: BC 3 epochs lr 1e-3, ALPHA_CONSERV 0.1, TAU_W 1.0, K_CONSERV 8, weight clip [0, 20], checkpoints BC-init/AWDC-1/AWDC-2/final, budget 4 h per rng seed, eval 20 dev seeds paired vs the same G1 guard report, analysis via blue.training.op2_dev_analysis, H1 success = guard minus 1.0 (OP3 H1), extraction rng seeds 0/1/2"
+  },
+  "frozen_source_shas_sha256_prefix8": {
+    "blue/training/op3_offline.py": "9932d7c2",
+    "blue/training/log_transitions.py": "1c8b9d50",
+    "blue/core/wrapper.py": "dea1a81c"
+  },
+  "data_npz_sha16": "23ea65a346eaa98e",
+  "env_info_sha256_prefix16": "82d05804b3a1d58b"
+}
