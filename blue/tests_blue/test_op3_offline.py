@@ -58,6 +58,29 @@ def test_load_and_stack_shapes_match_rows(tiny_npz):
         assert flat["mask"][t, acts[t]] == 1
 
 
+def test_q_all_actions_matches_q_per_action(tiny_npz):
+    path, _ = tiny_npz
+    flat = op.stacked(op.load_episodes(path))
+    n_t = flat["s"].shape[0]
+    ag = torch.from_numpy(np.tile(np.eye(op.N_AG,
+                                          dtype=np.float32), (n_t, 1)))
+    oc = torch.from_numpy(np.repeat(flat["s"], op.N_AG, axis=0))
+    critic = op.Critic()
+    critic.eval()
+    with torch.no_grad():
+        all_q = critic.q_all_actions(oc[:10], ag[:10])
+        assert all_q.shape == (10, op.N_ACT)
+        # spot-check 20 (row, action) pairs against the exact q()
+        rs = np.random.default_rng(0)
+        for _ in range(20):
+            r = int(rs.integers(0, 10))
+            a = int(rs.integers(0, op.N_ACT))
+            q_exact = critic.q(oc[r:r + 1], ag[r:r + 1],
+                               torch.tensor([a]))
+            assert torch.allclose(all_q[r, a], q_exact[0],
+                                  atol=1e-5), (r, a)
+
+
 def test_fit_paths_backward_and_weights(tiny_npz):
     path, _ = tiny_npz
     flat = op.stacked(op.load_episodes(path))

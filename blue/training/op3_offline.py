@@ -139,17 +139,43 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
+    """Q(s_joint, agent, action) = rest(relul(gt_state(s, ag) +
+    emb_lin(emb(a)))). v3 memory decomposition: the first Linear is split
+    into a state-only base and an action-embedding contribution so the
+    all-actions sweep (needed for the exact masked-mean V) runs as small
+    chunked matmuls instead of a rows*155 materialization that OOM-killed
+    extraction v1 mid-run. q() outputs are numerically IDENTICAL to the
+    v1 concatenation form."""
+
     def __init__(self):
         super().__init__()
+        d_in = FEAT * N_AG + N_AG
+        self.lin_state = nn.Linear(d_in, H_CRITIC)
+        self.lin_emb = nn.Linear(EMB, H_CRITIC, bias=False)
         self.emb = nn.Embedding(N_ACT, EMB)
-        d = FEAT * N_AG + N_AG + EMB
-        self.net = nn.Sequential(nn.Linear(d, H_CRITIC), nn.ReLU(),
-                                 nn.Linear(H_CRITIC, H_CRITIC), nn.ReLU(),
-                                 nn.Linear(H_CRITIC, 1))
+        self.rest = nn.Sequential(nn.Linear(H_CRITIC, H_CRITIC), nn.ReLU(),
+                                  nn.Linear(H_CRITIC, 1))
+
+    def _base(self, s, ag):
+        return self.lin_state(torch.cat([s, ag], dim=1))
 
     def q(self, s, ag, a):
-        z = torch.cat([s, ag, self.emb(a)], dim=1)
-        return self.net(z).squeeze(-1)
+        h = nn.functional.relu(self._base(s, ag)
+                               + self.lin_emb(self.emb(a)))
+        return self.rest(h).squeeze(-1)
+
+    def q_all_actions(self, s, ag, chunk=8192):
+        """(rows, N_ACT) Q for every candidate action, chunked so the
+        (rows*155, H_CRITIC) rest-input never materializes in full.
+        base_raw stays PRE-activation; q() is relu(base_raw + emb_lin)."""
+        base_raw = self._base(s, ag)                   # (rows,H)
+        e_all = self.lin_emb(self.emb.weight)          # (155,H)
+        out = torch.empty(base_raw.shape[0], N_ACT)
+        for c0 in range(0, base_raw.shape[0], chunk):
+            h = nn.functional.relu(base_raw[c0:c0 + chunk].unsqueeze(1)
+                                   + e_all.unsqueeze(0))
+            out[c0:c0 + chunk] = self.rest(h).squeeze(-1)
+        return out
 
 
 def eval_dev(actor, out_path):
@@ -303,11 +329,8 @@ def main():
     critic.eval()
     with torch.no_grad():
         q_sa_all = critic.q(oc, ag, ac)                          # (rows,)
-        # V(s): exact masked-mean via one full batched candidate sweep
-        vx = oc.repeat_interleave(N_ACT, dim=0)
-        vag = ag.repeat_interleave(N_ACT, dim=0)
-        vac = torch.arange(N_ACT).repeat(n_rows)                  # (rows*155,)
-        qv = critic.q(vx, vag, vac).view(n_rows, N_ACT)
+        # V(s): EXACT masked-mean via the chunked all-actions sweep
+        qv = critic.q_all_actions(oc, ag)                        # (rows,155)
         qv = qv.masked_fill(dev_m == 0, -float("inf"))
         V = qv.mean(dim=1)                                       # (rows,)
         A = q_sa_all - V
