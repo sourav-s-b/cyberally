@@ -1,5 +1,37 @@
 # Blue session update
 
+## OP3 logging done + extraction s0 running (2026-10-22)
+
+- **Logging PASS COMPLETE**: 72 episodes (12 train seeds × guard/lancer/
+  sleep/random×3 policy seeds), 28 728 ticks / 143 640 agent-rows, ~500 MB
+  compressed npz (`blue/results/op3_awdc_logs_v1/logged.npz`, sha16
+  `23ea65a346eaa98e`), wallclock 23 min (< 3 h cap), G1 in-script gates
+  never tripped. Manifest: `logging_manifest.json`.
+- **OP3 freeze** committed (`2c22ee1`) BEFORE logging: source-file shas,
+  real obs width 867 (skeleton's 510 recorded as wrong), env hash
+  identical to the OP2 stack, G2 leak-abort rule, extraction prereg
+  (actor/critic classes, ALPHA_CONSERV 0.1, TAU_W 1.0, weight clip [0,
+  20], checkpoints BC-init/AWDC-1/AWDC-2/final, budget caps). Extraction
+  software shas appended (`04e5928`) after logging but BEFORE any
+  extraction run (constants unchanged).
+- **Extraction s0** launched (`--rng-seed 0`): BC 3 epochs done (CE loss
+  ~16-18, not declining — the logs are sleep-token-heavy ON PURPOSE via
+  the scripted behaviours; BC-init eval currently in progress and its
+  early dev returns are sleep-degenerate). G2 leak-gate (BC ahead of
+  guard by > +1) is NOT expected to trip — but its inverse reading,
+  BC far behind, is NOT an abort condition and the critic + AWDC
+  weighting stages are the point of extraction. Watch for critic fit
+  completion and the four checkpoints. The G2 formal conclusion gets
+  recorded when the BC eval finishes (20/20 seeds).
+- Tests: test_op3_logging (2, including byte-identical rerun) and
+  test_op3_offline (staged-row/shape/critic-weight contracts) green;
+  smoke ran the fit paths on synthetic dims before commit.
+
+Next: after s0's four checkpoints — extraction rng seeds 1/2 (per
+freeze), then op2_dev_analysis on labels {bc, awdc_1, awdc_2, final}
+averaged across rng vs guard −127.8 (tau −1.0 per OP3 H1 rule: success
+= guard minus 1.0). Confirm block only on dev-gate pass + fresh audit.
+
 ## OP2 executed to completion: DEV GATE FAILED — negative result recorded (2026-10-22)
 
 The user launched training via `op2_pipeline.sh all` (server-install fix
