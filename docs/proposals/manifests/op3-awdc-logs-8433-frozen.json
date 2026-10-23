@@ -1,0 +1,44 @@
+{
+  "run_id": "op3-awdc-logs-8433-20261022",
+  "status": "FROZEN-PRE-RUN (logging stage; source-file pins + env hash recorded; nothing changes after logging starts)",
+  "supersedes": "docs/proposals/manifests/op3-awdc-logs-skeleton-20261022.json (skeleton, status SKELETON-PRE)",
+  "correction_vs_skeleton": "skeleton claimed per-agent obs width 510 from get_env_info(); the actual current-contract width under the frozen recipe (temporal features + include_root_session, red finite) is 867, verified by the G1 in-script check (every tick asserts obs width == get_env_info()) and test_op3_logging. Width is pinned by env hash, not by a literal in the prereg.",
+  "logging_recipe_frozen": {
+    "script": "blue/training/log_transitions.py",
+    "seeds": [8433, 8434, 8435, 8436, 8437, 8438, 8439, 8440, 8441, 8442, 8443, 8444],
+    "behaviour_arms": {"guard": "OrderedPolicy(LancerValues(fruitless_decay=0.5), max_age=80.0)", "lancer": "OrderedPolicy(LancerValues(fruitless_decay=0.5))", "sleep": "SleepBaseline", "random": "MaskedRandomBaseline, one policy seed per episode = 1000j + sim_seed, j in 1..3"},
+    "episodes": "12 seeds x (3 heuristic arms + 3 random distributions) = 72",
+    "steps": 400,
+    "env": "CC4MARLEnv with mappo_guide.ENV_KW (temporal_features ages+belief, include_root_session True) + red_agent finite",
+    "gates_in_script": ["per-tick obs width == get_env_info()", "every executed action inside its mask", "actions int16 within 155", "3h wallclock cap with no padding (partial allowed per prereg stop rule)"],
+    "outputs": {"npz": "blue/results/op3_awdc_logs_v1/logged.npz", "manifest": "blue/results/op3_awdc_logs_v1/logging_manifest.json"},
+    "no_privileged_features": "obs recorded via env.get_obs() (per-agent Blue-visible channels only); get_state() never touched"
+  },
+  "g0_gate": "cold-contract audit green on byte-identical wrapper/masking (shas below equal the OP2 freeze's; test_contract_cold 8/8 recorded at commit 41d18ad with wrapper dea1a81..., masking 8d8c81... — unchanged since)",
+  "g1_gate": "in-script: first logged episode's every tick check (also unit-tested); failure aborts before any batch",
+  "bc_gate_g2": "BC-init deterministic dev eval (20 seeds, paired vs guard from op2 G1 report): mean BC ahead of guard by MORE than +1 => logging recipe leaks -> ABORT offline stage per prereg stop rule; sane expectation is lightly behind",
+  "h1_prereg": "offline-extracted policy mean native return >= guard minus 1.0 on dev window (paired, 20 seeds) for the FINAL checkpoint; secondary per-RNG-seed spread reported without a gate",
+  "extraction_prereg_frozen": {
+    "actor": "per-agent factorized masked policy: Linear(867->hidden)->ReLU->Linear(hidden->hidden)->ReLU->Linear(hidden->155), mask applied at sampling AND at argmax eval; BC cross-entropy init on logged actions",
+    "hidden": 64, "bc_epochs": 3,
+    "critic": "Q(s_flat, a) MLP on (obs 867 x 5 concat + one-hot agent) -> hidden 128 -> 1; TD regression with conservative CQL-style penalty: logsumexp-vs-taken-action hinge as the lower-bound term, alpha reported in manifest",
+    "awdc_weighting": "A = Q(s,a_log) - V(s) with V(s) = mean over mask of Q; weights exp(A/tau), per-state normalized; tau in manifest (planned 1.0; NOT tunable post-freeze)",
+    "checkpoints": ["BC-init", "AWDC-1", "AWDC-2", "final"],
+    "budget": "extraction <= 4h CPU; .venv-train"
+  },
+  "eval_prereg": "deterministic per-seed eval on dev 8445-8464 with --eval JSON SAME shape as mappo cmd_eval ({results:{learned:{seed:{return}}}}); analysis by blue.training.op2_dev_analysis (paired bootstrap 10000, rng 20261022) against the SAME G1 guard report that OP2 used; ReBRAC-style: per-RNG-extraction-seed spread reported",
+  "extraction_rng_seeds": [0, 1, 2],
+  "confirm_gate": "8481-8500 opens ONLY on dev-gate pass + fresh seed_audit --check 8481 8500",
+  "stop_rules": ["no logging recipe or actor/critic config change mid-run", "BC-init failing G2 aborts the offline stage; report the recipe defect", "wallclock-capped logging reports partial npz with manifest; no padding with repeated same-seed runs"],
+  "frozen_source_shas_sha256_prefix8": {
+    "blue/training/log_transitions.py": "1c8b9d50",
+    "blue/core/wrapper.py": "dea1a81c",
+    "blue/core/baselines.py": "e0958ab0",
+    "blue/core/masking.py": "8d8c81d7",
+    "blue/policies/ordered.py": "5cbe5602",
+    "blue/training/mappo_guide.py": "8204e503",
+    "blue/tests_blue/test_op3_logging.py": "c0340dff"
+  },
+  "env_info_sha256_prefix16": "82d05804b3a1d58b (identical to OP2 G1 report env)",
+  "seed_ledger": {"train_8433_8444": "consumed by OP2 training + THIS logging pass (seed_audit --check 8433 8444 lists both sources; expected, prereg allocated this window for both)", "dev_8445_8464": "consumed by OP2 G1 re-measure + evals; OP3 evals reuse the SAME window for paired contrast (allocated role)", "spare_8465_8480": "untouched", "confirm_8481_8500": "never opened"}
+}
