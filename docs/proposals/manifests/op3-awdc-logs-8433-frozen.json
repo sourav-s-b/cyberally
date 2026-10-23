@@ -37,8 +37,11 @@
     "blue/core/masking.py": "8d8c81d7",
     "blue/policies/ordered.py": "5cbe5602",
     "blue/training/mappo_guide.py": "8204e503",
-    "blue/tests_blue/test_op3_logging.py": "c0340dff"
+    "blue/tests_blue/test_op3_logging.py": "c0340dff",
+    "blue/training/op3_offline.py": "32b28227",
+    "blue/tests_blue/test_op3_offline.py": "a683d7be"
   },
+  "freeze_amendment_note": "log_transitions + test_op3_logging shas were pinned BEFORE the logging batch launched (log recipe untouched since); op3_offline + test_op3_offline shas were appended AFTER logging finished-but-BEFORE any extraction run started (extraction-software development only; constants match the frozen extraction_prereg).",
   "env_info_sha256_prefix16": "82d05804b3a1d58b (identical to OP2 G1 report env)",
   "seed_ledger": {"train_8433_8444": "consumed by OP2 training + THIS logging pass (seed_audit --check 8433 8444 lists both sources; expected, prereg allocated this window for both)", "dev_8445_8464": "consumed by OP2 G1 re-measure + evals; OP3 evals reuse the SAME window for paired contrast (allocated role)", "spare_8465_8480": "untouched", "confirm_8481_8500": "never opened"}
 }
