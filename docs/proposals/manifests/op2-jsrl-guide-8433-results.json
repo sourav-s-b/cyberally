@@ -1,0 +1,34 @@
+{
+  "run_id": "op2-jsrl-guide-8433-20261022",
+  "frozen_prereg": "docs/proposals/manifests/op2-jsrl-guide-8433-final.json",
+  "outcome_verdict": "DEV GATE FAILED - negative result, recorded as-is per prereg reporting rules",
+  "executed": {
+    "guard_remeasure_G1": "blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json (sha256 3225431df4e1396d...), commit 41d18ad, env_info_sha256 82d05804b3a1d58b...",
+    "training": "6 sequential runs (jsrl_s0/s1/s2, noguide_s0/s1/s2) via op2_pipeline.sh, config verbatim from the freeze; no mid-run config change (G2)",
+    "dev_eval": "learned-arm only, 20 paired dev seeds, red finite, greedy hook as pre-registered",
+    "analysis": "blue/training/op2_dev_analysis.py, 10000 paired resamples, rng 20261022"
+  },
+  "results": {
+    "guard_control_mean": -127.80,
+    "contrasts": {
+      "jsrl_minus_guard": {"paired_mean": -401.68, "ci95": [-509.32, -306.81], "n": 20},
+      "noguide_minus_guard": {"paired_mean": -178.68, "ci95": [-233.92, -130.20], "n": 20},
+      "jsrl_minus_noguide": {"paired_mean": -223.00, "ci95": [-309.00, -148.22], "n": 20}
+    },
+    "gate": {"tau": 0.0, "passed": false, "ci_cross_zero": false}
+  },
+  "interpretive_notes": [
+    "Both arms are statistically worse than the frozen scripted guard; the JSRL guide warm-start made the actor WORSE than the identical no-guide ablation (opposite of the hypothesis direction).",
+    "This lands on the negative end of an already-sparse positive evidence field: no RL submission in the CAGE4 arena beat top heuristics (Kiely et al. AAAI-25); RL-beats-BC conditions (Kumar et al. 2204.05618) are about offline-derived policies, not scripted-guide PPO.",
+    "Named suspects worth one diagnostic pass before choosing next steps: (1) greedy deploy vs temperature-1 sampled rollout mismatch amplifying a drifted tanh head (jsrl_s0 catastrophically negative evals -1077..-1830 against its own training-window returns of -150..-360); (2) guide window covering the sparse-onset region may crowd out learner exposure on exactly the states that matter (bootstrapped-off-the-distribution effect from Uchendu et al.); (3) 12 iters x 4 eps is a small budget - the negative is an honest prereg outcome, NOT a proven impossibility claim.",
+    "HISTORICAL numbers remain context only: pilot guard -150.21/lancer -151.79 on 7665-7688, IQL -96.0."
+  ],
+  "stop_rule_applied": "confirm block 8481-8500 NOT opened (fresh seed_audit --check 8481 8500 never run this stage); dev-gate failure closes the prereg",
+  "seeds_consumed": {"train_8433_8444": "6 x 48 rollout episodes", "dev_8445_8464": "guard re-measure + 6 learned-arm evals (paired usage, allocated role)"},
+  "artifact_shas_sha256_prefix16": {
+    "blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json": "3225431df4e1396d",
+    "blue/results/op2_jsrl_guide_v1/dev_analysis.json": "406d2cc342ce6b7e",
+    "blue/results/op2_jsrl_guide_v1/jsrl_s0/eval_dev.json": "b204bab6f28668e8",
+    "blue/results/op2_jsrl_guide_v1/noguide_s0/actor.th": "b390668d8e8c8db9"
+  }
+}

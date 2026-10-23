@@ -1,5 +1,44 @@
 # Blue session update
 
+## OP2 executed to completion: DEV GATE FAILED — negative result recorded (2026-10-22)
+
+The user launched training via `op2_pipeline.sh all` (server-install fix
+`665ea96` — empty-array expansion had killed the first launch under set -u).
+All six trainings completed WITHOUT any mid-run config change (G2 honored):
+
+- jsrl_s0/s1/s2 and noguide_s0/s1/s2, ~16 min each, coverage 1.00 in every
+  iteration; guide-window share fell 0.86 → 0.62 as the schedule decayed.
+- Dev eval (learned arm only, 20 paired seeds, red `finite`) and the frozen
+  analysis (`op2_dev_analysis.py`) ran to completion:
+  **jsrl − guard −401.68 CI95 [−509.32, −306.81]**;
+  noguide − guard **−178.68** [−233.92, −130.20];
+  jsrl − noguide **−223.00** [−309.00, −148.22]. Gate TAU=0.0: FAILED,
+  all three CIs wholly negative.
+- The warm-start made the actor WORSE than its own no-guide ablation.
+  jsrl_s0's eval (−1077…−1830 on several seeds) is catastrophically worse
+  than its own training-window returns (−150…−360): the greedy-deploy
+  vs temperature-1-sampled-rollout mismatch is suspect #1 for any later
+  diagnostic pass (suspects recorded in the results record JSON).
+- Per prereg reporting rules: recorded as-is, no salvage, **confirm block
+  8481–8500 NOT opened** (seed_audit never run for it this stage). A
+  committed artifacts/record file lives at
+  `docs/proposals/manifests/op2-jsrl-guide-8433-results.json` with the
+  verdict, guard means (−127.8), contrasts, artifact hashes and named
+  suspects; gitignored outputs remain in
+  `blue/results/op2_jsrl_guide_v1/`. One decisive positive of the stage:
+  the whole pre-registered machinery (freeze → gate → fresh guard →
+  paired stats) worked end-to-end and correctly rejected a bad treatment.
+- Suspect list, NOT excuses: (1) deploy-time behavior shifted far from the
+  rollout distribution; (2) the guide window may crowd out exactly the
+  learner exposure the sparse-onset region needs; (3) 12×4 budget too
+  small — recorded as an honest prereg NEGATIVE, not a proof of
+  impossibility; any follow-up must re-freeze a NEW run_id.
+
+Remote: branch pushed (origin at `665ea96` + this recording commit).
+Next: OP3 (offline RL per `op3-awdc-logs-skeleton-20261022.json`) is the
+user's previously chosen sequential next stage; the behaviour-logging
+pass on train seeds (fresh, ≤3 h) is its first concrete task.
+
 ## G1 gate result: complete, PASSED (2026-10-22)
 
 `blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json` — 4 arms × 20
