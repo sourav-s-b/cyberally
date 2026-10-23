@@ -18,19 +18,18 @@ NP_ITERS=12
 
 train_one() {
   local arm=$1 s=$2 out="$RES/${1}_s${2}"
-  local resume=() done_it=0
+  local extra="" done_it=0
   if [[ -f "$out/pilot_manifest.json" ]]; then
     done_it=$("$PY" -c "import json;print(json.load(open('$out/pilot_manifest.json'))['iters_done'])")
     if [[ "$done_it" -ge $NP_ITERS ]]; then
       echo "skip train ${arm}_s${s}: ${done_it}/${NP_ITERS} iters done"
       return 0
     fi
-    resume=(--resume-from "$out")
+    extra="--resume-from $out"
     echo "resuming ${arm}_s${s} from iter $((done_it + 1))"
   fi
-  local flags="" extra=()
+  local flags=""
   if [[ $arm == jsrl ]]; then flags=$GUIDE; fi
-  [[ ${#resume[@]} -eq 2 ]] && extra=("${resume[@]}")
   "$PY" -m blue.training.mappo_guide --mode train \
     --train-seeds $TRAIN_SEEDS \
     --steps 400 --iters $NP_ITERS --eps-per-iter 4 --hidden 64 \
