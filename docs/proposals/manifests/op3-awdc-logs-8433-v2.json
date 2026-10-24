@@ -29,5 +29,11 @@
     "fix_op3_offline.py e54ffbf8": "Critic decomposed: lin_state(s,ag) + lin_emb(emb(a)) shared first layer, q() numerically identical to v1-v2 (spot-checked by test_q_all_actions_matches_q_per_action, atol 1e-5); V sweep now chunked via q_all_actions (max transient ~1.6 GB).",
     "carried": "logged.npz byte-hash unchanged (23ea65a346eaa98e); BC recipe + reused BC eval for rng 0 unchanged; all other v2 config constants unchanged.",
     "commits": "sha re-pinned in this file before the v3 run launched; the killed v2 partial logs are in extract_s0.log"
+  },
+  "v4_addendum": {
+    "what": "extraction v3 died silently after critic epoch 10, again. dmesg unavailable; system RAM measured at 7.5 GB with ~5.9 GB available: the true root cause of v1-v3 is the row-replicated 5x materializations (oc/nextx ~2*2.5 GB + c_x 0.5 GB on top of numpy bases) on a 7.5 GB box.",
+    "fix_op3_offline.py cebfa46d": "lazy row store: stacked() keeps only (T,5,867) obs + (T,5,155) masks + acts/rew/done/next_idx (~600 MB); new rows_slice() builds per-batch tensors (row i -> tick i//5, agent i%5); no row-replicated tensor is ever materialized; AWDC weight sweep streams 4096-row chunks. Math identical: v2/v3 constants unchanged, BC recipe unchanged.",
+    "carried": "logged.npz byte-hash 23ea65a346eaa98e unchanged; BC eval for rng 0 reused from eval_bc.json; freeze constants unchanged.",
+    "test": "test_op3_offline.py 2c11007d: 3 tests incl. q/q_all_actions exact equivalence (atol 1e-5); test_op3_logging still green (5 passed total)."
   }
 }

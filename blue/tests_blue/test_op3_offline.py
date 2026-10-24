@@ -48,34 +48,36 @@ def test_load_and_stack_shapes_match_rows(tiny_npz):
     assert len(eps) == 4
     flat = op.stacked(eps)
     n_t = sum(e["obs"].shape[0] for e in eps)
-    assert flat["s"].shape == (n_t, op.FEAT * op.N_AG)
-    assert flat["c_x"].shape == (n_t * op.N_AG, op.FEAT)
-    assert flat["mask"].shape == (n_t * op.N_AG, op.N_ACT)
+    assert flat["obs"].shape == (n_t, op.N_AG, op.FEAT)
+    assert flat["mask"].shape == (n_t, op.N_AG, op.N_ACT)
     assert flat["acts"].shape == (n_t, op.N_AG)
-    # every logged action legal in its mask
+    assert flat["next_idx"].shape == (n_t,)
+    # row i maps to (tick i//5, agent i%5) and every logged action is
+    # legal in its mask; next_idx stays within the same episode
     acts = flat["acts"].reshape(-1)
-    for t in range(acts.shape[0]):
-        assert flat["mask"][t, acts[t]] == 1
+    for t in range(n_t):
+        assert flat["mask"].reshape(-1, op.N_ACT)[t, acts[t]] == 1
+        assert 0 <= flat["next_idx"][t] <= n_t - 1
 
 
 def test_q_all_actions_matches_q_per_action(tiny_npz):
     path, _ = tiny_npz
     flat = op.stacked(op.load_episodes(path))
-    n_t = flat["s"].shape[0]
-    ag = torch.from_numpy(np.tile(np.eye(op.N_AG,
-                                          dtype=np.float32), (n_t, 1)))
-    oc = torch.from_numpy(np.repeat(flat["s"], op.N_AG, axis=0))
+    rows = np.arange(min(10, flat["obs"].shape[0] * op.N_AG))
+    b = op.rows_slice(flat, rows)
+    assert b["joint"].shape == (len(rows), op.FEAT * op.N_AG)
+    assert b["agent"].shape == (len(rows), op.FEAT)
     critic = op.Critic()
     critic.eval()
     with torch.no_grad():
-        all_q = critic.q_all_actions(oc[:10], ag[:10])
-        assert all_q.shape == (10, op.N_ACT)
+        all_q = critic.q_all_actions(b["joint"], b["onehot"])
+        assert all_q.shape == (len(rows), op.N_ACT)
         # spot-check 20 (row, action) pairs against the exact q()
         rs = np.random.default_rng(0)
         for _ in range(20):
-            r = int(rs.integers(0, 10))
+            r = int(rs.integers(0, len(rows)))
             a = int(rs.integers(0, op.N_ACT))
-            q_exact = critic.q(oc[r:r + 1], ag[r:r + 1],
+            q_exact = critic.q(b["joint"][r:r + 1], b["onehot"][r:r + 1],
                                torch.tensor([a]))
             assert torch.allclose(all_q[r, a], q_exact[0],
                                   atol=1e-5), (r, a)
@@ -84,39 +86,33 @@ def test_q_all_actions_matches_q_per_action(tiny_npz):
 def test_fit_paths_backward_and_weights(tiny_npz):
     path, _ = tiny_npz
     flat = op.stacked(op.load_episodes(path))
-    n_t = flat["s"].shape[0]
-    n_rows = n_t * op.N_AG
-    dev_m = torch.from_numpy(flat["mask"])
-    dev_a = torch.from_numpy(flat["acts"].reshape(-1))
-    dev_x = torch.from_numpy(flat["c_x"])
-    ag = torch.from_numpy(np.tile(np.eye(op.N_AG,
-                                          dtype=np.float32), (n_t, 1)))
-    oc = torch.from_numpy(np.repeat(flat["s"], op.N_AG, axis=0))
-    nextx = torch.from_numpy(np.repeat(flat["s_next"], op.N_AG, axis=0))
-    rj = torch.from_numpy(np.repeat(flat["rew"], op.N_AG).astype(np.float32))
-    dj = torch.from_numpy(np.repeat(flat["dones"], op.N_AG).astype(np.float32))
-    b = torch.arange(n_rows)
+    n_rows = flat["obs"].shape[0] * op.N_AG
+    rows = np.arange(n_rows)
+    b = op.rows_slice(flat, rows)
     critic = op.Critic()
-    tgt = rj[b] + op.GAMMA * (1.0 - dj[b]) * op.q_max_samples(
-        critic, nextx[b], ag[b], dev_m[b], op.K_CONSERV)
-    q_sa = critic.q(oc[b], ag[b], dev_a[b])
-    cons = op.q_max_samples(critic, oc[b], ag[b], dev_m[b], op.K_CONSERV)
+    tgt = b["rew"] + op.GAMMA * (1.0 - b["done"]) * op.q_max_samples(
+        critic, b["joint_next"], b["onehot"], b["mask"], op.K_CONSERV)
+    q_sa = critic.q(b["joint"], b["onehot"], b["acts"])
+    cons = op.q_max_samples(critic, b["joint"], b["onehot"], b["mask"],
+                            op.K_CONSERV)
     loss = nn.functional.mse_loss(q_sa, tgt) + op.ALPHA_CONSERV * \
         torch.nn.functional.relu(cons - q_sa).mean()
     assert torch.isfinite(loss).all()
+    # a backward step must succeed on a real optimizer path
+    optq = torch.optim.Adam(critic.parameters(), lr=1e-3)
+    critic.zero_grad()
+    loss.backward()
+    optq.step()
     critic.eval()
     with torch.no_grad():
-        q_all = critic.q(oc[b], ag[b], dev_a[b])
-        qv = critic.q(oc[b].repeat_interleave(op.N_ACT, dim=0),
-                      ag[b].repeat_interleave(op.N_ACT, dim=0),
-                      torch.arange(op.N_ACT).repeat(n_rows))
-        qv = qv.view(n_rows, op.N_ACT).masked_fill(dev_m[b] == 0,
-                                                   -float("inf"))
+        qv = critic.q_all_actions(b["joint"], b["onehot"])
+        qv = qv.masked_fill(b["mask"] == 0, -float("inf"))
         V = qv.mean(dim=1)
-        w = torch.exp((q_all - V) / op.TAU_W).clip(*op.W_CLIP)
+        w = torch.exp((critic.q(b["joint"], b["onehot"], b["acts"]) - V)
+                      / op.TAU_W).clip(*op.W_CLIP)
     assert torch.isfinite(w).all() and (w >= 0).all()
     actor = op.Actor()
-    lg = actor(dev_x[b]) + (dev_m[b] - 1.0).clip(max=-1e9)
-    logp = torch.log_softmax(lg, dim=1).gather(1, dev_a[b][:, None])
+    lg = actor(b["agent"]) + (b["mask"] - 1.0).clip(max=-1e9)
+    logp = torch.log_softmax(lg, dim=1).gather(1, b["acts"][:, None])
     loss = -(w * logp.squeeze(1)).mean()
     loss.backward()

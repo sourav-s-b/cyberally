@@ -101,29 +101,53 @@ def load_episodes(path):
 
 
 def stacked(eps):
-    """Flatten rows: s (T,4335), s_next, dones, rew, acts (T,5), masks
-    (T,5,155), plus per-agent actor rows c_x (T*5,867)."""
-    s, s2, dones, rs, acts, masks, c_x = [], [], [], [], [], [], []
+    """Lazy row store (v4). Keeps ONLY the (T*episodes, 5, FEAT) base
+    arrays on RAM; row i maps to (tick t = i // N_AG, agent a = i % N_AG).
+    The v1-v3 materializations (row-replicated 5x duplicates of the joint
+    states) exceeded the 7.5 GB box and OOM-killed silently, so the fit
+    loops now stream per-batch rows via rows_slice instead."""
+    obs = np.concatenate([e["obs"] for e in eps]).astype(np.float32)
+    acts = np.concatenate([e["acts"] for e in eps]).astype(np.int64)
+    mask = np.concatenate([e["mask"] for e in eps]).astype(np.int8)
+    rew = np.concatenate([e["rew"] for e in eps]).astype(np.float32)
+    dones = np.concatenate([e["done"] for e in eps]).astype(np.float32)
+    next_idx = np.empty(obs.shape[0], dtype=np.int64)
+    c = 0
     for e in eps:
         T = e["obs"].shape[0]
-        s.append(e["obs"].reshape(T, -1))
-        s2.append(np.vstack([e["obs"][1:], e["obs"][-1:]]).reshape(T, -1))
-        dones.append(e["done"].astype(np.float32))
-        rs.append(e["rew"])
-        acts.append(e["acts"])
-        masks.append(e["mask"])
-        c_x.append(e["obs"].reshape(T * N_AG, FEAT))
+        for t in range(T):
+            # terminal bootstrap is zeroed by done anyway; self-loop at
+            # the episode end keeps the index in bounds
+            next_idx[c + t] = c + t + 1 if t + 1 < T else c + t
+        c += T
+    return {"obs": obs, "acts": acts, "mask": mask, "rew": rew,
+            "dones": dones, "next_idx": next_idx}
+
+
+def rows_slice(flat, rows):
+    """Batch tensors for row indices (t = row // N_AG, a = row % N_AG):
+    joint (B,4335), agent row obs (B,867), agent one-hot (B,5), mask
+    (B,155), actions (B,), label reward/done (B,), and the next-joint
+    state for TD bootstrapping."""
+    t = np.asarray(rows) // N_AG
+    a = np.asarray(rows) % N_AG
+    B = len(t)
+    joint = torch.from_numpy(
+        flat["obs"][t].reshape(B, -1).astype(np.float32))
+    agent = torch.from_numpy(
+        flat["obs"][t, a].astype(np.float32))
     return {
-        "s": np.concatenate(s).astype(np.float32),
-        "s_next": np.concatenate(s2).astype(np.float32),
-        "dones": np.concatenate(dones).astype(np.float32),
-        "rew": np.concatenate(rs).astype(np.float32),
-        "acts": np.concatenate(acts).astype(np.int64),
-        # (T_total,5,155) -> (T_total*5,155), row t*5+agent, same order
-        # as the obs reshape used for c_x.
-        "mask": np.concatenate(masks).reshape(-1, N_ACT).astype(
-            np.float32),
-        "c_x": np.concatenate(c_x).astype(np.float32),
+        "joint": joint,
+        "agent": agent,
+        "onehot": torch.from_numpy(np.eye(N_AG, dtype=np.float32)[a]),
+        "mask": torch.from_numpy(
+            flat["mask"][t, a].astype(np.float32)),
+        "acts": torch.from_numpy(flat["acts"][t, a]),
+        "rew": torch.from_numpy(flat["rew"][t]),
+        "done": torch.from_numpy(flat["dones"][t]),
+        "joint_next": torch.from_numpy(
+            flat["obs"][flat["next_idx"][t]].reshape(B, -1).astype(
+                np.float32)),
     }
 
 
@@ -250,24 +274,19 @@ def main():
 
     eps = load_episodes(cli.data)
     flat = stacked(eps)
-    n_t = flat["s"].shape[0]          # ticks
-    n_rows = n_t * N_AG               # agent-rows
+    n_t = flat["obs"].shape[0]         # ticks
+    n_rows = n_t * N_AG                # agent-rows
     print(f"data: {len(eps)} episodes, {n_t} ticks, {n_rows} agent-rows",
           flush=True)
-
-    dev_x = torch.from_numpy(flat["c_x"])                     # (rows,867)
-    dev_m = torch.from_numpy(flat["mask"])                    # (rows,155)
-    dev_a = torch.from_numpy(flat["acts"].reshape(-1))        # (rows,)
 
     actor = Actor()
     opt = torch.optim.Adam(actor.parameters(), lr=1e-3)
     for ep in range(BC_EPOCHS):  # freeze: 3 epochs
         perm = rng_np.permutation(n_rows)
         for b0 in range(0, n_rows, 2048):
-            b = torch.from_numpy(perm[b0:b0 + 2048])
-            lg = actor(dev_x[b]) + (dev_m[b] - 1.0).clip(max=-1e9) \
-                .float()
-            loss = nn.functional.cross_entropy(lg, dev_a[b])
+            sl = rows_slice(flat, perm[b0:b0 + 2048])
+            lg = actor(sl["agent"]) + (sl["mask"] - 1.0).clip(max=-1e9)
+            loss = nn.functional.cross_entropy(lg, sl["acts"])
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -282,35 +301,21 @@ def main():
     else:
         eval_dev(actor, os.path.join(cli.out, "eval_bc.json"))
 
-    # ---- conservative critic fit -------------------------------------
-    s = torch.from_numpy(flat["s"])                            # (T,4335)
-    s2 = torch.from_numpy(flat["s_next"])
-    dones = torch.from_numpy(flat["dones"])                    # (T,)
-    rew_t = torch.from_numpy(flat["rew"])                      # (T,)
-    ag = torch.from_numpy(np.tile(np.eye(N_AG, dtype=np.float32),
-                                  (n_t, 1)))                   # (T*5,5)
-    nextx = torch.from_numpy(np.repeat(flat["s_next"], N_AG,
-                                       axis=0))                 # (T*5,4335)
-    nextag = ag
-    oc = torch.from_numpy(np.repeat(flat["s"], N_AG, axis=0))  # (rows,4335)
-    ac = dev_a
-    rj = torch.from_numpy(np.repeat(flat["rew"], N_AG).astype(np.float32))
-    dj = torch.from_numpy(np.repeat(flat["dones"], N_AG).astype(np.float32))
+    # ---- conservative critic fit (streamed rows, config unchanged) ----
     critic = Critic()
     optq = torch.optim.Adam(critic.parameters(), lr=1e-3)
     row_idx = rng_np.permutation(n_rows)[: int(n_rows * TD_SUB_FRAC)]
     for ep in range(Q_EPOCHS):  # freeze: fitted-Q sweeps, freeze params
         perm = rng_np.permutation(len(row_idx))
         for b0 in range(0, len(row_idx), 2048):
-            b = torch.from_numpy(row_idx[perm[b0:b0 + 2048]])
-            tgt = rj[b] + GAMMA * (1.0 - dj[b]) * \
-                q_max_samples(critic, nextx[b], nextag[b], dev_m[b],
-                              K_CONSERV)
-            q_sa = critic.q(oc[b], ag[b], ac[b])
-            # conservative hinge on DATA states: a random masked action's
-            # q must not exceed the logged action's q
-            cons = q_max_samples(critic, oc[b], ag[b], dev_m[b],
-                                 K_CONSERV)
+            sl = rows_slice(flat, row_idx[perm[b0:b0 + 2048]])
+            tgt = sl["rew"] + GAMMA * (1.0 - sl["done"]) * \
+                q_max_samples(critic, sl["joint_next"], sl["onehot"],
+                              sl["mask"], K_CONSERV)
+            q_sa = critic.q(sl["joint"], sl["onehot"], sl["acts"])
+            # conservative hinge on the SAME batch (data states)
+            cons = q_max_samples(critic, sl["joint"], sl["onehot"],
+                                 sl["mask"], K_CONSERV)
             loss = nn.functional.mse_loss(q_sa, tgt) + ALPHA_CONSERV * \
                 nn.functional.relu(cons - q_sa).mean()
             critic.zero_grad()
@@ -325,34 +330,34 @@ def main():
                   "prereg stop rule (partial report)", flush=True)
             break
 
-    # ---- AWDC weights from the FROZEN critic --------------------------
+    # ---- AWDC weights from the FROZEN critic (streamed, exact) --------
     critic.eval()
+    w_t = torch.empty(n_rows)
     with torch.no_grad():
-        q_sa_all = critic.q(oc, ag, ac)                          # (rows,)
-        # V(s): EXACT masked-mean via the chunked all-actions sweep
-        qv = critic.q_all_actions(oc, ag)                        # (rows,155)
-        qv = qv.masked_fill(dev_m == 0, -float("inf"))
-        V = qv.mean(dim=1)                                       # (rows,)
-        A = q_sa_all - V
-        w_t = torch.exp(A / TAU_W).clip(*W_CLIP)
-        w_mean = float(w_t.mean())
-        print(f"AWDC weights: mean {w_mean:.4f}, max {float(w_t.max()):.2f}",
-              flush=True)
+        for r0 in range(0, n_rows, 4096):
+            rows = np.arange(r0, min(r0 + 4096, n_rows))
+            sl = rows_slice(flat, rows)
+            q_sa_c = critic.q(sl["joint"], sl["onehot"], sl["acts"])
+            qv = critic.q_all_actions(sl["joint"], sl["onehot"])
+            V = qv.masked_fill(sl["mask"] == 0, -float("inf")).mean(dim=1)
+            w_t[r0:r0 + len(rows)] = torch.exp(
+                (q_sa_c - V) / TAU_W).clip(*W_CLIP)
+    w_mean = float(w_t.mean())
+    print(f"AWDC weights: mean {w_mean:.4f}, max {float(w_t.max()):.2f}",
+          flush=True)
 
     optw = torch.optim.Adam(actor.parameters(), lr=AWDC_LR)
-    n_running_rows = n_rows
     for ck, epochs in ((1, 4), (2, 4), (3, 8)):  # freeze checkpoint plan
         if time.time() - t0 > BUDGET_S:
             break
         for _ in range(epochs):
-            perm = rng_np.permutation(n_running_rows)
-            for b0 in range(0, n_running_rows, 2048):
-                b = torch.from_numpy(perm[b0:b0 + 2048])
-                lg = actor(dev_x[b]) + (dev_m[b] - 1.0).float() \
-                    .clip(max=-1e9)
+            perm = rng_np.permutation(n_rows)
+            for b0 in range(0, n_rows, 2048):
+                sl = rows_slice(flat, perm[b0:b0 + 2048])
+                lg = actor(sl["agent"]) + (sl["mask"] - 1.0).clip(max=-1e9)
                 logp = torch.log_softmax(lg, dim=1).gather(
-                    1, dev_a[b][:, None]).squeeze(1)
-                loss = -(w_t[b] * logp).mean()
+                    1, sl["acts"][:, None]).squeeze(1)
+                loss = -(w_t[perm[b0:b0 + 2048]] * logp).mean()
                 optw.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_value_(actor.parameters(), 5.0)
