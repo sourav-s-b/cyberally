@@ -1,5 +1,44 @@
 # Blue session update
 
+## Event-time RL / Qwen Red (2026-10-24, in progress)
+
+Branch `blue/event-time-rl`, based on `7ac88861970744f5328d60434cbb07734c3a522c`;
+merged-main dependency inspected at `01140fe517c056444e4e95430b034b35bd8aadf5`.
+The GPT-Blue harness candidate to inspect/port is exactly
+`f32ba7284d7000127bacb6f09fab2dcf980d7048`; it has **not** been merged.
+Proposal: `docs/proposals/blue-event-time-qwen-20261024.md`.
+
+The user chose a smaller Qwen Red planner for the new RL experiment. Blue's
+`llmred_eval.py` now accepts `--model` (default `qwen2.5:3b`) while Red's
+shared default remains unchanged. Installed Qwen digest is
+`357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b`
+under Ollama `0.40.0`, loaded 100% on GPU. A 20-tick wiring check at spent
+seed 7629 returned 0 for both Lancer arms; a 400-tick preflight on that same
+seed returned -134 native Blue reward with 12 Red plan requests, 71 Blue
+remediation actions, and 27 confirmed hosts (399 native ticks). These are
+preflight observations, not a Qwen baseline or RL outcome. Earlier Llama 8B
+returns/variance are not compared numerically to this new attacker regime.
+
+The evaluator adds strict-guard Lancer, action-stream SHA, exact model/config/
+source/artifact fingerprinting for durable partial episodes, and refuses a
+cross-run cache. Focused same-guard no-op hook parity test passed (1 passed,
+1 warning); syntax and diff checks passed. The historical actor/risk artifacts
+were rehashed as
+`f5afa909efeee600637e3cd01279ac8e1818b469133c752f770045f254267a4e`
+and `64b3c7ae7775a1cd447de11bfd453fafa1097ea730b8ffffb7351dfd71473f93`.
+Runtime JSONs live in ignored `blue/results/event_time_rl/`. No final seeds
+7809–8200 have been used.
+
+Next: run the predeclared Qwen development headroom comparison; inspect its
+attacker pressure and same-guard RL attribution. Then port the frozen
+GPT-Blue harness into this isolated branch, implement/test event-time targets,
+and run paired equal-budget RL arms. No shared contract, simulator, Red-source,
+or checkpoint migration is needed for the Qwen model switch. PR checklist:
+confirm model digest/source and seed separation, keep native rewards/privileged
+labels out of actor input, validate fallback/action masks and pending timing,
+report lower-tail episodes and independent training seeds. No messages or review
+requests have been sent to teammates.
+
 ## Research audit (2026-10-03)
 
 Branch `blue/mappo-training` at `a6eab7e`; exact main dependency
