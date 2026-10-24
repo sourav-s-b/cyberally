@@ -39,6 +39,7 @@ FROZEN_QWEN = {
 }
 BLUE_SOURCE = (
     "blue/training/event_time_rl.py", "blue/training/harness_redesign.py",
+    "blue/training/event_time_pilot.sh",
     "blue/training/mappo_guide.py", "blue/harness/features.py",
     "blue/harness/scoring.py", "blue/harness/policy.py",
     "blue/harness/redesign.py", "blue/harness/numerics.py",
