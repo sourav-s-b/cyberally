@@ -196,6 +196,10 @@ Pilot evaluation is four development seeds 7641–7644, one sampled policy
 replica, saved iteration 2, and the same strict-Lancer plus untrained-mixture
 controls for every model. Its returns are descriptive and do not choose an
 arm or checkpoint. The primary main endpoint remains fixed iteration 12.
+The restartable main launcher is `blue/training/event_time_main.sh`, SHA256
+`4e2077808eea023a8a4e71400ed162a886e6baffbab8967c1f8cdbef5513de48`.
+It reruns the pilot gate before starting, uses the frozen 10-run/480-episode
+budget above, and retains optimizer/RNG state at every completed iteration.
 
 The runnable implementation must save source commit and per-file hashes,
 exact model digest, Red prompt/source hashes, Blue checkpoint hashes,
