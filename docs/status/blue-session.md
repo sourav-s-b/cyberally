@@ -67,6 +67,22 @@ local time (kernel boot log, no Python traceback or OOM message). Its durable
 partial JSONL retained all 31 episodes; the same run fingerprint was accepted
 on relaunch, which resumed at strict-guard seed 7648. No RL training has been
 claimed from this headroom batch.
+
+A full 400-tick finite-Red mechanics run exposed near-zero policy movement
+under the inherited update settings (exact KL 1.05e-7 despite 718 learned
+decisions). The predeclared update-magnitude calibration on spent seed 7706
+selected candidate C2: `bonus=1.0, explore=0.5, actor_lr=0.003`, with default
+`critic_lr=0.0003, temp=0.5`. C1 KL was 0.000497; C2 KL 0.003607, sampled
+override rate 0.3943, finite gradient, clip fraction 0.0445. Both C1 and C2
+initial rollouts returned -236; returns were not used in selection. These
+settings are shared by lambda=1 and lambda=0.9 Qwen pilot/main arms and are
+frozen before either Qwen RL training run.
+The Qwen trainer now rejects any tag/digest/version other than the recorded
+`qwen2.5:3b` / `357c53fb…` / Ollama `0.40.0` combination. The headroom analysis
+script checks all three arms and 24 seed pairs, then uses 10,000 whole-seed
+bootstrap resamples for descriptive development intervals. Two synthetic
+analysis checks and 15 mechanism/redesign checks passed (17 total). Historical
+actor checkpoint load plus a 40-tick finite-Red hook smoke also passed.
 The historical actor/risk checkpoint also loaded and ran a 40-tick finite-Red
 hook smoke in the isolated worktree, after removing its unnecessary dependency
 on a missing initializer file. Focused integration checks: 25 passed,

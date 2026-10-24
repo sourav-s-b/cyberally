@@ -32,6 +32,11 @@ from blue.training.harness_redesign import Recorder, ExecutionAudit
 
 
 RED_SOURCE = ("red/llm_agent.py", "red/planned_agent.py", "red/blue_env.py")
+FROZEN_QWEN = {
+    "model": "qwen2.5:3b",
+    "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "ollama_version": "0.40.0",
+}
 BLUE_SOURCE = (
     "blue/training/event_time_rl.py", "blue/training/harness_redesign.py",
     "blue/training/mappo_guide.py", "blue/harness/features.py",
@@ -128,7 +133,10 @@ def model_info(cfg):
     # The local client checks the exact installed tag and returns its digest
     # and Ollama version without spending a plan request.
     from red.llm_agent import LLMConfig, OllamaClient
-    return OllamaClient(LLMConfig(**llm_config(cfg))).check_model()
+    actual = OllamaClient(LLMConfig(**llm_config(cfg))).check_model()
+    if actual != FROZEN_QWEN:
+        raise RuntimeError("Qwen tag/digest/Ollama version differs from freeze")
+    return actual
 
 
 def config(args):
@@ -220,6 +228,8 @@ def train(args):
         history.append({"iteration": iteration + 1, "episodes": episodes,
                         "decision_rows": len(rec.rows),
                         "singleton_forced_choices": rec.singleton_choices,
+                        "sampled_override_rate": (rec.sampled_disagree
+                                                  / max(rec.total, 1)),
                         **stats})
         # Preserve every candidate for the predeclared dev-checkpoint rule.
         checkpoints = out / "checkpoints"

@@ -79,6 +79,28 @@ theorem-based safety claim for this implementation.
    terminal/truncation bootstrapping, and zero gradient on forced choices.
    A one-episode dry run must emit transition counts and actor-gradient
    counts. Stop on any mismatch.
+   A 400-tick finite-Red dry run exposed almost zero initial policy movement
+   (`KL ~ 1e-7`) under the inherited `bonus=.25, explore=.2, lr=3e-4`.
+   Before Qwen pilot/training, run a **mechanical update calibration** on
+   spent training seed 7706 with `lambda=1.0`, one full 400-tick episode per
+   candidate. The
+   ordered candidates are `(bonus, explore, actor_lr)` =
+   `(.25,.2,3e-4)`, `(1.0,.5,1e-3)`, `(1.0,.5,3e-3)`. Choose the first with
+   exact post-update KL in `[.001,.02]`, nonzero actor gradient, and sampled
+   override rate in `[.10,.50]`; otherwise stop and version a new proposal.
+   This gate uses **no return ranking**. Both RL arms then share the selected
+   bonus/explore/actor learning rate, same critic learning rate and rollout
+   budget. The calibration is diagnostic and its episodes are not evidence
+   of policy value.
+
+   **Pre-pilot calibration result (same spent seed, 2026-10-24):** inherited
+   C0 had exact KL `1.05e-7`; C1 had KL `0.000497`, override 0.3943 and
+   nonzero gradient; C2 had KL `0.003607`, override 0.3943, nonzero gradient,
+   12 policy steps and clip fraction 0.0445. C2 is the first candidate
+   satisfying the frozen gate. The C1 and C2 initial rollouts both returned
+   -236; that return was not used for selection. **Freeze both Qwen RL arms
+   at `bonus=1.0`, `explore=0.5`, `actor_lr=0.003`, `critic_lr=0.0003`,
+   `temp=0.5`.**
 2. **Qwen headroom (development).** Evaluate `lancer`, `lancer_guard`, and
    historical `actor_guard` on identical development seeds 7641–7664,
    400 ticks, native reward. The old actor checkpoint is frozen at SHA256
@@ -98,7 +120,8 @@ theorem-based safety claim for this implementation.
    with the guard enabled during collection and evaluation. Check episode
    boundaries and gradient counts again. Continue to the main run only if the
    event-time arm actually produces nonzero free-decision updates, never
-   violates coverage/masks, and finishes within the measured compute budget.
+   violates coverage/masks, keeps finite gradients and KL <=0.02, and
+   finishes within the measured compute budget.
    The pilot does not select between arms by return.
 4. **Main.** Training RNGs 0–4 per RL arm, 12 iterations x 4 full
    400-tick episodes per run (48 episodes/run), cycling training seeds
@@ -130,8 +153,9 @@ Finite Red seed 7629 found 663 free strict-guard sweep decisions, median
 top-two Lancer margin 0 and 97.0% margins <=0.5. Therefore the frozen
 `bonus=0.25` residual (up to 0.5 difference between two candidates) has
 capacity to reorder most free decisions. This was a mechanism check, not a
-return-based hyperparameter search; both RL arms keep `bonus=0.25`,
-`explore=0.2`, and `temperature=0.5`.
+return-based hyperparameter search. The update calibration above addresses
+the separate issue of policy-gradient magnitude; both RL arms keep the same
+selected settings and `temperature=0.5`.
 
 ## Reproducibility and rollout
 
