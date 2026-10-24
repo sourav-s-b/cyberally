@@ -126,9 +126,12 @@ theorem-based safety claim for this implementation.
 4. **Main.** Training RNGs 0–4 per RL arm, 12 iterations x 4 full
    400-tick episodes per run (48 episodes/run), cycling training seeds
    7706–7721. This is 480 episodes total across the ten runs and gives both
-   arms exactly equal native rollout budgets. Save all checkpoints; select each run's checkpoint
-   by a predeclared development rule using native return versus strict
-   Lancer, with lower-tail return breaking ties. Measure Qwen, Finite, Sleep,
+   arms exactly equal native rollout budgets. Save all checkpoints; the
+   primary endpoint uses **iteration 12 for every run**, fixed before pilot
+   development evaluation. Earlier iterations are learning-curve diagnostics
+   and cannot be selected by return. This replaces the initial proposal's
+   unspecified development checkpoint search: testing many checkpoints on a
+   small dev block would add large Qwen cost and selection bias. Measure Qwen, Finite, Sleep,
    random, unguarded Lancer, strict Lancer, and both RL arms on separate
    paired evaluation seeds. Size the Qwen evaluation from a fresh Qwen pilot
    variance; never reuse Llama's paired SD. Use episode and training-run
@@ -183,6 +186,16 @@ An event-time trainer Qwen wiring run on spent training seed 7706 at 40 ticks
 completed with 93 learnable decisions, seven forced singletons, finite
 gradients, exact post-update KL `0.000637`, and three Red plan requests.
 Its `-3` native return is only a short wiring observation.
+
+**Pilot mechanics result and development-evaluation freeze (before pilot
+evaluation outcomes):** two RNGs in each arm completed two iterations each.
+The frozen pilot audit passed source/model/scorer/checkpoint hashes, positive
+free-decision updates, complete coverage, and KL <=0.02; the first-episode
+requested Blue-action hashes match between lambda arms for both RNGs.
+Pilot evaluation is four development seeds 7641–7644, one sampled policy
+replica, saved iteration 2, and the same strict-Lancer plus untrained-mixture
+controls for every model. Its returns are descriptive and do not choose an
+arm or checkpoint. The primary main endpoint remains fixed iteration 12.
 
 The runnable implementation must save source commit and per-file hashes,
 exact model digest, Red prompt/source hashes, Blue checkpoint hashes,
