@@ -131,8 +131,24 @@ A Qwen trainer-factory wiring run (40 ticks, spent training seed 7706) had
 `0.000637`, three Red requests, and native return `-3` (mechanics only).
 The branch was pushed to `origin/blue/event-time-rl` before the pilot.
 
-Next: launch the frozen four-run Qwen RL pilot. Review its mechanism gates before the
-main equal-budget lambda comparison. No shared contract, simulator,
+The frozen Qwen pilot completed all 16 training episodes (lambda 1.0 and
+0.9, RNGs 0/1, two iterations x two episodes/run). The no-return-selection
+audit in `blue/results/event_time_rl/pilot_gate.json` passed: same executable
+source/model/scorer pins, intact saved checkpoints, coverage 1.0, positive
+free-decision gradients, and all eight exact KL values in [0, 0.02]
+(range 0.000176–0.005844). Initial requested Blue-action hashes match
+between lambda arms for both RNGs, so the first-policy comparison isolates
+the credit target. Training returns are not efficacy evidence. A four-seed
+development evaluation of every pilot model at saved iteration 2, with
+strict-Lancer and untrained-mixture controls, is running in ignored results.
+Before those evaluation outcomes were available, the main primary checkpoint
+rule was fixed to **iteration 12 for every run**; earlier checkpoints are
+diagnostic only. This replaces a costly and selection-prone unspecified
+dev-checkpoint search in the original plan.
+
+Next: finish the four-seed Qwen pilot development evaluation, measure runtime
+and paired variance, then freeze the final power target and start the main
+equal-budget lambda comparison. No shared contract, simulator,
 Red-source, or checkpoint migration is needed for the Qwen model switch.
 PR checklist:
 confirm model digest/source and seed separation, keep native rewards/privileged
