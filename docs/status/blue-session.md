@@ -47,6 +47,26 @@ return; target means differed (-10.39 versus -4.02) and both produced finite
 nonzero actor gradients. A one-seed evaluation load also passed. These are
 mechanics checks, not policy gains. The scorer copied into ignored results
 has SHA256 `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`.
+The evaluator now includes an untrained mixture with the same sampling
+distribution, so stochastic exploration is controlled separately from
+learning. A finite-Red score-margin check on spent seed 7629 found 663 free
+strict-guard decisions, median top-two Lancer score gap 0, 97.0% gaps <=0.5.
+The frozen ±0.25 residual can therefore change host ordering on most free
+decisions; the observed small gradient is not an action-range impossibility.
+The strict-guard runner excludes single-candidate guard choices from actor
+gradient rows and reports their count. A rerun on finite seed 7706 recorded
+87 learnable and 7 forced singleton choices with the same -17 native return;
+the saved-iteration loader and an untrained-mixture evaluation control worked
+on finite seed 7641. All iteration actor/critic weights are retained for the
+predeclared development checkpoint rule. The new singleton-focused test and
+ported redesign tests passed (15 passed, 1 upstream warning).
+
+The 24-seed Qwen headroom batch completed 24 Lancer episodes and seven
+strict-guard Lancer episodes before the WSL environment restarted at 20:51
+local time (kernel boot log, no Python traceback or OOM message). Its durable
+partial JSONL retained all 31 episodes; the same run fingerprint was accepted
+on relaunch, which resumed at strict-guard seed 7648. No RL training has been
+claimed from this headroom batch.
 The historical actor/risk checkpoint also loaded and ran a 40-tick finite-Red
 hook smoke in the isolated worktree, after removing its unnecessary dependency
 on a missing initializer file. Focused integration checks: 25 passed,

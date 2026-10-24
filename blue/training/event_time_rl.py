@@ -42,6 +42,29 @@ BLUE_SOURCE = (
 )
 
 
+class FreeChoiceRecorder(Recorder):
+    """Only two-or-more-candidate sweeps are learned decision rows."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.singleton_choices = 0
+
+    def __call__(self, env, agent, cands, scored):
+        if len(cands) == 1:
+            self.singleton_choices += 1
+            return cands[0]
+        return super().__call__(env, agent, cands, scored)
+
+
+class FreeChoiceAudit(ExecutionAudit):
+    """Match training's learned-decision count at evaluation."""
+
+    def __call__(self, env, agent, cands, scored):
+        if len(cands) == 1:
+            return cands[0]
+        return super().__call__(env, agent, cands, scored)
+
+
 def source_hashes():
     files = BLUE_SOURCE + RED_SOURCE
     return {name: sha256(name) for name in files}
@@ -167,16 +190,19 @@ def train(args):
     manifest["history"] = history
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for iteration in range(len(history), args.iters):
-        rec = Recorder(actor, critic, scorer, args, iteration)
+        rec = FreeChoiceRecorder(actor, critic, scorer, args, iteration)
         policy = StrictHarnessPolicy(rec, record_requests=True)
         episodes = []
         for e in range(args.eps_per_iter):
             seed = args.train_seeds[(iteration * args.eps_per_iter + e)
                                     % len(args.train_seeds)]
             rec.policy_seed = args.seed * 100003 + iteration * 1009 + e + 1
+            singleton_before = rec.singleton_choices
             result = mg.run_team_episode(policy, seed, args.steps, hook=rec,
                                          recorder=rec, env_factory=env_factory)
             episodes.append({**result,
+                             "singleton_forced": (rec.singleton_choices
+                                                  - singleton_before),
                              "requests": policy.request_digest.result()})
             print(f"iteration={iteration+1} episode={e+1} seed={seed} "
                   f"return={result['return']:.1f} "
@@ -192,7 +218,9 @@ def train(args):
                        max_grad_norm=args.max_grad_norm,
                        critic_epochs=args.critic_epochs)
         history.append({"iteration": iteration + 1, "episodes": episodes,
-                        "decision_rows": len(rec.rows), **stats})
+                        "decision_rows": len(rec.rows),
+                        "singleton_forced_choices": rec.singleton_choices,
+                        **stats})
         # Preserve every candidate for the predeclared dev-checkpoint rule.
         checkpoints = out / "checkpoints"
         checkpoints.mkdir(exist_ok=True)
@@ -273,7 +301,8 @@ def evaluate(args):
         raise FileExistsError("new evaluation directory required")
     results = {"claim": "development evaluation; no held-out superiority claim",
                "model_dir": str(Path(args.model_dir).resolve()),
-               "seeds": args.eval_seeds, "cells": {}, "strict_lancer": {}}
+               "seeds": args.eval_seeds, "policy_replicas": args.policy_replicas,
+               "cells": {}, "untrained_mixture": {}, "strict_lancer": {}}
     for seed in args.eval_seeds:
         policy, manifest = load(args.model_dir, args.scorer, seed * 997,
                                 checkpoint=args.checkpoint)
@@ -288,22 +317,41 @@ def evaluate(args):
         results["strict_lancer"][str(seed)] = mg.run_team_episode(
             strict, seed, args.steps, env_factory=env_factory)
         rows = []
+        untrained_rows = []
         for replica in range(args.policy_replicas):
+            policy_seed = seed * 997 + replica
+            # SetActor's head is zero at initialization, so this is the
+            # same teacher-mixture sampling path without a trained residual.
+            zero_actor = SetActor(cfg["hidden"])
+            zero_hook = RedesignHook(
+                zero_actor, MLScorer(args.scorer), cfg["bonus"],
+                cfg["ml_inputs"], cfg["temp"], cfg["explore"], policy_seed)
+            zero_audit = FreeChoiceAudit(zero_hook)
+            zero_policy = StrictHarnessPolicy(zero_audit,
+                                              record_requests=True)
+            zero_result = mg.run_team_episode(
+                zero_policy, seed, args.steps, hook=zero_audit,
+                recorder=zero_audit, env_factory=env_factory)
+            untrained_rows.append({**zero_result,
+                                   "policy_seed": policy_seed,
+                                   "requests": zero_policy.request_digest.result()})
             policy, _ = load(args.model_dir, args.scorer,
-                             seed * 997 + replica,
+                             policy_seed,
                              checkpoint=args.checkpoint)
-            audit = ExecutionAudit(policy.hook)
+            audit = FreeChoiceAudit(policy.hook)
             policy.hook = audit
             cell = mg.run_team_episode(policy, seed, args.steps, hook=audit,
                                        recorder=audit,
                                        env_factory=env_factory)
-            rows.append({**cell, "policy_seed": seed * 997 + replica,
+            rows.append({**cell, "policy_seed": policy_seed,
                          "requests": policy.request_digest.result()})
         results["cells"][str(seed)] = rows
+        results["untrained_mixture"][str(seed)] = untrained_rows
         results["model_manifest"] = manifest
         (out / "report.json").write_text(json.dumps(results, indent=2) + "\n")
         print(json.dumps({"seed": seed,
                           "strict_lancer": results["strict_lancer"][str(seed)]["return"],
+                          "untrained": [r["return"] for r in untrained_rows],
                           "rl": [r["return"] for r in rows]}), flush=True)
 
 

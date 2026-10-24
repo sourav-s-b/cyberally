@@ -7,6 +7,7 @@ from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
 from blue.harness.policy import StrictHarnessPolicy
 from blue.policies.ordered import LancerValues, OrderedPolicy, argmax_pick
 from blue.training import mappo_guide as mg
+from blue.training.event_time_rl import FreeChoiceAudit, FreeChoiceRecorder
 
 
 KW = {"red_agent": "finite", "temporal_features": ("ages", "belief"),
@@ -51,3 +52,23 @@ def test_rollout_factory_preserves_finite_behavior():
     assert a["return"] == b["return"]
     assert a["coverage"] == b["coverage"]
     assert a["ticks"] == b["ticks"]
+
+
+def test_singleton_guard_choice_never_reaches_actor_or_audit():
+    rec = object.__new__(FreeChoiceRecorder)
+    rec.singleton_choices = 0
+    assert rec(None, "blue_agent_0", ["only"], [(1.0, "only")]) == "only"
+    assert rec.singleton_choices == 1
+
+    class Hook:
+        called = 0
+
+        def __call__(self, *args):
+            self.called += 1
+            return "only"
+
+    hook = Hook()
+    audit = FreeChoiceAudit(hook)
+    assert audit(None, "blue_agent_0", ["only"], [(1.0, "only")]) == "only"
+    assert hook.called == 0
+    assert audit.rows == []

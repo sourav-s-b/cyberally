@@ -21,6 +21,8 @@ hosts only when the fixed policy has a free, nonurgent sweep choice. Its
 decisions cannot bypass simulator validity or the strict coverage rule. The
 primary control has the **same** guard and fixed rules, with Lancer host
 ranking at the free choice. An unguarded Lancer remains a context arm.
+If the guard leaves only one legal candidate, the action is recorded as a
+forced guard choice and creates no actor-gradient row.
 
 The GPT-Blue branch at exact commit `f32ba72` **already implements**
 decision-time credit in `blue/harness/learning.py` and ran a small local
@@ -120,6 +122,16 @@ seeds reduce scenario variance but do not make the Red trajectory identical.
 Report inference/version details and any repeat-run variance. The fixed
 fallback is a safeguard/control, while the endpoint claim is a trained RL
 host selector outperforming its same-guard heuristic control.
+
+An untrained zero-head actor with the identical teacher-mixture sampling
+distribution is an additional control; improvement over strict Lancer alone
+does not establish learning. A pre-pilot score-margin diagnostic on spent
+Finite Red seed 7629 found 663 free strict-guard sweep decisions, median
+top-two Lancer margin 0 and 97.0% margins <=0.5. Therefore the frozen
+`bonus=0.25` residual (up to 0.5 difference between two candidates) has
+capacity to reorder most free decisions. This was a mechanism check, not a
+return-based hyperparameter search; both RL arms keep `bonus=0.25`,
+`explore=0.2`, and `temperature=0.5`.
 
 ## Reproducibility and rollout
 
