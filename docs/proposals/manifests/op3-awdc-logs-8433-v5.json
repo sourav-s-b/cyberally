@@ -1,0 +1,36 @@
+{
+  "run_id": "op3-awdc-logs-8433-v5",
+  "status": "FROZEN-PRE-RUN",
+  "supersedes": "op3-awdc-logs-8433-v2.json through its v4 addendum; logged data and original OP3 seed/evaluation contracts remain fixed",
+  "prior_result_disposition": {
+    "v1_to_v3": "Stopped before a complete extraction because critic cost and memory use exceeded the machine's limits; defects and changes are recorded in the v2 manifest addenda.",
+    "v4_seed0": "Completed but INVALID as an AWDC result. Legal and illegal logits were both replaced by -1e9; the masked mean included -inf for illegal actions, forcing all AWDC weights to clip at 20.0. All four checkpoint dev means were exactly -4189.10 (Sleep arm). Preserve these artifacts as defect evidence; do not include them in v5 statistics or reuse the BC evaluation."
+  },
+  "v5_correctness_repairs": [
+    "masked logits preserve the legal logits and set only illegal logits to -1e9, in BC, AWDC and greedy evaluation",
+    "V(s) averages Q over valid actions only; advantage weights are exp(A/tau), normalized within each state over valid actions using a stable exponent, then clipped to [0,20]",
+    "TD bootstraps use the next tick's mask for the same Blue agent",
+    "the conservative term uses masked-sample logsumexp vs Q(s,a_logged), with gradients to sampled Q values",
+    "G2 is checked immediately after a fresh BC evaluation; a BC mean more than 1.0 ahead of frozen guard mean -127.80 aborts extraction",
+    "BC, AWDC-1, AWDC-2 and final actor state_dict checkpoints are written outside Git with SHA-256 hashes in the extraction manifest"
+  ],
+  "unchanged_pre_registered_contract": {
+    "logged_npz_sha256": "23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41",
+    "guard_report_sha256": "3225431df4e1396d67d7a82e74536236881932debb385fb8228edc9bc77fce1c",
+    "train_seeds": "simulator 8433-8444; 72 logged episodes",
+    "dev_seeds": "8445-8464 inclusive; finite Red, 400 native steps, native return",
+    "extraction_rng_seeds": [0, 1, 2],
+    "actor": "per-agent MLP: 867->64->64->155, BC epochs 3 at lr 1e-3",
+    "critic": "Q over joint Blue-visible observations (5x867), agent one-hot, embedded action; hidden 128, alpha 0.1, K=8 masked samples, gamma 0.99; 12 TD epochs on a deterministic 33% row subsample per extraction seed",
+    "awdc": "tau 1.0, clip [0,20], AWDC-1 after 4 weighted epochs, AWDC-2 after 8, final after 16; lr 1e-4",
+    "g2_abort": "BC mean > guard mean + 1.0",
+    "h1_success": "final mean native return >= guard mean - 1.0; report paired bootstrap and per-RNG-seed spread; no confirm suite unless gate passes and a fresh seed audit is clean",
+    "time_cap": "4 hours per extraction seed"
+  },
+  "source_shas_sha256": {
+    "blue/training/op3_offline.py": "51a5516384ca34eab8c6c9ece2b19d37da04f036bcc765c827777dac6ba5b9a7",
+    "blue/tests_blue/test_op3_offline.py": "7201744358ff6bd25d8a3210f2a90ebc441681f1f4df9aa228e60fbf51ef45be"
+  },
+  "preflight": "6 focused tests passed and a 128-agent-row real-log batch completed TD loss backward and produced finite normalized AWDC weights (mean 0.998 before fitted critic).",
+  "rollout_order": ["commit freeze and repairs", "rng 0 full extraction and G2", "rng 1", "rng 2", "paired dev analysis vs frozen guard", "record gate and preserve confirm-suite boundary"]
+}

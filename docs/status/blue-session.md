@@ -1,6 +1,42 @@
 # Blue session update
 
-## OP3 logging done + extraction s0 running (2026-10-22)
+## OP3 extraction v5 pre-run handoff (2026-10-24)
+
+Branch `blue/contract-suite`; exact tested dependency commit `8704522` for the
+Blue wrapper/logging stack, with OP3 logging artifact SHA-256
+`23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41`.
+Origin was fetched this session; `origin/main` has no commits ahead of this
+branch. The v5 freeze and repairs are in
+`docs/proposals/manifests/op3-awdc-logs-8433-v5.json`.
+
+The v4 seed-0 extraction finished in 1973 seconds and emitted BC, AWDC-1,
+AWDC-2 and final evals, but **the result is invalid**: every checkpoint had
+the Sleep arm's dev mean −4189.10. Inspection found that the mask expression
+set *legal and illegal* logits to −1e9, while V(s) averaged Q values with
+−inf entries for illegal actions. The resulting weights all clipped at 20.
+Do not pool or reuse v4's evals with v5. Preserve the old output as defect
+evidence (directory `extract_s0_v4_invalid/`). This corrects the earlier
+interpretation below that the Sleep behavior was necessarily caused by the
+logged-action mixture; that claim is unsupported by a valid BC extraction.
+
+v5 repairs legal-logit masking, valid-action averaging and per-state weight
+normalization, next-state TD masks, and the conservative logsumexp gradient.
+It also saves hashed actor checkpoints, verifies G2 immediately after BC,
+and records exact artifact hashes/seed lists. Logging, dev seeds, guard
+reference (−127.80), alpha/tau/clip, actor/critic sizes and extraction rng
+seeds remain fixed. Tests run: 6 focused OP3 tests passed; a real 128-row
+logged-data batch completed TD backward and gave finite normalized weights.
+
+Next: commit this new freeze before executing rng 0; if G2 passes, complete
+rng 0/1/2, run the frozen paired analysis, then record H1 and leave the
+confirm suite 8481–8500 closed unless the preregistered gate passes. Risks:
+the conservative sampled-action critic is noisy and the 3-epoch BC may still
+prefer Sleep; report those measured outcomes rather than retuning v5. No
+dependent branch changes are required. PR checklist: role-owned files only,
+source/data/guard hashes pinned, focused tests green, dev/confirm seed
+separation retained, model weights and runtime logs remain outside Git.
+
+## OP3 logging done + historical extraction notes (2026-10-22)
 
 - **Logging PASS COMPLETE**: 72 episodes (12 train seeds × guard/lancer/
   sleep/random×3 policy seeds), 28 728 ticks / 143 640 agent-rows, ~500 MB

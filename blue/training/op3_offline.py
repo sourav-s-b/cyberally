@@ -27,6 +27,7 @@ Wallclock-cap guarded (4 h). Eval JSONs use the mappo cmd_eval shape so
 blue.training.op2_dev_analysis stays the single analysis script.
 """
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -61,13 +62,15 @@ BC_EPOCHS = 3
 AWDC_LR = 1e-4
 BUDGET_S = 4 * 3600
 DEV_SEEDS = list(range(8445, 8465))
+GUARD_DEV_MEAN = -127.80
+RUN_ID = "op3-awdc-logs-8433-v5"
 
 
 def git_commit():
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"],
                                        cwd=REPO_ROOT,
-                                       stderr=subprocess.DEVNULL).decode()
+                                       stderr=subprocess.DEVNULL).decode().strip()
     except Exception:
         return "unknown"
 
@@ -142,6 +145,8 @@ def rows_slice(flat, rows):
         "onehot": torch.from_numpy(np.eye(N_AG, dtype=np.float32)[a]),
         "mask": torch.from_numpy(
             flat["mask"][t, a].astype(np.float32)),
+        "mask_next": torch.from_numpy(
+            flat["mask"][flat["next_idx"][t], a].astype(np.float32)),
         "acts": torch.from_numpy(flat["acts"][t, a]),
         "rew": torch.from_numpy(flat["rew"][t]),
         "done": torch.from_numpy(flat["dones"][t]),
@@ -202,6 +207,20 @@ class Critic(nn.Module):
         return out
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as src:
+        for block in iter(lambda: src.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def save_actor(actor, out_dir, name):
+    path = os.path.join(out_dir, f"actor_{name}.pt")
+    torch.save(actor.state_dict(), path)
+    return {"path": os.path.abspath(path), "sha256": sha256_file(path)}
+
+
 def eval_dev(actor, out_path):
     from blue.training.mappo_guide import ENV_KW, run_team_episode
     env_kw = dict(ENV_KW)
@@ -217,6 +236,7 @@ def eval_dev(actor, out_path):
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     with open(out_path, "w") as f:
         json.dump({"results": {"learned": res}}, f, indent=1)
+    return res
 
 
 class _Greedy:
@@ -237,21 +257,47 @@ class _Greedy:
             np.float32)
         with torch.no_grad():
             lg = self.actor(torch.from_numpy(obs[None]).float())[0]
-            lg = lg + torch.from_numpy((mask - 1.0).clip(max=-1e9)
-                                       ).float()
+            lg = mask_logits(lg, torch.from_numpy(mask))
         return int(lg.argmax().item())
 
 
-def q_max_samples(critic, state, ag_row, mask_row, k):
+def mask_logits(logits, mask):
+    """Exclude illegal actions while preserving the legal logits."""
+    return logits.masked_fill(mask == 0, -1e9)
+
+
+def normalized_awdc_weights(q_logged, q_actions, mask):
+    """Per-state normalized exp advantage, clipped to the frozen range."""
+    valid = mask != 0
+    n_valid = valid.sum(dim=1).clamp_min(1)
+    v = (q_actions * valid).sum(dim=1) / n_valid
+    z_all = (q_actions - v[:, None]) / TAU_W
+    z_log = (q_logged - v) / TAU_W
+    z_masked = z_all.masked_fill(~valid, -float("inf"))
+    z_max = z_masked.max(dim=1).values
+    denom = torch.exp(z_masked - z_max[:, None]).sum(dim=1) / n_valid
+    return (torch.exp(z_log - z_max) / denom).clamp(*W_CLIP)
+
+
+def q_max_samples(critic, state, ag_row, mask_row, k, *, grad=False):
     """For each row: max over k random masked actions of Q(state, a).
 
     state (B, 4335), ag_row (B, 5), mask_row (B, 155); returns (B,)."""
-    with torch.no_grad():
-        a = mask_row.multinomial(k, replacement=True)          # (B,k)
-        s = state.repeat_interleave(k, dim=0)                  # (B*k,:)
-        g = ag_row.repeat_interleave(k, dim=0)
+    a = mask_row.multinomial(k, replacement=True)          # (B,k)
+    s = state.repeat_interleave(k, dim=0)                  # (B*k,:)
+    g = ag_row.repeat_interleave(k, dim=0)
+    with torch.enable_grad() if grad else torch.no_grad():
         q = critic.q(s, g, a.reshape(-1)).view(-1, k)
         return q.max(dim=1).values
+
+
+def q_logsumexp_samples(critic, state, ag_row, mask_row, k):
+    """Conservative masked-sample logsumexp with gradients to sampled Q."""
+    a = mask_row.multinomial(k, replacement=True)
+    s = state.repeat_interleave(k, dim=0)
+    g = ag_row.repeat_interleave(k, dim=0)
+    q = critic.q(s, g, a.reshape(-1)).view(-1, k)
+    return torch.logsumexp(q, dim=1)
 
 
 def main():
@@ -280,18 +326,20 @@ def main():
           flush=True)
 
     actor = Actor()
+    checkpoints = {}
     opt = torch.optim.Adam(actor.parameters(), lr=1e-3)
     for ep in range(BC_EPOCHS):  # freeze: 3 epochs
         perm = rng_np.permutation(n_rows)
         for b0 in range(0, n_rows, 2048):
             sl = rows_slice(flat, perm[b0:b0 + 2048])
-            lg = actor(sl["agent"]) + (sl["mask"] - 1.0).clip(max=-1e9)
+            lg = mask_logits(actor(sl["agent"]), sl["mask"])
             loss = nn.functional.cross_entropy(lg, sl["acts"])
             opt.zero_grad()
             loss.backward()
             opt.step()
         print(f"BC epoch {ep + 1}: loss {float(loss):.4f} "
               f"({time.time() - t0:.0f}s)", flush=True)
+    checkpoints["bc"] = save_actor(actor, cli.out, "bc")
     if cli.reuse_bc_eval:
         import shutil
         os.makedirs(cli.out, exist_ok=True)
@@ -300,6 +348,13 @@ def main():
         print("BC eval reused from", cli.reuse_bc_eval, flush=True)
     else:
         eval_dev(actor, os.path.join(cli.out, "eval_bc.json"))
+    with open(os.path.join(cli.out, "eval_bc.json")) as f:
+        bc_results = json.load(f)["results"]["learned"]
+    bc_mean = float(np.mean([float(v["return"]) for v in bc_results.values()]))
+    print(f"G2 BC-init mean {bc_mean:.3f}; guard {GUARD_DEV_MEAN:.3f}",
+          flush=True)
+    if bc_mean > GUARD_DEV_MEAN + 1.0:
+        raise RuntimeError("G2 leak gate failed: BC-init ahead of guard by >1")
 
     # ---- conservative critic fit (streamed rows, config unchanged) ----
     critic = Critic()
@@ -311,11 +366,11 @@ def main():
             sl = rows_slice(flat, row_idx[perm[b0:b0 + 2048]])
             tgt = sl["rew"] + GAMMA * (1.0 - sl["done"]) * \
                 q_max_samples(critic, sl["joint_next"], sl["onehot"],
-                              sl["mask"], K_CONSERV)
+                              sl["mask_next"], K_CONSERV)
             q_sa = critic.q(sl["joint"], sl["onehot"], sl["acts"])
             # conservative hinge on the SAME batch (data states)
-            cons = q_max_samples(critic, sl["joint"], sl["onehot"],
-                                 sl["mask"], K_CONSERV)
+            cons = q_logsumexp_samples(critic, sl["joint"], sl["onehot"],
+                                       sl["mask"], K_CONSERV)
             loss = nn.functional.mse_loss(q_sa, tgt) + ALPHA_CONSERV * \
                 nn.functional.relu(cons - q_sa).mean()
             critic.zero_grad()
@@ -339,12 +394,12 @@ def main():
             sl = rows_slice(flat, rows)
             q_sa_c = critic.q(sl["joint"], sl["onehot"], sl["acts"])
             qv = critic.q_all_actions(sl["joint"], sl["onehot"])
-            V = qv.masked_fill(sl["mask"] == 0, -float("inf")).mean(dim=1)
-            w_t[r0:r0 + len(rows)] = torch.exp(
-                (q_sa_c - V) / TAU_W).clip(*W_CLIP)
+            w_t[r0:r0 + len(rows)] = normalized_awdc_weights(
+                q_sa_c, qv, sl["mask"])
     w_mean = float(w_t.mean())
-    print(f"AWDC weights: mean {w_mean:.4f}, max {float(w_t.max()):.2f}",
-          flush=True)
+    w_clip_frac = float((w_t >= W_CLIP[1]).float().mean())
+    print(f"AWDC weights: mean {w_mean:.4f}, max {float(w_t.max()):.2f}, "
+          f"clip_frac {w_clip_frac:.4f}", flush=True)
 
     optw = torch.optim.Adam(actor.parameters(), lr=AWDC_LR)
     for ck, epochs in ((1, 4), (2, 4), (3, 8)):  # freeze checkpoint plan
@@ -354,7 +409,7 @@ def main():
             perm = rng_np.permutation(n_rows)
             for b0 in range(0, n_rows, 2048):
                 sl = rows_slice(flat, perm[b0:b0 + 2048])
-                lg = actor(sl["agent"]) + (sl["mask"] - 1.0).clip(max=-1e9)
+                lg = mask_logits(actor(sl["agent"]), sl["mask"])
                 logp = torch.log_softmax(lg, dim=1).gather(
                     1, sl["acts"][:, None]).squeeze(1)
                 loss = -(w_t[perm[b0:b0 + 2048]] * logp).mean()
@@ -364,16 +419,27 @@ def main():
                 optw.step()
         name = "final" if ck == 3 else f"awdc_{ck}"
         print(f"checkpoint {name} ({time.time() - t0:.0f}s)", flush=True)
+        checkpoints[name] = save_actor(actor, cli.out, name)
         eval_dev(actor, os.path.join(cli.out, f"eval_{name}.json"))
 
     manifest = {
+        "run_id": RUN_ID,
         "purpose": "OP3 offline extraction per frozen prereg; no online "
                    "stage; evals run through op2_dev_analysis vs the G1 "
                    "guard report",
         "git_commit": git_commit(),
         "rng_seed": cli.rng_seed,
         "data": os.path.abspath(cli.data),
+        "data_sha256": sha256_file(cli.data),
+        "dev_seeds": DEV_SEEDS,
+        "bc_dev_mean": bc_mean,
+        "g2_guard_dev_mean": GUARD_DEV_MEAN,
+        "bc_eval_reused_from": cli.reuse_bc_eval,
+        "checkpoint_artifacts": checkpoints,
+        "awdc_weight_mean": w_mean,
+        "awdc_weight_clip_fraction": w_clip_frac,
         "config": {"bc_epochs": BC_EPOCHS, "q_epochs": Q_EPOCHS,
+                   "td_subsample_frac": TD_SUB_FRAC,
                    "tau_w": TAU_W, "alpha_conserv": ALPHA_CONSERV,
                    "k_cons": K_CONSERV, "w_clip": list(W_CLIP),
                    "awdc_lr": AWDC_LR, "h_actor": H_ACTOR,
@@ -381,6 +447,7 @@ def main():
         "rows": {"ticks": int(n_t), "agent_rows": int(n_rows)},
         "episodes": len(eps),
         "wallclock_s": round(time.time() - t0),
+        "complete": len(checkpoints) == 4,
     }
     with open(os.path.join(cli.out, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)

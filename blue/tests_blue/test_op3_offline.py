@@ -58,6 +58,25 @@ def test_load_and_stack_shapes_match_rows(tiny_npz):
     for t in range(n_t):
         assert flat["mask"].reshape(-1, op.N_ACT)[t, acts[t]] == 1
         assert 0 <= flat["next_idx"][t] <= n_t - 1
+    row = op.rows_slice(flat, np.array([0, 1, 5]))
+    np.testing.assert_array_equal(row["mask_next"][0].numpy(), flat["mask"][1, 0])
+    np.testing.assert_array_equal(row["mask_next"][1].numpy(), flat["mask"][1, 1])
+    np.testing.assert_array_equal(row["mask_next"][2].numpy(), flat["mask"][2, 0])
+
+
+def test_masked_logits_and_weights_exclude_illegal_actions():
+    logits = torch.tensor([[1.0, 3.0, 99.0]])
+    mask = torch.tensor([[1.0, 1.0, 0.0]])
+    masked = op.mask_logits(logits, mask)
+    assert masked.argmax(dim=1).item() == 1
+    assert masked[0, 0].item() == 1.0
+    assert masked[0, 1].item() == 3.0
+    q = torch.tensor([[1.0, 3.0, 999.0]])
+    logged = q[:, 1]
+    w = op.normalized_awdc_weights(logged, q, mask)
+    expected = 2 * np.exp(3) / (np.exp(1) + np.exp(3))
+    assert torch.allclose(w, torch.tensor([expected], dtype=torch.float32))
+    assert w.item() < op.W_CLIP[1]
 
 
 def test_q_all_actions_matches_q_per_action(tiny_npz):
@@ -91,10 +110,10 @@ def test_fit_paths_backward_and_weights(tiny_npz):
     b = op.rows_slice(flat, rows)
     critic = op.Critic()
     tgt = b["rew"] + op.GAMMA * (1.0 - b["done"]) * op.q_max_samples(
-        critic, b["joint_next"], b["onehot"], b["mask"], op.K_CONSERV)
+        critic, b["joint_next"], b["onehot"], b["mask_next"], op.K_CONSERV)
     q_sa = critic.q(b["joint"], b["onehot"], b["acts"])
-    cons = op.q_max_samples(critic, b["joint"], b["onehot"], b["mask"],
-                            op.K_CONSERV)
+    cons = op.q_logsumexp_samples(critic, b["joint"], b["onehot"], b["mask"],
+                                  op.K_CONSERV)
     loss = nn.functional.mse_loss(q_sa, tgt) + op.ALPHA_CONSERV * \
         torch.nn.functional.relu(cons - q_sa).mean()
     assert torch.isfinite(loss).all()
@@ -106,13 +125,11 @@ def test_fit_paths_backward_and_weights(tiny_npz):
     critic.eval()
     with torch.no_grad():
         qv = critic.q_all_actions(b["joint"], b["onehot"])
-        qv = qv.masked_fill(b["mask"] == 0, -float("inf"))
-        V = qv.mean(dim=1)
-        w = torch.exp((critic.q(b["joint"], b["onehot"], b["acts"]) - V)
-                      / op.TAU_W).clip(*op.W_CLIP)
+        q_logged = critic.q(b["joint"], b["onehot"], b["acts"])
+        w = op.normalized_awdc_weights(q_logged, qv, b["mask"])
     assert torch.isfinite(w).all() and (w >= 0).all()
     actor = op.Actor()
-    lg = actor(b["agent"]) + (b["mask"] - 1.0).clip(max=-1e9)
+    lg = op.mask_logits(actor(b["agent"]), b["mask"])
     logp = torch.log_softmax(lg, dim=1).gather(1, b["acts"][:, None])
     loss = -(w * logp.squeeze(1)).mean()
     loss.backward()
