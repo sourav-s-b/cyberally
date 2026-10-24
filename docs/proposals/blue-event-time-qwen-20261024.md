@@ -169,6 +169,21 @@ selected settings and `temperature=0.5`.
 
 ## Reproducibility and rollout
 
+**Development headroom completed before Qwen RL pilot (2026-10-24).** On
+24 paired seeds 7641–7664, native mean returns were unguarded Lancer
+`-183.17`, strict-guard Lancer `-165.71`, and historical guarded actor
+`-171.96`. Strict guard minus unguarded Lancer was `+17.46` with paired
+bootstrap 95% interval `[-5.33, 41.17]`; historical guarded actor minus
+the **same-guard** Lancer was `-6.25`, interval `[-28.17, 13.67]`.
+All three arms made about 12 Red plan requests per 400-tick episode; Qwen
+attack pressure is nonzero. The earlier actor is not evidence of a same-guard
+RL gain. Full ignored result SHA256:
+`38b8379b56477db5a890795183f36755e16a83756c21f641ec50126c7f4577eb`.
+An event-time trainer Qwen wiring run on spent training seed 7706 at 40 ticks
+completed with 93 learnable decisions, seven forced singletons, finite
+gradients, exact post-update KL `0.000637`, and three Red plan requests.
+Its `-3` native return is only a short wiring observation.
+
 The runnable implementation must save source commit and per-file hashes,
 exact model digest, Red prompt/source hashes, Blue checkpoint hashes,
 observations/action/preprocessing versions, training and evaluation seed

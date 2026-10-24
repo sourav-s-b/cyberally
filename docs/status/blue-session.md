@@ -118,9 +118,20 @@ The final prefix length remains undecided pending Qwen variance and a fresh
 audit; the runner still refuses the entire nominal block. The unrelated
 `8501+` reservation dispute remains untouched.
 
-Next: finish the 24-seed Qwen headroom comparison and record its paired
-same-guard result; run one 40-tick Qwen trainer-factory smoke; then launch
-the frozen four-run Qwen RL pilot. Review its mechanism gates before the
+The completed 24-seed Qwen development headroom comparison reports native
+mean return `-183.17` for Lancer, `-165.71` for strict-guard Lancer, and
+`-171.96` for the historical guarded actor. Historical actor minus the
+**same-guard** Lancer is `-6.25`, paired 95% bootstrap interval
+`[-28.17, 13.67]`; there is no established RL gain. All arms made about
+12 Red plan requests per episode. Ignored result JSON SHA256 is
+`38b8379b56477db5a890795183f36755e16a83756c21f641ec50126c7f4577eb`;
+analysis lives in `blue/results/event_time_rl/qwen_headroom_analysis.json`.
+A Qwen trainer-factory wiring run (40 ticks, spent training seed 7706) had
+93 learnable decisions, seven forced singletons, finite gradients, KL
+`0.000637`, three Red requests, and native return `-3` (mechanics only).
+The branch was pushed to `origin/blue/event-time-rl` before the pilot.
+
+Next: launch the frozen four-run Qwen RL pilot. Review its mechanism gates before the
 main equal-budget lambda comparison. No shared contract, simulator,
 Red-source, or checkpoint migration is needed for the Qwen model switch.
 PR checklist:
