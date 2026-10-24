@@ -19,11 +19,21 @@ for arm in mc gae; do
     mkdir -p "$out"
     if [[ -f "$out/manifest.json" ]]; then
       status="$($train_python -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$out/manifest.json")"
-      if [[ "$status" == complete ]]; then
+      if [[ "$status" == complete && -f "$out/checkpoint.pt" && -f "$out/actor.th" ]]; then
         echo "already complete: $out"
         continue
       fi
-      resume=(--resume)
+      if [[ -f "$out/checkpoint.pt" ]]; then
+        resume=(--resume)
+      else
+        # A machine restart before iteration 1 leaves a manifest but no
+        # resumable optimizer/RNG state. Preserve that trace and restart.
+        archived="${out}_before_first_checkpoint_$(date +%Y%m%d_%H%M%S)"
+        mv "$out" "$archived"
+        mkdir -p "$out"
+        echo "archived nonresumable start: $archived"
+        resume=()
+      fi
     else
       resume=()
     fi
