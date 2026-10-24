@@ -146,6 +146,19 @@ rule was fixed to **iteration 12 for every run**; earlier checkpoints are
 diagnostic only. This replaces a costly and selection-prone unspecified
 dev-checkpoint search in the original plan.
 
+At the user's request, the pilot development evaluation was paused after
+two complete seeds in the first model to audit GPU placement. Ollama reports
+Qwen `qwen2.5:3b` at **100% GPU** on the RTX 3050; a separate live 1,000-token
+generation sampled `nvidia-smi` 16 times and measured 48–89% GPU utilization
+(83.8% mean, about 2.2 GB VRAM). The training venv's PyTorch is CPU-only,
+but profiling a 40-tick finite-Red RL update measured 0.147 s in the PPO
+optimizer versus 6.573 s in the simulator rollout, with policy/simulator work
+dominating. Installing CUDA PyTorch would not move those CPU simulator and
+feature operations to GPU and would compete with Qwen for VRAM. No Qwen CPU
+fallback was found. The evaluation resumed from its atomic two-seed report
+without rerunning seeds 7641–7642; the independent diagnostic generation was
+outside all simulator episodes and is not evaluation data.
+
 Next: finish the four-seed Qwen pilot development evaluation, measure runtime
 and paired variance, then freeze the final power target and start the main
 equal-budget lambda comparison. No shared contract, simulator,
