@@ -27,7 +27,8 @@ were rehashed as
 `f5afa909efeee600637e3cd01279ac8e1818b469133c752f770045f254267a4e`
 and `64b3c7ae7775a1cd447de11bfd453fafa1097ea730b8ffffb7351dfd71473f93`.
 Runtime JSONs live in ignored `blue/results/event_time_rl/`. No final seeds
-7809–8200 have been used.
+eligible under this experiment's audit have been used; the nominal 7809–8200
+block already contains 20 historical seed uses, so it is not wholly fresh.
 
 The first 24-seed Qwen headroom launch stopped before any episode because the
 legacy actor constructor read an ignored initialization file missing from the
@@ -106,6 +107,16 @@ run manifest and evaluation configuration; a two-seed finite test was
 interrupted after the first seed, then completed without rerunning it. The
 focused event-time tests passed (17 passed, 1 upstream warning); shell syntax,
 Python compile, and diff checks passed. No final seeds were opened.
+
+The seed audit exposed an older ledger error before final evaluation: 20
+numbers inside nominal final block 7809–8200 already occur in earlier
+seed-bearing work (7809, 7901–7908, 8001–8008, 8123–8124, 8200). This
+experiment excludes all 20 conservatively, leaving 372 eligible seeds;
+the ascending-list SHA256 is
+`5c42866da56a94d25ddb96320242e9e7372240e4ae63f8bdd3584b5d2a0c2761`.
+The final prefix length remains undecided pending Qwen variance and a fresh
+audit; the runner still refuses the entire nominal block. The unrelated
+`8501+` reservation dispute remains untouched.
 
 Next: finish the 24-seed Qwen headroom comparison and record its paired
 same-guard result; run one 40-tick Qwen trainer-factory smoke; then launch

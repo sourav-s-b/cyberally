@@ -133,8 +133,18 @@ theorem-based safety claim for this implementation.
    paired evaluation seeds. Size the Qwen evaluation from a fresh Qwen pilot
    variance; never reuse Llama's paired SD. Use episode and training-run
    bootstrap units, not agents or ticks, for intervals.
-5. **Final.** The reserved block 7809–8200 remains unopened until code,
-   model, artifact hashes, checkpoint rule, and sample size are frozen.
+5. **Final.** Seed audit corrected the nominal `7809–8200` reservation:
+   20 seeds already appear in earlier seed-bearing work (7809, 7901–7908,
+   8001–8008, 8123–8124, 8200). They are **ineligible** even if some are
+   only historical bounds. The remaining 372 eligible seeds, in ascending
+   order, have SHA256
+   `5c42866da56a94d25ddb96320242e9e7372240e4ae63f8bdd3584b5d2a0c2761`
+   when encoded as compact JSON. No eligible final seed has been opened by
+   this experiment. Choose the final prefix length only after the Qwen pilot
+   variance, checkpoint rule, code, model, and artifact hashes are frozen;
+   rerun the audit immediately before use. The existing runner refuses the
+   entire nominal block until a separately reviewed final-evaluation gate
+   is frozen before main training.
    A win requires the event-time RL arm to improve mean native reward over
    **strict Lancer** with a paired 95% interval above zero, no material
    deterioration in the lower tail or host coverage, and the benefit to
