@@ -180,9 +180,13 @@ def train(args):
             raise FileExistsError("new run directory required")
         old = json.loads((out / "manifest.json").read_text())
         for key in ("version", "feature_names", "config", "scorer_sha256",
-                    "model_info", "source_files", "source_commit", "runtime"):
+                    "model_info", "source_files", "runtime"):
             if old[key] != manifest[key]:
                 raise ValueError("resume drift: " + key)
+        # A docs/result commit may advance HEAD between iterations. The
+        # source-file hashes above remain the executable contract; retain
+        # the original run commit in the resumed manifest.
+        manifest["source_commit"] = old["source_commit"]
         ck = torch.load(out / "checkpoint.pt", map_location="cpu",
                         weights_only=False)
         actor.load_state_dict(ck["actor"])
