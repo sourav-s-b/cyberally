@@ -29,10 +29,39 @@ and `64b3c7ae7775a1cd447de11bfd453fafa1097ea730b8ffffb7351dfd71473f93`.
 Runtime JSONs live in ignored `blue/results/event_time_rl/`. No final seeds
 7809–8200 have been used.
 
+The first 24-seed Qwen headroom launch stopped before any episode because the
+legacy actor constructor read an ignored initialization file missing from the
+isolated worktree. The evaluator now builds the identical 15-feature network
+directly and loads all saved weights; the aborted log is preserved. The
+restarted headroom run is in progress and persists each episode to JSONL.
+
+The tested GPT-Blue v2 actor/critic/credit modules were ported from exact
+`f32ba72`. Review found that GPT-Blue **already** implements elapsed decision
+time and lambda=1 Monte Carlo and ran a four-model, one-episode local smoke.
+The revised experiment isolates bootstrapped lambda=0.9 versus lambda=1.0,
+both with the same strict coverage guard, Qwen Red, PPO, architecture, scorer,
+and rollout budget. The new `event_time_rl.py` runner reuses the audited
+`decision_credit`/`update` code. A finite-Red 40-tick mechanics run for both
+arms yielded the same first action digest, 94 learned decisions and -17 native
+return; target means differed (-10.39 versus -4.02) and both produced finite
+nonzero actor gradients. A one-seed evaluation load also passed. These are
+mechanics checks, not policy gains. The scorer copied into ignored results
+has SHA256 `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`.
+The historical actor/risk checkpoint also loaded and ran a 40-tick finite-Red
+hook smoke in the isolated worktree, after removing its unnecessary dependency
+on a missing initializer file. Focused integration checks: 25 passed,
+1 upstream warning; Python compile and `git diff --check` passed. One earlier
+full focused run failed solely because a 24 KB ignored legacy test fixture was
+absent from the new worktree; copying the exact artifact made its targeted test
+pass, and the 25-test rerun passed. The fixture remains ignored.
+
 Next: run the predeclared Qwen development headroom comparison; inspect its
 attacker pressure and same-guard RL attribution. Then port the frozen
-GPT-Blue harness into this isolated branch, implement/test event-time targets,
-and run paired equal-budget RL arms. No shared contract, simulator, Red-source,
+GPT-Blue harness into this isolated branch, retain/test its existing
+decision-time duration accounting, and compare lambda=1.0 Monte Carlo to
+lambda=0.9 bootstrapped GAE under equal-budget PPO. The GPT-Blue branch
+already has decision-time credit and a tiny MAPPO/A2C local smoke; this
+experiment does not claim those as new. No shared contract, simulator, Red-source,
 or checkpoint migration is needed for the Qwen model switch. PR checklist:
 confirm model digest/source and seed separation, keep native rewards/privileged
 labels out of actor input, validate fallback/action masks and pending timing,

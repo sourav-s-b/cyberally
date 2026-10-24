@@ -22,13 +22,24 @@ decisions cannot bypass simulator validity or the strict coverage rule. The
 primary control has the **same** guard and fixed rules, with Lancer host
 ranking at the free choice. An unguarded Lancer remains a context arm.
 
-The learning comparison keeps policy architecture, observations, exploration,
-rollout budget, optimizer, and seed schedule equal. Arm A uses the existing
-per-tick Monte Carlo/PPO targets. Arm B uses event-time semi-Markov targets:
-if an agent's free decision occurs at tick `t` and its next free decision is
-at `t+d`, its target is `sum_{k=0}^{d-1} gamma^k r_{t+k} + gamma^d V(h_{t+d})`;
-terminal episodes omit the bootstrap. Both arms use only recent joint
-Blue-visible history for the centralized critic; no Red or simulator truth is
+The GPT-Blue branch at exact commit `f32ba72` **already implements**
+decision-time credit in `blue/harness/learning.py` and ran a small local
+MAPPO/A2C pipeline check. Its lambda=1 setting is exact discounted
+Monte Carlo over intervening ticks; a new "duration fix" would be redundant.
+Its sampled policies matched the untrained mixture on one reused evaluation
+episode after only four training episodes, so there is no established gain.
+
+The new learning comparison keeps policy architecture, observations,
+exploration, rollout budget, PPO optimizer, and seed schedule equal. Arm A
+uses the existing decision-time Monte Carlo target (`lambda=1.0`). Arm B
+uses decision-time bootstrapped GAE (`lambda=0.9`) with the actual elapsed
+duration `d`: each temporal difference is
+`delta_t = sum_{k=0}^{d-1} gamma^k r_{t+k} + gamma^d V(h_{t+d}) - V(h_t)`,
+and the GAE carry is discounted by `(gamma*lambda)^d`. Terminal episodes
+omit the bootstrap. The comparison isolates bootstrapping/variance; it
+does not claim to discover elapsed-time accounting. Both arms use the same
+pooled joint Blue-visible critic context, including temporal ages and the
+existing event-memory features; no Red or simulator truth is
 an actor/critic input. Forced Sleep, recovery, and verification decisions
 have no actor gradient. Native team reward is counted once per tick. The
 event-time update uses the actual next free decision and logged duration,
@@ -76,14 +87,21 @@ theorem-based safety claim for this implementation.
    attack pressure (near-zero native loss and no meaningful planning), do not
    claim a win; use Finite Red for the main causal training comparison and
    version any proposed attacker change separately.
-3. **Pilot.** Two training RNG seeds per RL arm, equal native rollout ticks,
+3. **Pilot.** Training RNGs 0 and 1 per RL arm, 2 iterations x 2 full
+   400-tick episodes per run (4 episodes per run), the same episode-seed
+   rotation 7706–7709 and equal native rollout ticks. Use Qwen Red with the
+   exact model/config above and compare the first-iteration request digest
+   across arms. The historical scorer is pinned at SHA256
+   `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`.
    with the guard enabled during collection and evaluation. Check episode
    boundaries and gradient counts again. Continue to the main run only if the
    event-time arm actually produces nonzero free-decision updates, never
    violates coverage/masks, and finishes within the measured compute budget.
    The pilot does not select between arms by return.
-4. **Main.** At least five independent training RNG seeds per RL arm, fixed
-   equal rollout budgets. Save all checkpoints; select each run's checkpoint
+4. **Main.** Training RNGs 0–4 per RL arm, 12 iterations x 4 full
+   400-tick episodes per run (48 episodes/run), cycling training seeds
+   7706–7721. This is 480 episodes total across the ten runs and gives both
+   arms exactly equal native rollout budgets. Save all checkpoints; select each run's checkpoint
    by a predeclared development rule using native return versus strict
    Lancer, with lower-tail return breaking ties. Measure Qwen, Finite, Sleep,
    random, unguarded Lancer, strict Lancer, and both RL arms on separate

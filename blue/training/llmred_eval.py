@@ -154,7 +154,11 @@ def main():
         if not args.actor:
             raise SystemExit("--actor required for actor arms")
         import torch as th
-        actor = ra.build_actor(hidden=64)
+        # ra.build_actor() reads the old scorer initialization artifact even
+        # though load_state_dict replaces every parameter. Construct the
+        # identical geometry directly so frozen checkpoints are portable.
+        from blue.training.residual import build_nets
+        actor, _ = build_nets(feat_dim=ra.FEAT_DIM, hidden=64)
         actor.load_state_dict(th.load(os.path.join(args.actor, "actor.th"),
                                       map_location="cpu", weights_only=False))
         actor.eval()

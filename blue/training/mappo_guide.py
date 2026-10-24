@@ -214,6 +214,7 @@ class JointRecorder:
 
 
 def run_team_episode(policy, seed, steps, hook=None, recorder=None,
+                     env_factory=None,
                      **env_kw):
     """Joint rollout. Returns per-tick team rewards plus the forced-vs-
     sampled split. Hook calls are sampled actor decisions; everything else
@@ -227,7 +228,8 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     is Blue-visible."""
     from blue.core.baselines import decode_index
     from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
-    env = CC4MARLEnv(seed=seed, steps=steps, **env_kw)
+    env = (env_factory(seed, steps) if env_factory is not None
+           else CC4MARLEnv(seed=seed, steps=steps, **env_kw))
     env.reset(seed=seed)
     policy.reset()
     policy.hook = hook  # None = reference behavior (never contaminated)
@@ -274,6 +276,9 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     n_forced = sum(cats.values())
     return {"seed": seed, "return": float(sum(rewards)),
             "coverage": coverage, "ticks": n_ticks,
+            "red_plan_requests": getattr(getattr(env, "llm_client", None),
+                                         "requests", None),
+            "red_model_info": getattr(env, "llm_model", None),
             "n_actor": n_actor, "n_forced": n_forced,
             "forced_cats": dict(cats),
             "n_decisions": (len(recorder.rows) if recorder is not None
