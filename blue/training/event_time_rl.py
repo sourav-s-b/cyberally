@@ -310,21 +310,50 @@ def evaluate(args):
     check_seeds(args.eval_seeds)
     if args.policy_replicas < 1:
         raise ValueError("empty policy replica list")
+    _, manifest = load(args.model_dir, args.scorer,
+                       args.eval_seeds[0] * 997,
+                       checkpoint=args.checkpoint)
+    cfg = manifest["config"]
+    check_seeds(args.eval_seeds, cfg["train_seeds"])
+    if args.steps != cfg["steps"]:
+        raise ValueError("horizon drift")
+    eval_config = {
+        "model_dir": str(Path(args.model_dir).resolve()),
+        "scorer_sha256": sha256(args.scorer),
+        "seeds": args.eval_seeds,
+        "policy_replicas": args.policy_replicas,
+        "checkpoint": args.checkpoint,
+        "steps": args.steps,
+    }
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    if (out / "report.json").exists():
-        raise FileExistsError("new evaluation directory required")
-    results = {"claim": "development evaluation; no held-out superiority claim",
-               "model_dir": str(Path(args.model_dir).resolve()),
-               "seeds": args.eval_seeds, "policy_replicas": args.policy_replicas,
-               "cells": {}, "untrained_mixture": {}, "strict_lancer": {}}
+    report = out / "report.json"
+    if report.exists():
+        if not args.resume:
+            raise FileExistsError("new evaluation directory required")
+        results = json.loads(report.read_text())
+        if (results.get("eval_config") != eval_config or
+                results.get("model_manifest") != manifest):
+            raise ValueError("evaluation resume drift")
+        completed = set(results["cells"])
+        if (completed != set(results["strict_lancer"]) or
+                completed != set(results["untrained_mixture"]) or
+                not completed <= {str(s) for s in args.eval_seeds}):
+            raise ValueError("inconsistent partial evaluation")
+    elif args.resume:
+        raise FileNotFoundError("no evaluation report to resume")
+    else:
+        results = {
+            "claim": "development evaluation; no held-out superiority claim",
+            "eval_config": eval_config, "model_manifest": manifest,
+            "seeds": args.eval_seeds, "policy_replicas": args.policy_replicas,
+            "cells": {}, "untrained_mixture": {}, "strict_lancer": {},
+            "status": "started",
+        }
     for seed in args.eval_seeds:
-        policy, manifest = load(args.model_dir, args.scorer, seed * 997,
-                                checkpoint=args.checkpoint)
-        cfg = manifest["config"]
-        check_seeds([seed], cfg["train_seeds"])
-        if args.steps != cfg["steps"]:
-            raise ValueError("horizon drift")
+        if str(seed) in results["cells"]:
+            print(f"already evaluated: seed={seed}", flush=True)
+            continue
         env_factory = make_env_factory(cfg, manifest["model_info"])
         from blue.policies.ordered import LancerValues, OrderedPolicy
         strict = OrderedPolicy(scorer=LancerValues(fruitless_decay=.5),
@@ -362,8 +391,10 @@ def evaluate(args):
                          "requests": policy.request_digest.result()})
         results["cells"][str(seed)] = rows
         results["untrained_mixture"][str(seed)] = untrained_rows
-        results["model_manifest"] = manifest
-        (out / "report.json").write_text(json.dumps(results, indent=2) + "\n")
+        if len(results["cells"]) == len(args.eval_seeds):
+            results["status"] = "complete"
+        (out / "report.tmp").write_text(json.dumps(results, indent=2) + "\n")
+        os.replace(out / "report.tmp", report)
         print(json.dumps({"seed": seed,
                           "strict_lancer": results["strict_lancer"][str(seed)]["return"],
                           "untrained": [r["return"] for r in untrained_rows],
