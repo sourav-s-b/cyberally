@@ -1,6 +1,47 @@
 # Blue session update
 
-## OP3 extraction v5 pre-run handoff (2026-10-24)
+## OP3 v5 complete: DEV GATE FAILED (2026-10-24)
+
+Branch `blue/contract-suite`; frozen source commit `c2c6cb6`, logged npz
+SHA-256 `23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41`,
+guard report SHA-256 `3225431df4e1396d67d7a82e74536236881932debb385fb8228edc9bc77fce1c`.
+The v5 freeze and every run result are recorded in
+`docs/proposals/manifests/op3-awdc-logs-8433-v5.json` and
+`docs/proposals/manifests/op3-awdc-logs-8433-v5-results.json`.
+
+- All three extraction seeds (0, 1, 2) completed within the four-hour
+  per-seed cap; 12 actor checkpoint hashes and 12 dev eval hashes were
+  verified. G2 passed each time (BC mean −4189.10 vs guard −127.80;
+  no forward leak).
+- BC, AWDC-1, AWDC-2 and final all had mean return **−4189.10** and
+  **zero Analyse coverage** on the 20 dev seeds, for every extraction
+  seed. Every eval cell is identical to G1's Sleep-arm cell for that
+  simulator seed. The saved final actors choose Sleep for all five agents
+  on the checked first tick of dev seed 8445, despite 26–119 legal
+  actions per agent. On sampled *logged* free-choice states, AWDC-1 and
+  BC disagree on about half of choices: the learned weights differ but
+  do not break the on-policy initial Sleep trap.
+- The frozen OP2 paired bootstrap was reused with label `jsrl` mapped to
+  OP3 `final` only for that script's CLI. Final minus guard: **−4061.30**
+  native return points, CI95 **[−4607.35, −3509.33]** (20 paired seeds;
+  10 000 resamples, rng 20261022). OP3 H1 threshold is guard −1.0 =
+  −128.80; **FAILED**. The confirm suite 8481–8500 stays **CLOSED**;
+  no confirm-seed audit or evaluation was run.
+- Validation: 6 focused OP3 tests passed, real 128-row logged-data
+  critic backward/finite-weight smoke passed, all 12 actor/eval hashes,
+  data hash, source commit and dev seed sets verified. No retuning or
+  code change occurred between v5 rng seeds. The result applies to
+  this extraction recipe, not to all offline learning methods.
+
+Next concrete task: design and pre-register a **new** experiment that
+prevents the initial all-Sleep policy lock, retaining the untouched
+confirm-suite boundary. PR checklist: Blue-owned files only; frozen
+source/artifact hashes and seed lists recorded; role status updated;
+runtime logs and model weights remain outside Git. Risk: the critic's
+8-action sampled logsumexp is an approximation. Dependent branch changes:
+none.
+
+## OP3 v5 pre-run freeze (historical)
 
 Branch `blue/contract-suite`; exact tested dependency commit `8704522` for the
 Blue wrapper/logging stack, with OP3 logging artifact SHA-256

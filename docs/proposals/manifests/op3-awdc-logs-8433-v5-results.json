@@ -1,0 +1,249 @@
+{
+  "run_id": "op3-awdc-logs-8433-v5",
+  "status": "COMPLETE_DEV_GATE_FAILED",
+  "source_commit": "c2c6cb68043b25fc26da9bb93299411f46117cbd",
+  "tested_wrapper_dependency_commit": "87045229aaae971c36f14e3037695ff65800fb10",
+  "freeze": "docs/proposals/manifests/op3-awdc-logs-8433-v5.json",
+  "logged_npz": {
+    "path": "blue/results/op3_awdc_logs_v1/logged.npz",
+    "sha256": "23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41",
+    "episodes": 72,
+    "ticks": 28728,
+    "agent_rows": 143640
+  },
+  "guard_report": {
+    "path": "blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json",
+    "sha256": "3225431df4e1396d67d7a82e74536236881932debb385fb8228edc9bc77fce1c",
+    "mean_return": -127.8
+  },
+  "analysis": {
+    "method": "blue.training.op2_dev_analysis, paired percentile bootstrap 10000, rng 20261022",
+    "output_path": "blue/results/op3_awdc_logs_v1/dev_analysis_op2_alias.json",
+    "output_sha256": "6b7d2fbf46b07ca23bd3576ae1478796c67f055a933845370338d7ea29f07c98",
+    "label_alias": "jsrl in the reused OP2 script means OP3 final",
+    "final_minus_guard_paired_mean": -4061.3,
+    "ci95": [
+      -4607.351250000001,
+      -3509.33125
+    ],
+    "n_dev_seeds": 20
+  },
+  "g2": {
+    "passes_all_three": true,
+    "bc_means": [
+      -4189.1,
+      -4189.1,
+      -4189.1
+    ],
+    "abort_if_bc_more_than_one_ahead_of_guard": true
+  },
+  "h1": {
+    "threshold_delta": -1.0,
+    "threshold_mean_return": -128.8,
+    "final_mean_return": -4189.1,
+    "passes": false
+  },
+  "per_rng": {
+    "0": {
+      "bc": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_1": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_2": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "final": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      }
+    },
+    "1": {
+      "bc": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_1": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_2": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "final": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      }
+    },
+    "2": {
+      "bc": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_1": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "awdc_2": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      },
+      "final": {
+        "mean_return": -4189.1,
+        "mean_coverage": 0.0,
+        "n_dev_seeds": 20
+      }
+    }
+  },
+  "weight_diagnostics": {
+    "0": {
+      "mean": 0.8947925567626953,
+      "clip_fraction": 7.658034155610949e-05
+    },
+    "1": {
+      "mean": 0.9464088678359985,
+      "clip_fraction": 1.3923698134021834e-05
+    },
+    "2": {
+      "mean": 1.2619450092315674,
+      "clip_fraction": 0.00013227513409219682
+    }
+  },
+  "manifests": {
+    "0": {
+      "path": "blue/results/op3_awdc_logs_v1/extract_s0/manifest.json",
+      "sha256": "6ef5f2fe37c4a9011ce492a10837a113f81f3317f99e95f325bb12f68ed1c53c",
+      "wallclock_s": 2100
+    },
+    "1": {
+      "path": "blue/results/op3_awdc_logs_v1/extract_s1/manifest.json",
+      "sha256": "e348b50b89957ad40edf54cabd3f5b25af1d2c52370eb4269b3f6de90634661f",
+      "wallclock_s": 2044
+    },
+    "2": {
+      "path": "blue/results/op3_awdc_logs_v1/extract_s2/manifest.json",
+      "sha256": "e8d5ac2f9bddd2bad11ec3cc431991719b2f6eaf296db93c0744a0aec71891a1",
+      "wallclock_s": 2636
+    }
+  },
+  "checkpoints": {
+    "0": {
+      "bc": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s0/eval_bc.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s0/actor_bc.pt",
+        "model_sha256": "6f560cc1d64c1f46ff3f7cabf009f824734f2499e6c898b690085e59d1b9f56c"
+      },
+      "awdc_1": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s0/eval_awdc_1.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s0/actor_awdc_1.pt",
+        "model_sha256": "32d4028d3270362775112a1553ddf7ebd7ebb60ab0cd75035a09133e30966eaa"
+      },
+      "awdc_2": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s0/eval_awdc_2.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s0/actor_awdc_2.pt",
+        "model_sha256": "5e2ddc78aba50b2aacaba01824c69151f56d616d149feba5125896da0725e9e7"
+      },
+      "final": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s0/eval_final.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s0/actor_final.pt",
+        "model_sha256": "d045de7ddb08c9c6ce3dd54f8bbbab7650c8c1088a94d0ea6bc2d41989dc99f6"
+      }
+    },
+    "1": {
+      "bc": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s1/eval_bc.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s1/actor_bc.pt",
+        "model_sha256": "c014aa73c7d042fe52b67bb2a334bb2080395940a8d655284276ea5cadcbdf9b"
+      },
+      "awdc_1": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s1/eval_awdc_1.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s1/actor_awdc_1.pt",
+        "model_sha256": "a10b06c45f54eea41acb7c47c266be4853d82610b2b7b820154946380e4f0d10"
+      },
+      "awdc_2": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s1/eval_awdc_2.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s1/actor_awdc_2.pt",
+        "model_sha256": "aaca477ba6752c50d211f8fd7c19616e791d4966fe0b0b1ec13e54cb65d552f3"
+      },
+      "final": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s1/eval_final.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s1/actor_final.pt",
+        "model_sha256": "95a097546c1d3abce63717da19460344010b26af678058ba49b05bd71f17665b"
+      }
+    },
+    "2": {
+      "bc": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s2/eval_bc.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s2/actor_bc.pt",
+        "model_sha256": "08b8133e1e5c86006ab8693f6c31f4299fd1cdd5f73d3ba4b8cf8b5c1df3053f"
+      },
+      "awdc_1": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s2/eval_awdc_1.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s2/actor_awdc_1.pt",
+        "model_sha256": "2c0deb370bb669c4a3f2a04a62295f151cc461ba332599f3588608adffa87ac4"
+      },
+      "awdc_2": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s2/eval_awdc_2.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s2/actor_awdc_2.pt",
+        "model_sha256": "cd8348af95bb4e953fe8dbf7a6cf691a69e1dc397f69a557f19705108efba346"
+      },
+      "final": {
+        "eval_path": "blue/results/op3_awdc_logs_v1/extract_s2/eval_final.json",
+        "eval_sha256": "c552623bbc895027c5ab69bea87704633834aff762e5f2543ed397cf8b2778ff",
+        "model_path": "blue/results/op3_awdc_logs_v1/extract_s2/actor_final.pt",
+        "model_sha256": "2d5c8ab1fb325b3ea5da4cc17cdc501941381ad72731ae17b69b7eee7e3485ca"
+      }
+    }
+  },
+  "diagnostic": {
+    "all_12_eval_jsons_byte_identical": true,
+    "all_eval_cells_equal_g1_sleep_by_seed": true,
+    "all_mean_analyse_coverage_zero": true,
+    "final_first_tick_actions_on_dev_seed_8445": [
+      "Sleep",
+      "Sleep",
+      "Sleep",
+      "Sleep",
+      "Sleep"
+    ],
+    "interpretation": "The frozen offline extraction reproduced Sleep behavior on the dev suite. Distinct model weights and changing logged-state choices did not produce active scanning from initial dev states. This is a measured negative result, not proof the entire offline-learning family cannot work."
+  },
+  "confirm_8481_8500": "CLOSED; H1 dev gate failed; seed_audit was not used to open it",
+  "validation": [
+    "6 focused OP3 tests passed",
+    "128-row real-log critic backward/finite-weight smoke passed",
+    "12 evaluation and actor file hashes verified against manifests",
+    "three complete extraction manifests verified",
+    "dev seed sets and logged data/source hashes verified"
+  ],
+  "risk": "The critic uses an 8-action sampled approximation to the masked action logsumexp; the conclusion applies to this frozen extraction recipe and simulator stack only.",
+  "dependent_branch_changes": "None",
+  "next_task": "Design and pre-register a new experiment that prevents the initial all-Sleep action lock without using confirm seeds or altering the recorded v5 result."
+}
