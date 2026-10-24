@@ -91,14 +91,28 @@ full focused run failed solely because a 24 KB ignored legacy test fixture was
 absent from the new worktree; copying the exact artifact made its targeted test
 pass, and the 25-test rerun passed. The fixture remains ignored.
 
-Next: run the predeclared Qwen development headroom comparison; inspect its
-attacker pressure and same-guard RL attribution. Then port the frozen
-GPT-Blue harness into this isolated branch, retain/test its existing
-decision-time duration accounting, and compare lambda=1.0 Monte Carlo to
-lambda=0.9 bootstrapped GAE under equal-budget PPO. The GPT-Blue branch
-already has decision-time credit and a tiny MAPPO/A2C local smoke; this
-experiment does not claim those as new. No shared contract, simulator, Red-source,
-or checkpoint migration is needed for the Qwen model switch. PR checklist:
+The Qwen headroom relaunch has completed both 24-seed Lancer arms and is now
+running the historical actor with the same strict guard. Training has not
+begun. The restartable pilot launcher is
+`blue/training/event_time_pilot.sh`: two RNGs each for lambda 1.0 and 0.9,
+two iterations of two 400-tick Qwen episodes per run. It skips complete runs,
+resumes from a full iteration checkpoint, and archives a start interrupted
+before its first checkpoint. The trainer now accepts a docs-only HEAD change
+on resume while checking executable source-file hashes and retaining the
+original run commit. A 40-tick finite-Red two-iteration run resumed after a
+synthetic HEAD change, retaining its original commit in the manifest. Evaluation
+also persists whole seeds atomically and resumes by seed after checking the
+run manifest and evaluation configuration; a two-seed finite test was
+interrupted after the first seed, then completed without rerunning it. The
+focused event-time tests passed (17 passed, 1 upstream warning); shell syntax,
+Python compile, and diff checks passed. No final seeds were opened.
+
+Next: finish the 24-seed Qwen headroom comparison and record its paired
+same-guard result; run one 40-tick Qwen trainer-factory smoke; then launch
+the frozen four-run Qwen RL pilot. Review its mechanism gates before the
+main equal-budget lambda comparison. No shared contract, simulator,
+Red-source, or checkpoint migration is needed for the Qwen model switch.
+PR checklist:
 confirm model digest/source and seed separation, keep native rewards/privileged
 labels out of actor input, validate fallback/action masks and pending timing,
 report lower-tail episodes and independent training seeds. No messages or review
