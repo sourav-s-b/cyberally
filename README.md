@@ -1,4 +1,4 @@
-# Cyberally: self-evolving cyber defense research
+![alt text](image.png)# Cyberally: self-evolving cyber defense research
 
 Shared student project for a CybORG/CAGE4 cyber-range, Red agents, Blue MARL
 defenders, and a measured adversarial retraining loop.

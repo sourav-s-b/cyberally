@@ -1,11 +1,12 @@
 /**
- * CyberRangeAI - Core Frontend Controller
- * Matches Homepage & Dashboard Screens (Panels 2, 3, 4, 5)
+ * CyberAlly - Core Frontend Controller
+ * Matches Homepage, Simulation Configuration & Updated Dashboard Screens
  */
 
 document.addEventListener('DOMContentLoaded', () => {
   // --- View Elements ---
   const homeView = document.getElementById('home-view');
+  const configView = document.getElementById('config-view');
   const dashboardView = document.getElementById('dashboard-view');
   
   // --- Navigation Elements ---
@@ -13,6 +14,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const dashNavItems = document.querySelectorAll('.dash-nav-item');
   const homeLogoBtn = document.getElementById('home-logo-btn');
   const sidebarBrandBtn = document.getElementById('sidebar-brand-btn');
+  const configBackBtn = document.getElementById('config-back-btn');
+  const configBrandBtn = document.getElementById('config-brand-btn');
+  const btnLaunchSim = document.getElementById('btn-launch-sim');
+  
+  // --- Config Mode Selection ---
+  let selectedAttackMode = 'scripted'; // 'scripted' or 'llm'
+  const cardScripted = document.getElementById('config-card-scripted');
+  const cardLlm = document.getElementById('config-card-llm');
+  const indicatorScripted = document.getElementById('indicator-scripted');
+  const indicatorLlm = document.getElementById('indicator-llm');
   
   // --- Dashboard Tab Panels ---
   const dashTabContents = document.querySelectorAll('.dash-tab-content');
@@ -28,10 +39,23 @@ document.addEventListener('DOMContentLoaded', () => {
   let isSimRunning = true;
   const simStatusBadge = document.getElementById('sim-status-badge');
   const btnToggleSim = document.getElementById('btn-toggle-sim');
+  const simTimer = document.getElementById('sim-timer');
   const liveActiveAttacks = document.getElementById('live-active-attacks');
   const liveActiveDefenses = document.getElementById('live-active-defenses');
   const liveTotalEvents = document.getElementById('live-total-events');
   const liveEventsTbody = document.getElementById('live-events-tbody');
+  
+  // --- Simulation Running Timer (00:12:34) ---
+  let simSeconds = 754; // starts at 12m 34s matching screenshot
+  setInterval(() => {
+    if (isSimRunning && simTimer) {
+      simSeconds++;
+      const hrs = String(Math.floor(simSeconds / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((simSeconds % 3600) / 60)).padStart(2, '0');
+      const secs = String(simSeconds % 60).padStart(2, '0');
+      simTimer.textContent = `${hrs}:${mins}:${secs}`;
+    }
+  }, 1000);
   
   // --- Theme Toggle Elements ---
   const homeThemeToggle = document.getElementById('home-theme-toggle');
@@ -46,40 +70,132 @@ document.addEventListener('DOMContentLoaded', () => {
   const docModal = document.getElementById('doc-modal');
   
   // =========================================================================
-  // VIEW SWITCHING (Home <-> Dashboard)
+  // VIEW SWITCHING (Home <-> Config <-> Dashboard)
   // =========================================================================
   function showView(viewId) {
+    homeView.classList.remove('active');
+    if (configView) configView.classList.remove('active');
+    dashboardView.classList.remove('active');
+
     if (viewId === 'dashboard') {
-      homeView.classList.remove('active');
       dashboardView.classList.add('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (viewId === 'config') {
+      if (configView) configView.classList.add('active');
     } else {
-      dashboardView.classList.remove('active');
       homeView.classList.add('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // "Start Simulation" buttons transition to Dashboard -> Live Monitoring
+  // Hash-based routing to allow direct URL access (#config, #live-monitoring, #analytics, etc.)
+  function handleHashRoute() {
+    const rawHash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+    if (rawHash === 'config' || rawHash === 'configuration' || rawHash === 'simulation-config') {
+      closeAllModals();
+      showView('config');
+    } else if (rawHash === 'live-monitoring' || rawHash === 'live') {
+      closeAllModals();
+      showView('dashboard');
+      activateDashTab('live-monitoring');
+    } else if (rawHash === 'analytics') {
+      closeAllModals();
+      showView('dashboard');
+      activateDashTab('analytics');
+    } else if (rawHash === 'reports') {
+      closeAllModals();
+      showView('dashboard');
+      activateDashTab('reports');
+    } else if (rawHash === 'export') {
+      closeAllModals();
+      showView('dashboard');
+      activateDashTab('export');
+    } else if (rawHash === 'home' || rawHash === '') {
+      showView('home');
+    }
+  }
+  window.addEventListener('hashchange', handleHashRoute);
+
+  // "Start Simulation" on Homepage -> goes to Simulation Configuration
   startSimButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       closeAllModals();
-      showView('dashboard');
-      activateDashTab('live-monitoring');
-      showToast('Entered Autonomous Cyber-Range Simulation', 'success');
+      window.location.hash = 'config';
+      showView('config');
     });
   });
 
-  // Clicking Logo returns to Home
+  // Back button on Config View -> returns to Home
+  if (configBackBtn) {
+    configBackBtn.addEventListener('click', () => {
+      window.location.hash = 'home';
+      showView('home');
+    });
+  }
+  if (configBrandBtn) {
+    configBrandBtn.addEventListener('click', () => {
+      window.location.hash = 'home';
+      showView('home');
+    });
+  }
+
+  // Attack Mode Selection Cards
+  function updateAttackModeUI(mode) {
+    selectedAttackMode = mode;
+    if (mode === 'scripted') {
+      if (cardScripted) cardScripted.classList.add('selected');
+      if (cardLlm) cardLlm.classList.remove('selected');
+      if (indicatorScripted) {
+        indicatorScripted.className = 'config-selection-indicator checked';
+        indicatorScripted.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      }
+      if (indicatorLlm) {
+        indicatorLlm.className = 'config-selection-indicator unchecked';
+        indicatorLlm.innerHTML = '';
+      }
+    } else {
+      if (cardLlm) cardLlm.classList.add('selected');
+      if (cardScripted) cardScripted.classList.remove('selected');
+      if (indicatorLlm) {
+        indicatorLlm.className = 'config-selection-indicator checked';
+        indicatorLlm.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      }
+      if (indicatorScripted) {
+        indicatorScripted.className = 'config-selection-indicator unchecked';
+        indicatorScripted.innerHTML = '';
+      }
+    }
+  }
+
+  if (cardScripted) {
+    cardScripted.addEventListener('click', () => updateAttackModeUI('scripted'));
+  }
+  if (cardLlm) {
+    cardLlm.addEventListener('click', () => updateAttackModeUI('llm'));
+  }
+
+  // "Next →" on Config View -> launches Live Monitoring
+  if (btnLaunchSim) {
+    btnLaunchSim.addEventListener('click', () => {
+      window.location.hash = 'live-monitoring';
+      showView('dashboard');
+      activateDashTab('live-monitoring');
+      const modeName = selectedAttackMode === 'llm' ? 'LLM Red Team Agent' : 'Scripted Attacks';
+      showToast(`Simulation launched with ${modeName}`, 'success');
+    });
+  }
+
+  // Brand logos return to Home
   if (homeLogoBtn) {
     homeLogoBtn.addEventListener('click', (e) => {
       e.preventDefault();
+      window.location.hash = 'home';
       showView('home');
     });
   }
   if (sidebarBrandBtn) {
     sidebarBrandBtn.addEventListener('click', () => {
+      window.location.hash = 'home';
       showView('home');
     });
   }
@@ -98,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     'analytics': {
       title: 'Analytics',
-      desc: 'Performance metrics, learning progress and attack/defense insights'
+      desc: 'Performance metrics, attack/defense insights and penalty analysis'
     },
     'reports': {
       title: 'Reports',
@@ -141,6 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
   dashNavItems.forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = btn.dataset.dashTab;
+      if (tab === 'home') {
+        window.location.hash = 'home';
+      } else {
+        window.location.hash = tab;
+      }
       activateDashTab(tab);
     });
   });
@@ -153,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       isSimRunning = !isSimRunning;
       if (isSimRunning) {
         simStatusBadge.className = 'sim-status-badge running';
-        simStatusBadge.innerHTML = `<span class="pulse-dot"></span><span class="status-text">Simulation Running</span>`;
+        simStatusBadge.innerHTML = `<span class="pulse-dot"></span><span class="status-text">Simulation Running</span> <span class="sim-timer-text" id="sim-timer">00:12:34</span>`;
         btnToggleSim.textContent = 'Stop Simulation';
         btnToggleSim.className = 'btn-stop-sim';
         showToast('Autonomous Cyber Simulation Resumed', 'success');
@@ -167,7 +288,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Periodic simulated events ticker to make the dashboard feel alive
+  // Live Event Log Filter Pills
+  const eventFilterPills = document.querySelectorAll('.filter-pill');
+  eventFilterPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      eventFilterPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      const filter = pill.dataset.filter;
+
+      const rows = liveEventsTbody ? liveEventsTbody.querySelectorAll('tr') : [];
+      rows.forEach((row) => {
+        if (filter === 'all' || row.dataset.type === filter) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Simulated telemetry ticker for realistic live activity
   let simEventCount = 128;
   const attackTypes = ['SQL injection attempt', 'Lateral movement probing', 'Remote Code Execution (RCE)', 'Credential brute-force'];
   const defenseTypes = ['Blocked suspicious traffic', 'Reinforced authentication token', 'Isolated compromised container', 'Applied zero-day egress filter'];
@@ -175,7 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     if (!isSimRunning || !dashboardView.classList.contains('active')) return;
     
-    // 25% chance every tick to trigger a simulated background telemetry event
     if (Math.random() > 0.65) {
       simEventCount++;
       if (liveTotalEvents) liveTotalEvents.textContent = simEventCount;
@@ -187,6 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
       if (isAttack) {
         const desc = attackTypes[Math.floor(Math.random() * attackTypes.length)];
+        tr.dataset.type = 'attack';
         tr.innerHTML = `
           <td class="font-mono">${timeStr}</td>
           <td><span class="type-badge badge-attack">ATTACK</span></td>
@@ -197,6 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
       } else {
         const desc = defenseTypes[Math.floor(Math.random() * defenseTypes.length)];
+        tr.dataset.type = 'defense';
         tr.innerHTML = `
           <td class="font-mono">${timeStr}</td>
           <td><span class="type-badge badge-defense">DEFENSE</span></td>
@@ -209,7 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (liveEventsTbody) {
         liveEventsTbody.insertBefore(tr, liveEventsTbody.firstChild);
-        // keep table at reasonable length
         if (liveEventsTbody.children.length > 8) {
           liveEventsTbody.removeChild(liveEventsTbody.lastChild);
         }
@@ -228,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const ttStatus = document.getElementById('tt-status');
 
   networkNodes.forEach((node) => {
-    node.addEventListener('mouseenter', (e) => {
+    node.addEventListener('mouseenter', () => {
       const name = node.dataset.name || 'Node';
       const role = node.dataset.role || 'Host';
       const ip = node.dataset.ip || '10.0.0.1';
@@ -243,7 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     node.addEventListener('mousemove', (e) => {
-      const containerRect = document.getElementById('network-topology-container').getBoundingClientRect();
+      const container = document.getElementById('network-topology-container');
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
       const x = e.clientX - containerRect.left + 15;
       const y = e.clientY - containerRect.top + 15;
       nodeTooltip.style.left = `${Math.min(x, containerRect.width - 180)}px`;
@@ -290,61 +432,75 @@ document.addEventListener('DOMContentLoaded', () => {
       title: 'Simulation Report - Run 5',
       date: 'Oct 18, 2026',
       duration: '30 min',
+      negativeScore: -125,
       score: '91.4%',
-      attempts: 48,
-      mitigations: '44 (91.7%)',
+      attempts: 42,
+      mitigations: '38 (90.5%)',
+      compromised: 1,
       mtt: '1.2s / 2.4s',
-      summary: 'Red Team agents launched chained multi-stage penetration attacks against the DMZ and internal microservices. The decentralized MARL Blue Team autonomously deployed host isolation, firewall policy updates, and token reinforcement within an average containment time of 1.8 seconds.'
+      summary: 'Red Team agents launched chained multi-stage penetration attacks against the DMZ and internal microservices. The decentralized MARL Blue Team autonomously deployed host isolation, firewall policy updates, and token reinforcement within an average containment time of 1.8 seconds. Cumulative negative penalty score: -125.'
     },
     '2': {
-      title: 'Attack Analysis Report',
+      title: 'Simulation Report - Run 4',
       date: 'Oct 17, 2026',
       duration: '45 min',
+      negativeScore: -80,
       score: '88.2%',
       attempts: 64,
       mitigations: '57 (89.1%)',
+      compromised: 1,
       mtt: '1.5s / 2.8s',
-      summary: 'Evaluation of LLM-generated attack payloads utilizing dynamic prompt mutation. 57 out of 64 exploitation trajectories were intercepted prior to privilege escalation.'
+      summary: 'Evaluation of LLM-generated attack payloads utilizing dynamic prompt mutation. 57 out of 64 exploitation trajectories were intercepted prior to privilege escalation. Cumulative negative penalty score: -80.'
     },
     '3': {
-      title: 'Defense Performance',
+      title: 'Simulation Report - Run 3',
       date: 'Oct 16, 2026',
       duration: '30 min',
-      score: '94.0%',
-      attempts: 40,
-      mitigations: '38 (95.0%)',
-      mtt: '1.0s / 1.9s',
-      summary: 'Evaluation of cooperative multi-agent PPO policies on coalition subnet defense. Fast convergence and minimal cross-zone policy conflict observed.'
+      negativeScore: -210,
+      score: '74.0%',
+      attempts: 55,
+      mitigations: '39 (70.9%)',
+      compromised: 3,
+      mtt: '2.1s / 3.9s',
+      summary: 'Stress test against aggressive multi-vector lateral movement. Higher negative score reflects 3 host compromises during the initial policy exploration phase. Cumulative negative penalty score: -210.'
     },
     '4': {
-      title: 'System Vulnerabilities',
+      title: 'Simulation Report - Run 2',
       date: 'Oct 15, 2026',
       duration: '25 min',
-      score: '86.5%',
+      negativeScore: -45,
+      score: '96.5%',
       attempts: 32,
-      mitigations: '28 (87.5%)',
-      mtt: '1.8s / 3.1s',
-      summary: 'Synthetic vulnerability scanning report detailing CVE distribution in JuiceShop, DVWA, and internal RPC microservices.'
+      mitigations: '31 (96.8%)',
+      compromised: 0,
+      mtt: '1.1s / 1.8s',
+      summary: 'High defense resilience run. Zero hosts compromised, with early detection on SQLi and credential brute-force attempts. Cumulative negative penalty score: -45.'
     },
     '5': {
-      title: 'Simulation Report - Run 4',
+      title: 'Simulation Report - Run 1',
       date: 'Oct 14, 2026',
       duration: '40 min',
+      negativeScore: -95,
       score: '89.7%',
       attempts: 52,
       mitigations: '47 (90.4%)',
+      compromised: 1,
       mtt: '1.4s / 2.6s',
-      summary: 'Baseline comparative run between static heuristic defense and decentralized multi-agent reinforcement learning defense.'
+      summary: 'Initial baseline comparative run establishing policy reward bounds. Cumulative negative penalty score: -95.'
     }
   };
 
-  // Sub-tabs in Reports (Simulation Reports vs Performance Reports)
-  const reportSubtabs = document.querySelectorAll('.reports-subtab');
-  reportSubtabs.forEach((st) => {
-    st.addEventListener('click', () => {
-      reportSubtabs.forEach((s) => s.classList.remove('active'));
-      st.classList.add('active');
-      showToast(`Showing: ${st.textContent}`, 'info');
+  // Report Modal Tabs (Executive Summary, Attack Timeline, Penalty Breakdown, Findings, Recommendations)
+  const reportModalTabs = document.querySelectorAll('.report-modal-tab');
+  const reportTabPanels = document.querySelectorAll('.report-tab-panel');
+
+  reportModalTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      reportModalTabs.forEach((t) => t.classList.remove('active'));
+      reportTabPanels.forEach((p) => p.classList.remove('active'));
+      tab.classList.add('active');
+      const targetPanel = document.getElementById(`report-tab-${tab.dataset.reportTab}`);
+      if (targetPanel) targetPanel.classList.add('active');
     });
   });
 
@@ -357,6 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('modal-report-title').textContent = data.title;
       document.getElementById('modal-report-meta').textContent = `Executed on ${data.date} | Duration: ${data.duration} | Status: Completed`;
       
+      // Reset to first tab
+      reportModalTabs.forEach((t, i) => t.classList.toggle('active', i === 0));
+      reportTabPanels.forEach((p, i) => p.classList.toggle('active', i === 0));
+
       reportViewModal.classList.add('active');
     });
   });
@@ -400,6 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td class="font-semibold text-white">${title}</td>
         <td class="text-muted">Just now</td>
         <td class="text-muted">Live</td>
+        <td><span class="penalty-score-badge">-75</span></td>
         <td><span class="status-badge-pill badge-success">Completed</span></td>
         <td style="text-align: right;">
           <button class="btn-table-action btn-view-report" data-id="1">View</button>
@@ -411,20 +572,19 @@ document.addEventListener('DOMContentLoaded', () => {
       generateReportModal.classList.remove('active');
       showToast(`Report '${title}' successfully generated!`, 'success');
 
-      // Re-attach view event for new element
       newRow.querySelector('.btn-view-report').addEventListener('click', () => {
         document.getElementById('modal-report-title').textContent = title;
         reportViewModal.classList.add('active');
       });
       newRow.querySelector('.btn-download-report').addEventListener('click', () => {
-        downloadFile(`${title.replace(/\s+/g, '_')}.json`, JSON.stringify({ title, date: 'Oct 18, 2026', status: 'Completed' }, null, 2), 'application/json');
+        downloadFile(`${title.replace(/\s+/g, '_')}.json`, JSON.stringify({ title, date: 'Oct 24, 2026', negativeScore: -75, status: 'Completed' }, null, 2), 'application/json');
         showToast(`Downloaded: ${title}`, 'success');
       });
     });
   }
 
   // =========================================================================
-  // EXPORT DATA FUNCTIONALITY (Panel 5 from image.png)
+  // EXPORT DATA FUNCTIONALITY
   // =========================================================================
   const btnSubmitExport = document.getElementById('btn-submit-export');
   if (btnSubmitExport) {
@@ -459,20 +619,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const exportPayload = {
           exportDate: new Date().toISOString(),
+          platform: 'CyberAlly',
+          attackMode: selectedAttackMode,
           format: format,
           datasetsIncluded: exportOptions,
           telemetryStats: {
             totalAttacks: 342,
             detectionRate: '89%',
             mitigationRate: '76%',
+            negativePenaltyScore: -125,
             avgResponseSeconds: 1.8,
             activeHosts: 10,
             compromisedHosts: 1
           },
-          exportSummary: 'Autonomous CyberRangeAI environment telemetry package verified.'
+          penaltyBreakdown: {
+            criticalHostCompromise: -60,
+            criticalBreaches: -40,
+            dataExfiltration: -25
+          },
+          exportSummary: 'Autonomous CyberAlly environment telemetry package verified.'
         };
 
-        const filename = `CyberRangeAI_Export_${Date.now()}.${format.toLowerCase()}`;
+        const filename = `CyberAlly_Export_${Date.now()}.${format.toLowerCase()}`;
         downloadFile(filename, JSON.stringify(exportPayload, null, 2), 'text/plain');
         showToast(`Successfully exported ${exportOptions.length} datasets in ${format} format!`, 'success');
       }, 700);
@@ -591,4 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 300);
     }, 3200);
   }
+
+  // Check initial hash route on page load (e.g., #config, #live-monitoring)
+  handleHashRoute();
 });

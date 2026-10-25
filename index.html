@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CyberRangeAI - Autonomous Cyber-Range</title>
+  <title>CyberAlly - Autonomous Cyber-Range</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 40'><path d='M18 2L33 8.5V20C33 29.5 26.5 35.5 18 38C9.5 35.5 3 29.5 3 20V8.5L18 2Z' fill='%236366f1'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,7 +13,7 @@
 <body class="dark-theme">
 
   <!-- ========================================================================= -->
-  <!-- 1. HOMEPAGE VIEW (Based on CyberRangeAI Neon Security Dashboard1.png)    -->
+  <!-- 1. HOMEPAGE VIEW                                                           -->
   <!-- ========================================================================= -->
   <div id="home-view" class="app-view active">
     <!-- Homepage Navbar -->
@@ -32,15 +32,13 @@
             <path d="M18 8L27 12.5V20C27 25.5 23 29.5 18 31.5C13 29.5 9 25.5 9 20V12.5L18 8Z" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="2 2" fill="none" />
             <circle cx="18" cy="20" r="4" fill="#a855f7" filter="drop-shadow(0 0 6px #a855f7)" />
           </svg>
-          <span class="brand-name">CyberRangeAI</span>
+          <span class="brand-name">CyberAlly</span>
         </a>
 
         <nav class="home-nav-links">
           <a href="#home-hero" class="home-nav-link active">Home</a>
-          <a href="#about-section" class="home-nav-link">About</a>
           <a href="#how-it-works-section" class="home-nav-link">How It Works</a>
           <a href="#key-features-section" class="home-nav-link">Features</a>
-          <a href="#team-section" class="home-nav-link">Team</a>
         </nav>
 
         <div class="home-nav-actions">
@@ -346,11 +344,116 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- 2. DASHBOARD VIEW (Based on image.png Panels 2, 3, 4, 5)                  -->
+  <!-- 1.5. CONFIG VIEW (Simulation Configuration)                               -->
+  <!-- ========================================================================= -->
+  <div id="config-view" class="app-view">
+    <div class="config-shell">
+      <!-- Config Header -->
+      <header class="config-header">
+        <div class="config-header-inner">
+          <div class="config-brand" id="config-brand-btn" style="cursor: pointer;" title="Back to Home">
+            <svg class="logo-shield" viewBox="0 0 36 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="shieldGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#9d4edd" />
+                  <stop offset="50%" stop-color="#3a86ff" />
+                  <stop offset="100%" stop-color="#00f5d4" />
+                </linearGradient>
+              </defs>
+              <path d="M18 2L33 8.5V20C33 29.5 26.5 35.5 18 38C9.5 35.5 3 29.5 3 20V8.5L18 2Z" stroke="url(#shieldGrad2)" stroke-width="2.5" fill="rgba(15, 23, 42, 0.7)" />
+              <circle cx="18" cy="20" r="4" fill="#a855f7" filter="drop-shadow(0 0 6px #a855f7)" />
+            </svg>
+            <span class="brand-name">CyberAlly</span>
+          </div>
+          <button class="config-back-btn" id="config-back-btn" title="Back to Home">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            <span>Back to Home</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Config Body -->
+      <main class="config-body">
+        <div class="config-page-header">
+          <h1 class="config-page-title">Choose Attack Mode</h1>
+          <p class="config-page-subtitle">Select how the Red Team will generate attacks for this simulation run.</p>
+        </div>
+
+        <!-- Two Selection Cards -->
+        <div class="config-cards-row">
+          <!-- Card 1: Scripted Attacks -->
+          <div class="config-mode-card selected" id="config-card-scripted" data-mode="scripted">
+            <div class="config-card-header-row">
+              <div class="config-selection-indicator checked" id="indicator-scripted">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+            </div>
+            <div class="config-card-inner">
+              <div class="config-card-icon-wrap red-hacker-wrap">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
+                  <circle cx="12" cy="7" r="4"></circle>
+                  <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"></path>
+                  <path d="M8 7L4 4"></path>
+                  <path d="M16 7l4-3"></path>
+                </svg>
+              </div>
+              <h3 class="config-card-title">Scripted Attacks</h3>
+              <p class="config-card-desc">Run predefined attack scenarios with known techniques and targets.</p>
+              <ul class="config-feature-list">
+                <li><span class="chk-icon">✔</span> Use curated attack scenarios</li>
+                <li><span class="chk-icon">✔</span> Consistent and reproducible</li>
+                <li><span class="chk-icon">✔</span> Ideal for baseline evaluation</li>
+                <li><span class="chk-icon">✔</span> Supports OWASP, DVWA, etc.</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Card 2: LLM Red Team Agent -->
+          <div class="config-mode-card" id="config-card-llm" data-mode="llm">
+            <div class="config-card-header-row">
+              <div class="config-selection-indicator unchecked" id="indicator-llm"></div>
+              <div class="config-card-badge">Recommended</div>
+            </div>
+            <div class="config-card-inner">
+              <div class="config-card-icon-wrap blue-brain-wrap">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2">
+                  <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
+                  <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
+                </svg>
+              </div>
+              <h3 class="config-card-title">LLM Red Team Agent</h3>
+              <p class="config-card-desc">Use an LLM-driven autonomous agent to dynamically generate and adapt attacks in real-time.</p>
+              <ul class="config-feature-list">
+                <li><span class="chk-icon">✔</span> Generates novel attack strategies</li>
+                <li><span class="chk-icon">✔</span> Adapts based on environment</li>
+                <li><span class="chk-icon">✔</span> More realistic and unpredictable</li>
+                <li><span class="chk-icon">✔</span> Tests blue team adaptability</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Launch Button -->
+        <div class="config-action-row">
+          <button class="btn-primary-gradient config-next-btn" id="btn-launch-sim">
+            <span>Next →</span>
+          </button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. DASHBOARD VIEW                                                         -->
   <!-- ========================================================================= -->
   <div id="dashboard-view" class="app-view">
     <div class="dashboard-shell-layout">
-      <!-- SIDEBAR (Shown across Panels 2, 3, 4, 5) -->
+      <!-- SIDEBAR -->
       <aside class="dash-sidebar" aria-label="Dashboard Navigation">
         <!-- Sidebar Brand -->
         <div class="dash-sidebar-brand" id="sidebar-brand-btn">
@@ -358,7 +461,7 @@
             <path d="M18 2L33 8.5V20C33 29.5 26.5 35.5 18 38C9.5 35.5 3 29.5 3 20V8.5L18 2Z" stroke="url(#shieldGrad)" stroke-width="2.5" fill="rgba(15, 23, 42, 0.7)" />
             <circle cx="18" cy="20" r="3.5" fill="#a855f7" />
           </svg>
-          <span class="dash-brand-name">CyberRangeAI</span>
+          <span class="dash-brand-name">CyberAlly</span>
         </div>
 
         <!-- Sidebar Navigation Menu -->
@@ -432,6 +535,7 @@
               <div class="sim-status-badge running" id="sim-status-badge">
                 <span class="pulse-dot"></span>
                 <span class="status-text">Simulation Running</span>
+                <span class="sim-timer-text" id="sim-timer">00:12:34</span>
               </div>
               <button class="btn-stop-sim" id="btn-toggle-sim">Stop Simulation</button>
             </div>
@@ -465,21 +569,9 @@
               </button>
             </div>
 
-            <!-- Common theme toggle & user pill -->
+            <!-- Common theme toggle -->
             <div class="theme-switch-pill" id="dash-theme-toggle" title="Switch Theme">
               <div class="switch-handle"></div>
-            </div>
-
-            <div class="admin-profile-pill" id="admin-profile-btn">
-              <div class="user-avatar-circle">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-              <span class="user-name">Admin</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
             </div>
           </div>
         </header>
@@ -487,7 +579,7 @@
         <!-- DASHBOARD BODY: TABS CONTAINER -->
         <div class="dash-tab-body">
           <!-- ================================================================= -->
-          <!-- TAB 2: LIVE MONITORING (Panel 2 from image.png)                   -->
+          <!-- TAB 2: LIVE MONITORING                                             -->
           <!-- ================================================================= -->
           <section id="tab-live-monitoring" class="dash-tab-content active">
             <!-- 4 Top Stat Cards -->
@@ -557,263 +649,185 @@
               </div>
             </div>
 
-            <!-- Middle Section: Network View (Left) & Resources + Live Traffic (Right) -->
-            <div class="dash-middle-grid">
-              <!-- Left: Live Network View -->
-              <div class="dash-panel network-view-panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">Live Network View</h3>
-                  <div class="topology-legend">
-                    <span class="legend-item"><i class="dot dot-red"></i> Attacker</span>
-                    <span class="legend-item"><i class="dot dot-blue"></i> Defender</span>
-                    <span class="legend-item"><i class="dot dot-normal"></i> Normal</span>
-                  </div>
+            <!-- Live Network View (Full Width) -->
+            <div class="dash-panel network-view-panel live-network-full" style="margin-bottom:20px;">
+              <div class="panel-header">
+                <h3 class="panel-title">Live Network View</h3>
+                <div class="topology-legend">
+                  <span class="legend-item"><i class="dot dot-red"></i> Attacker</span>
+                  <span class="legend-item"><i class="dot dot-blue"></i> Defender</span>
+                  <span class="legend-item"><i class="dot dot-normal"></i> Normal</span>
                 </div>
-                <div class="network-canvas-container" id="network-topology-container">
-                  <!-- Interactive SVG Topology with dynamic nodes & glowing attack packet animations -->
-                  <svg id="network-svg" viewBox="0 0 540 320" preserveAspectRatio="xMidYMid meet">
-                    <!-- Glow and drop shadow definitions -->
-                    <defs>
-                      <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                      <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                      <filter id="glowOrange" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="4" result="blur" />
-                        <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                      </filter>
-                    </defs>
+              </div>
+              <div class="network-canvas-container" id="network-topology-container">
+                <svg id="network-svg" viewBox="0 0 540 320" preserveAspectRatio="xMidYMid meet">
+                  <defs>
+                    <filter id="glowRed" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                    <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                    <filter id="glowOrange" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
 
-                    <!-- Network Link lines -->
-                    <g class="network-links">
-                      <!-- Attacker to Firewall -->
-                      <line x1="125" y1="165" x2="210" y2="165" class="link-line link-attack" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 4" />
-                      <line x1="125" y1="165" x2="170" y2="105" class="link-line link-attack" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 3" />
-                      <line x1="125" y1="165" x2="170" y2="230" class="link-line link-normal" stroke="#1e293b" stroke-width="1.5" />
+                  <!-- Network Link lines -->
+                  <g class="network-links">
+                    <line x1="125" y1="165" x2="210" y2="165" class="link-line link-attack" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 4" />
+                    <line x1="125" y1="165" x2="170" y2="105" class="link-line link-attack" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 3" />
+                    <line x1="125" y1="165" x2="170" y2="230" class="link-line link-normal" stroke="#1e293b" stroke-width="1.5" />
+                    <line x1="210" y1="165" x2="230" y2="85" class="link-line link-defense" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" />
+                    <line x1="210" y1="165" x2="280" y2="160" class="link-line link-defense" stroke="#3b82f6" stroke-width="2" />
+                    <line x1="210" y1="165" x2="255" y2="250" class="link-line link-normal" stroke="#334155" stroke-width="1.5" />
+                    <line x1="170" y1="105" x2="230" y2="85" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="230" y1="85" x2="310" y2="90" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="280" y1="160" x2="310" y2="90" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="280" y1="160" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="310" y1="90" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="255" y1="250" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
+                    <line x1="170" y1="230" x2="210" y2="165" class="link-line link-normal" stroke="#1e293b" stroke-width="1.5" />
+                  </g>
 
-                      <!-- Firewall to Servers -->
-                      <line x1="210" y1="165" x2="230" y2="85" class="link-line link-defense" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 3" />
-                      <line x1="210" y1="165" x2="280" y2="160" class="link-line link-defense" stroke="#3b82f6" stroke-width="2" />
-                      <line x1="210" y1="165" x2="255" y2="250" class="link-line link-normal" stroke="#334155" stroke-width="1.5" />
+                  <!-- Animated attack & defense pulse dots -->
+                  <circle cx="165" cy="165" r="3.5" fill="#ef4444" filter="url(#glowRed)">
+                    <animate attributeName="cx" from="125" to="210" dur="2s" repeatCount="indefinite" />
+                  </circle>
+                  <circle cx="210" cy="165" r="3" fill="#38bdf8" filter="url(#glowBlue)">
+                    <animate attributeName="cx" from="280" to="210" dur="2.4s" repeatCount="indefinite" />
+                  </circle>
 
-                      <!-- Inter-network hosts -->
-                      <line x1="170" y1="105" x2="230" y2="85" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="230" y1="85" x2="310" y2="90" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="280" y1="160" x2="310" y2="90" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="280" y1="160" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="310" y1="90" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="255" y1="250" x2="350" y2="190" class="link-line link-normal" stroke="#1e3a8a" stroke-width="1.5" />
-                      <line x1="170" y1="230" x2="210" y2="165" class="link-line link-normal" stroke="#1e293b" stroke-width="1.5" />
-                    </g>
-
-                    <!-- Animated attack & defense pulse dots traveling along links -->
-                    <circle cx="165" cy="165" r="3.5" fill="#ef4444" filter="url(#glowRed)">
-                      <animate attributeName="cx" from="125" to="210" dur="2s" repeatCount="indefinite" />
+                  <!-- Network Nodes -->
+                  <g class="network-node node-attacker" transform="translate(125, 165)" data-name="RedAgent-1" data-role="Attacker" data-ip="192.168.10.105" data-status="Active Attack (SQLi)">
+                    <circle cx="0" cy="0" r="28" fill="none" stroke="#ef4444" stroke-width="1.5" opacity="0.4" stroke-dasharray="3 3">
+                      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite" />
                     </circle>
-                    <circle cx="210" cy="165" r="3" fill="#38bdf8" filter="url(#glowBlue)">
-                      <animate attributeName="cx" from="280" to="210" dur="2.4s" repeatCount="indefinite" />
-                    </circle>
+                    <circle cx="0" cy="0" r="22" fill="#1e1017" stroke="#ef4444" stroke-width="2" filter="url(#glowRed)" />
+                    <path d="M-6 -2 C-6 -7 6 -7 6 -2 C6 3 -6 3 -6 -2 Z M-9 9 C-9 4 9 4 9 9 Z" fill="#ef4444" />
+                    <text x="0" y="34" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="600">Attacker</text>
+                  </g>
 
-                    <!-- Network Nodes -->
-                    <!-- 1. Attacker Node (Left) -->
-                    <g class="network-node node-attacker" transform="translate(125, 165)" data-name="RedAgent-1" data-role="Attacker" data-ip="192.168.10.105" data-status="Active Attack (SQLi)">
-                      <circle cx="0" cy="0" r="28" fill="none" stroke="#ef4444" stroke-width="1.5" opacity="0.4" stroke-dasharray="3 3">
-                        <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="10s" repeatCount="indefinite" />
-                      </circle>
-                      <circle cx="0" cy="0" r="22" fill="#1e1017" stroke="#ef4444" stroke-width="2" filter="url(#glowRed)" />
-                      <!-- Hacker avatar icon -->
-                      <path d="M-6 -2 C-6 -7 6 -7 6 -2 C6 3 -6 3 -6 -2 Z M-9 9 C-9 4 9 4 9 9 Z" fill="#ef4444" />
-                      <text x="0" y="34" text-anchor="middle" fill="#ef4444" font-size="10" font-weight="600">Attacker</text>
-                    </g>
+                  <g class="network-node node-host compromised" transform="translate(170, 105)" data-name="JuiceShop" data-role="Target Web App" data-ip="10.0.1.20" data-status="Compromised / Under Attack">
+                    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#ef4444" stroke-width="2" />
+                    <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#f87171" stroke-width="1.2" />
+                    <line x1="-5" y1="7" x2="5" y2="7" stroke="#f87171" stroke-width="1.5" />
+                    <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">JuiceShop</text>
+                  </g>
 
-                    <!-- 2. Host: JuiceShop (Vulnerable Target) -->
-                    <g class="network-node node-host compromised" transform="translate(170, 105)" data-name="JuiceShop" data-role="Target Web App" data-ip="10.0.1.20" data-status="Compromised / Under Attack">
-                      <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#ef4444" stroke-width="2" />
-                      <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#f87171" stroke-width="1.2" />
-                      <line x1="-5" y1="7" x2="5" y2="7" stroke="#f87171" stroke-width="1.5" />
-                      <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">JuiceShop</text>
-                    </g>
+                  <g class="network-node node-host" transform="translate(170, 230)" data-name="DVWA" data-role="Target App" data-ip="10.0.1.25" data-status="Normal / Monitoring">
+                    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5" />
+                    <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#60a5fa" stroke-width="1.2" />
+                    <line x1="-5" y1="7" x2="5" y2="7" stroke="#60a5fa" stroke-width="1.5" />
+                    <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">DVWA</text>
+                  </g>
 
-                    <!-- 3. Host: DVWA -->
-                    <g class="network-node node-host" transform="translate(170, 230)" data-name="DVWA" data-role="Target App" data-ip="10.0.1.25" data-status="Normal / Monitoring">
-                      <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5" />
-                      <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#60a5fa" stroke-width="1.2" />
-                      <line x1="-5" y1="7" x2="5" y2="7" stroke="#60a5fa" stroke-width="1.5" />
-                      <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">DVWA</text>
-                    </g>
+                  <g class="network-node node-firewall" transform="translate(210, 165)" data-name="Perimeter Firewall" data-role="Defense Gateway" data-ip="10.0.1.1" data-status="Enforcing Rules (Filtering)">
+                    <rect x="-18" y="-18" width="36" height="36" rx="8" fill="#241408" stroke="#f97316" stroke-width="2" filter="url(#glowOrange)" />
+                    <line x1="-12" y1="-8" x2="12" y2="-8" stroke="#fdba74" stroke-width="2" />
+                    <line x1="-12" y1="0" x2="12" y2="0" stroke="#fdba74" stroke-width="2" />
+                    <line x1="-12" y1="8" x2="12" y2="8" stroke="#fdba74" stroke-width="2" />
+                    <line x1="0" y1="-8" x2="0" y2="0" stroke="#fdba74" stroke-width="1.5" />
+                    <line x1="-6" y1="0" x2="-6" y2="8" stroke="#fdba74" stroke-width="1.5" />
+                    <line x1="6" y1="0" x2="6" y2="8" stroke="#fdba74" stroke-width="1.5" />
+                    <text x="0" y="30" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">Firewall</text>
+                  </g>
 
-                    <!-- 4. Firewall Node (Center) -->
-                    <g class="network-node node-firewall" transform="translate(210, 165)" data-name="Perimeter Firewall" data-role="Defense Gateway" data-ip="10.0.1.1" data-status="Enforcing Rules (Filtering)">
-                      <rect x="-18" y="-18" width="36" height="36" rx="8" fill="#241408" stroke="#f97316" stroke-width="2" filter="url(#glowOrange)" />
-                      <!-- Firewall brick pattern -->
-                      <line x1="-12" y1="-8" x2="12" y2="-8" stroke="#fdba74" stroke-width="2" />
-                      <line x1="-12" y1="0" x2="12" y2="0" stroke="#fdba74" stroke-width="2" />
-                      <line x1="-12" y1="8" x2="12" y2="8" stroke="#fdba74" stroke-width="2" />
-                      <line x1="0" y1="-8" x2="0" y2="0" stroke="#fdba74" stroke-width="1.5" />
-                      <line x1="-6" y1="0" x2="-6" y2="8" stroke="#fdba74" stroke-width="1.5" />
-                      <line x1="6" y1="0" x2="6" y2="8" stroke="#fdba74" stroke-width="1.5" />
-                      <text x="0" y="30" text-anchor="middle" fill="#f97316" font-size="10" font-weight="600">Firewall</text>
-                    </g>
+                  <g class="network-node node-defender" transform="translate(230, 85)" data-name="BlueAgent-1" data-role="Zone Defender" data-ip="10.0.2.11" data-status="Patrolling Subnet">
+                    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1.8" filter="url(#glowBlue)" />
+                    <path d="M0 -7 L6 -4 V1 C6 4 0 7 0 7 C0 7 -6 4 -6 1 V-4 Z" fill="none" stroke="#38bdf8" stroke-width="1.5" />
+                    <text x="0" y="24" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="500">Blue-1</text>
+                  </g>
 
-                    <!-- 5. Defender: BlueAgent-1 -->
-                    <g class="network-node node-defender" transform="translate(230, 85)" data-name="BlueAgent-1" data-role="Zone Defender" data-ip="10.0.2.11" data-status="Patrolling Subnet">
-                      <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1.8" filter="url(#glowBlue)" />
-                      <path d="M0 -7 L6 -4 V1 C6 4 0 7 0 7 C0 7 -6 4 -6 1 V-4 Z" fill="none" stroke="#38bdf8" stroke-width="1.5" />
-                      <text x="0" y="24" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="500">Blue-1</text>
-                    </g>
+                  <g class="network-node node-defender" transform="translate(280, 160)" data-name="BlueAgent-2" data-role="MARL Defender" data-ip="10.0.2.12" data-status="Traffic Inspection Active">
+                    <rect x="-15" y="-15" width="30" height="30" rx="6" fill="#082f49" stroke="#38bdf8" stroke-width="2" filter="url(#glowBlue)" />
+                    <path d="M0 -7 L7 -4 V2 C7 5 0 8 0 8 C0 8 -7 5 -7 2 V-4 Z" fill="#0284c7" stroke="#bae6fd" stroke-width="1.2" />
+                    <text x="0" y="25" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="600">Blue-2</text>
+                  </g>
 
-                    <!-- 6. Defender: BlueAgent-2 -->
-                    <g class="network-node node-defender" transform="translate(280, 160)" data-name="BlueAgent-2" data-role="MARL Defender" data-ip="10.0.2.12" data-status="Traffic Inspection Active">
-                      <rect x="-15" y="-15" width="30" height="30" rx="6" fill="#082f49" stroke="#38bdf8" stroke-width="2" filter="url(#glowBlue)" />
-                      <path d="M0 -7 L7 -4 V2 C7 5 0 8 0 8 C0 8 -7 5 -7 2 V-4 Z" fill="#0284c7" stroke="#bae6fd" stroke-width="1.2" />
-                      <text x="0" y="25" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="600">Blue-2</text>
-                    </g>
+                  <g class="network-node node-host" transform="translate(310, 90)" data-name="Web Server" data-role="Application Host" data-ip="10.0.2.45" data-status="Normal Load">
+                    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5" />
+                    <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#60a5fa" stroke-width="1.2" />
+                    <line x1="-5" y1="7" x2="5" y2="7" stroke="#60a5fa" stroke-width="1.5" />
+                    <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">WebSrv</text>
+                  </g>
 
-                    <!-- 7. Host: Internal Web Server -->
-                    <g class="network-node node-host" transform="translate(310, 90)" data-name="Web Server" data-role="Application Host" data-ip="10.0.2.45" data-status="Normal Load">
-                      <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#0f172a" stroke="#3b82f6" stroke-width="1.5" />
-                      <rect x="-9" y="-9" width="18" height="12" rx="2" fill="none" stroke="#60a5fa" stroke-width="1.2" />
-                      <line x1="-5" y1="7" x2="5" y2="7" stroke="#60a5fa" stroke-width="1.5" />
-                      <text x="0" y="24" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">WebSrv</text>
-                    </g>
+                  <g class="network-node node-defender" transform="translate(255, 250)" data-name="BlueAgent-3" data-role="Container Isolation Agent" data-ip="10.0.2.13" data-status="Isolation Ready">
+                    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1.8" />
+                    <path d="M0 -7 L6 -4 V1 C6 4 0 7 0 7 C0 7 -6 4 -6 1 V-4 Z" fill="none" stroke="#38bdf8" stroke-width="1.5" />
+                    <text x="0" y="24" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="500">Blue-3</text>
+                  </g>
 
-                    <!-- 8. Defender: BlueAgent-3 -->
-                    <g class="network-node node-defender" transform="translate(255, 250)" data-name="BlueAgent-3" data-role="Container Isolation Agent" data-ip="10.0.2.13" data-status="Isolation Ready">
-                      <rect x="-14" y="-14" width="28" height="28" rx="6" fill="#082f49" stroke="#0ea5e9" stroke-width="1.8" />
-                      <path d="M0 -7 L6 -4 V1 C6 4 0 7 0 7 C0 7 -6 4 -6 1 V-4 Z" fill="none" stroke="#38bdf8" stroke-width="1.5" />
-                      <text x="0" y="24" text-anchor="middle" fill="#38bdf8" font-size="9" font-weight="500">Blue-3</text>
-                    </g>
+                  <g class="network-node node-database" transform="translate(350, 190)" data-name="Core Database" data-role="Secure Storage" data-ip="10.0.3.50" data-status="Protected / Encrypted">
+                    <circle cx="0" cy="0" r="18" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+                    <ellipse cx="0" cy="-6" rx="8" ry="3" fill="none" stroke="#38bdf8" stroke-width="1.2" />
+                    <path d="M-8 -6 v6 c0 1.6 3.6 3 8 3 s8 -1.4 8 -3 v-6" fill="none" stroke="#38bdf8" stroke-width="1.2" />
+                    <path d="M-8 0 v6 c0 1.6 3.6 3 8 3 s8 -1.4 8 -3 v-6" fill="none" stroke="#38bdf8" stroke-width="1.2" />
+                    <text x="0" y="28" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">DB</text>
+                  </g>
+                </svg>
 
-                    <!-- 9. Host: Primary Database -->
-                    <g class="network-node node-database" transform="translate(350, 190)" data-name="Core Database" data-role="Secure Storage" data-ip="10.0.3.50" data-status="Protected / Encrypted">
-                      <circle cx="0" cy="0" r="18" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
-                      <!-- Database cylinder rings -->
-                      <ellipse cx="0" cy="-6" rx="8" ry="3" fill="none" stroke="#38bdf8" stroke-width="1.2" />
-                      <path d="M-8 -6 v6 c0 1.6 3.6 3 8 3 s8 -1.4 8 -3 v-6" fill="none" stroke="#38bdf8" stroke-width="1.2" />
-                      <path d="M-8 0 v6 c0 1.6 3.6 3 8 3 s8 -1.4 8 -3 v-6" fill="none" stroke="#38bdf8" stroke-width="1.2" />
-                      <text x="0" y="28" text-anchor="middle" fill="#94a3b8" font-size="9" font-weight="500">DB</text>
-                    </g>
-                  </svg>
-
-                  <!-- Node Inspection Tooltip Popup -->
-                  <div class="node-tooltip" id="node-tooltip">
-                    <div class="tt-header">
-                      <span class="tt-name" id="tt-name">Node Name</span>
-                      <span class="tt-badge" id="tt-role">Role</span>
-                    </div>
-                    <div class="tt-body">
-                      <div>IP: <span class="tt-val" id="tt-ip">10.0.0.1</span></div>
-                      <div>Status: <span class="tt-val" id="tt-status">Active</span></div>
-                    </div>
+                <!-- Node Inspection Tooltip Popup -->
+                <div class="node-tooltip" id="node-tooltip">
+                  <div class="tt-header">
+                    <span class="tt-name" id="tt-name">Node Name</span>
+                    <span class="tt-badge" id="tt-role">Role</span>
+                  </div>
+                  <div class="tt-body">
+                    <div>IP: <span class="tt-val" id="tt-ip">10.0.0.1</span></div>
+                    <div>Status: <span class="tt-val" id="tt-status">Active</span></div>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- Right Column: System Resources + Network Traffic (Live) -->
-              <div class="dash-right-col">
-                <!-- System Resources Panel -->
-                <div class="dash-panel resources-panel">
-                  <div class="panel-header">
-                    <h3 class="panel-title">System Resources</h3>
-                  </div>
-                  <div class="resource-gauges-row">
-                    <!-- Gauge 1: CPU -->
-                    <div class="gauge-item">
-                      <div class="circular-gauge-wrapper">
-                        <svg class="circular-gauge" viewBox="0 0 100 100">
-                          <circle class="gauge-bg" cx="50" cy="50" r="40" stroke-width="8" />
-                          <circle class="gauge-bar gauge-green" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="145.7" />
-                        </svg>
-                        <div class="gauge-number" id="cpu-percent-val">42%</div>
-                      </div>
-                      <div class="gauge-label">CPU</div>
-                    </div>
-
-                    <!-- Gauge 2: Memory -->
-                    <div class="gauge-item">
-                      <div class="circular-gauge-wrapper">
-                        <svg class="circular-gauge" viewBox="0 0 100 100">
-                          <circle class="gauge-bg" cx="50" cy="50" r="40" stroke-width="8" />
-                          <circle class="gauge-bar gauge-orange" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="80.4" />
-                        </svg>
-                        <div class="gauge-number" id="mem-percent-val">68%</div>
-                      </div>
-                      <div class="gauge-label">Memory</div>
-                    </div>
-
-                    <!-- Gauge 3: Containers -->
-                    <div class="gauge-item">
-                      <div class="circular-gauge-wrapper">
-                        <svg class="circular-gauge" viewBox="0 0 100 100">
-                          <circle class="gauge-bg" cx="50" cy="50" r="40" stroke-width="8" />
-                          <circle class="gauge-bar gauge-cyan" cx="50" cy="50" r="40" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="50.2" />
-                        </svg>
-                        <div class="gauge-number" id="containers-val">8/10</div>
-                      </div>
-                      <div class="gauge-label">Containers</div>
-                    </div>
-                  </div>
+            <!-- Network Traffic (Live) - Full Width -->
+            <div class="dash-panel traffic-panel live-traffic-full" style="margin-bottom:20px;">
+              <div class="panel-header">
+                <h3 class="panel-title">Network Traffic (Live)</h3>
+                <div class="traffic-legend">
+                  <span class="legend-item"><i class="dot dot-cyan"></i> Incoming</span>
+                  <span class="legend-item"><i class="dot dot-pink"></i> Outgoing</span>
                 </div>
-
-                <!-- Network Traffic (Live) Panel -->
-                <div class="dash-panel traffic-panel">
-                  <div class="panel-header">
-                    <h3 class="panel-title">Network Traffic (Live)</h3>
-                    <div class="traffic-legend">
-                      <span class="legend-item"><i class="dot dot-cyan"></i> Incoming</span>
-                      <span class="legend-item"><i class="dot dot-pink"></i> Outgoing</span>
-                    </div>
-                  </div>
-
-                  <div class="traffic-chart-container">
-                    <svg class="traffic-svg" viewBox="0 0 380 140" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="incGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stop-color="#0284c7" stop-opacity="0.3" />
-                          <stop offset="100%" stop-color="#0284c7" stop-opacity="0.0" />
-                        </linearGradient>
-                        <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.25" />
-                          <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0" />
-                        </linearGradient>
-                      </defs>
-
-                      <!-- Grid Lines and Y-Axis Labels -->
-                      <g class="chart-grid">
-                        <line x1="30" y1="20" x2="370" y2="20" stroke="rgba(255,255,255,0.05)" />
-                        <text x="22" y="23" text-anchor="end" fill="#64748b" font-size="8">200</text>
-                        <line x1="30" y1="50" x2="370" y2="50" stroke="rgba(255,255,255,0.05)" />
-                        <text x="22" y="53" text-anchor="end" fill="#64748b" font-size="8">150</text>
-                        <line x1="30" y1="80" x2="370" y2="80" stroke="rgba(255,255,255,0.05)" />
-                        <text x="22" y="83" text-anchor="end" fill="#64748b" font-size="8">100</text>
-                        <line x1="30" y1="110" x2="370" y2="110" stroke="rgba(255,255,255,0.05)" />
-                        <text x="22" y="113" text-anchor="end" fill="#64748b" font-size="8">50</text>
-                        <text x="22" y="128" text-anchor="end" fill="#64748b" font-size="8">0</text>
-                      </g>
-
-                      <!-- Outgoing Area & Line (Pink/Red) -->
-                      <path d="M40,120 L80,118 L120,95 L160,115 L200,90 L240,112 L280,105 L320,70 L350,115 L370,60 L370,125 L40,125 Z" fill="url(#outGrad)" />
-                      <path d="M40,120 L80,118 L120,95 L160,115 L200,90 L240,112 L280,105 L320,70 L350,115 L370,60" fill="none" stroke="#f43f5e" stroke-width="2" />
-
-                      <!-- Incoming Area & Line (Cyan/Blue) -->
-                      <path d="M40,122 L80,110 L120,70 L160,110 L200,85 L240,115 L280,95 L320,118 L350,120 L370,112 L370,125 L40,125 Z" fill="url(#incGrad)" />
-                      <path d="M40,122 L80,110 L120,70 L160,110 L200,85 L240,115 L280,95 L320,118 L350,120 L370,112" fill="none" stroke="#0ea5e9" stroke-width="2" />
-                    </svg>
-
-                    <!-- X-Axis Timestamps -->
-                    <div class="chart-x-labels">
-                      <span>14:10</span>
-                      <span>14:12</span>
-                      <span>14:14</span>
-                      <span>14:16</span>
-                      <span>14:18</span>
-                      <span>14:20</span>
-                    </div>
-                  </div>
+              </div>
+              <div class="traffic-chart-container">
+                <svg class="traffic-svg" viewBox="0 0 380 140" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="incGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.3" />
+                      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.0" />
+                    </linearGradient>
+                    <linearGradient id="outGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.25" />
+                      <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  <g class="chart-grid">
+                    <line x1="30" y1="20" x2="370" y2="20" stroke="rgba(255,255,255,0.05)" />
+                    <text x="22" y="23" text-anchor="end" fill="#64748b" font-size="8">200</text>
+                    <line x1="30" y1="50" x2="370" y2="50" stroke="rgba(255,255,255,0.05)" />
+                    <text x="22" y="53" text-anchor="end" fill="#64748b" font-size="8">150</text>
+                    <line x1="30" y1="80" x2="370" y2="80" stroke="rgba(255,255,255,0.05)" />
+                    <text x="22" y="83" text-anchor="end" fill="#64748b" font-size="8">100</text>
+                    <line x1="30" y1="110" x2="370" y2="110" stroke="rgba(255,255,255,0.05)" />
+                    <text x="22" y="113" text-anchor="end" fill="#64748b" font-size="8">50</text>
+                    <text x="22" y="128" text-anchor="end" fill="#64748b" font-size="8">0</text>
+                  </g>
+                  <path d="M40,120 L80,118 L120,95 L160,115 L200,90 L240,112 L280,105 L320,70 L350,115 L370,60 L370,125 L40,125 Z" fill="url(#outGrad)" />
+                  <path d="M40,120 L80,118 L120,95 L160,115 L200,90 L240,112 L280,105 L320,70 L350,115 L370,60" fill="none" stroke="#f43f5e" stroke-width="2" />
+                  <path d="M40,122 L80,110 L120,70 L160,110 L200,85 L240,115 L280,95 L320,118 L350,120 L370,112 L370,125 L40,125 Z" fill="url(#incGrad)" />
+                  <path d="M40,122 L80,110 L120,70 L160,110 L200,85 L240,115 L280,95 L320,118 L350,120 L370,112" fill="none" stroke="#0ea5e9" stroke-width="2" />
+                </svg>
+                <div class="chart-x-labels">
+                  <span>14:10</span>
+                  <span>14:12</span>
+                  <span>14:14</span>
+                  <span>14:16</span>
+                  <span>14:18</span>
+                  <span>14:20</span>
                 </div>
               </div>
             </div>
@@ -822,6 +836,12 @@
             <div class="dash-panel event-log-panel">
               <div class="panel-header">
                 <h3 class="panel-title">Live Event Log</h3>
+                <div class="event-filter-pills" id="event-filter-pills">
+                  <button class="filter-pill active" data-filter="all">All</button>
+                  <button class="filter-pill" data-filter="attack">Attacks</button>
+                  <button class="filter-pill" data-filter="defense">Defenses</button>
+                  <button class="filter-pill" data-filter="system">System</button>
+                </div>
               </div>
               <div class="table-responsive">
                 <table class="dash-table" id="live-event-table">
@@ -836,50 +856,45 @@
                     </tr>
                   </thead>
                   <tbody id="live-events-tbody">
-                    <!-- Row 1 -->
-                    <tr>
-                      <td class="font-mono">14:20:31</td>
+                    <tr data-type="attack">
+                      <td class="font-mono">14:23:10</td>
                       <td><span class="type-badge badge-attack">ATTACK</span></td>
                       <td>RedAgent-1</td>
                       <td>JuiceShop</td>
                       <td>SQL injection attempt</td>
                       <td><span class="status-badge-pill badge-in-progress">In Progress</span></td>
                     </tr>
-                    <!-- Row 2 -->
-                    <tr>
-                      <td class="font-mono">14:20:28</td>
+                    <tr data-type="defense">
+                      <td class="font-mono">14:22:58</td>
                       <td><span class="type-badge badge-defense">DEFENSE</span></td>
-                      <td>BlueAgent-2</td>
+                      <td>BlueAgent-1</td>
                       <td>Firewall</td>
                       <td>Blocked suspicious traffic</td>
                       <td><span class="status-badge-pill badge-success">Success</span></td>
                     </tr>
-                    <!-- Row 3 -->
-                    <tr>
-                      <td class="font-mono">14:20:15</td>
+                    <tr data-type="system">
+                      <td class="font-mono">14:22:41</td>
                       <td><span class="type-badge badge-system">SYSTEM</span></td>
                       <td>Container</td>
                       <td>Web Server</td>
                       <td>New container started</td>
                       <td><span class="status-badge-pill badge-info">Info</span></td>
                     </tr>
-                    <!-- Row 4 -->
-                    <tr>
-                      <td class="font-mono">14:20:03</td>
+                    <tr data-type="attack">
+                      <td class="font-mono">14:22:30</td>
                       <td><span class="type-badge badge-attack">ATTACK</span></td>
                       <td>RedAgent-1</td>
                       <td>DVWA</td>
                       <td>Brute force login attempt</td>
                       <td><span class="status-badge-pill badge-failed">Failed</span></td>
                     </tr>
-                    <!-- Row 5 -->
-                    <tr>
-                      <td class="font-mono">14:19:50</td>
-                      <td><span class="type-badge badge-defense">DEFENSE</span></td>
-                      <td>BlueAgent-3</td>
+                    <tr data-type="defense">
+                      <td class="font-mono">14:22:10</td>
+                      <td><span class="type-badge badge-alert">ALERT</span></td>
+                      <td>IDS</td>
                       <td>Network</td>
-                      <td>Isolated compromised host</td>
-                      <td><span class="status-badge-pill badge-success">Success</span></td>
+                      <td>Port scan detected</td>
+                      <td><span class="status-badge-pill badge-warning">Warning</span></td>
                     </tr>
                   </tbody>
                 </table>
@@ -888,7 +903,7 @@
           </section>
 
           <!-- ================================================================= -->
-          <!-- TAB 3: ANALYTICS (Panel 3 from image.png)                         -->
+          <!-- TAB 3: ANALYTICS                                                   -->
           <!-- ================================================================= -->
           <section id="tab-analytics" class="dash-tab-content">
             <!-- 4 Top Stat Cards -->
@@ -940,22 +955,23 @@
                 </div>
               </div>
 
-              <!-- Avg Response Time -->
-              <div class="stat-card border-purple">
-                <div class="stat-icon-wrapper bg-purple-muted">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2">
+              <!-- Negative Penalty Score -->
+              <div class="stat-card border-red">
+                <div class="stat-icon-wrapper bg-red-muted">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2">
                     <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
                   </svg>
                 </div>
                 <div class="stat-text-wrap">
-                  <div class="stat-title text-purple">Avg Response Time</div>
-                  <div class="stat-number">1.8s</div>
+                  <div class="stat-title text-red">Negative Penalty Score</div>
+                  <div class="stat-number text-red">-125</div>
                 </div>
               </div>
             </div>
 
-            <!-- Middle Row: 2 Line Charts -->
+            <!-- Middle Row: Attack vs Defense + Negative Scoring Analysis -->
             <div class="analytics-charts-row">
               <!-- Attack vs Defense Events -->
               <div class="dash-panel analytics-chart-card">
@@ -966,7 +982,6 @@
                     <span class="legend-item"><i class="dot dot-cyan"></i> Defenses</span>
                   </div>
                 </div>
-
                 <div class="chart-canvas-wrap">
                   <svg class="analytics-line-svg" viewBox="0 0 460 170" preserveAspectRatio="none">
                     <defs>
@@ -979,8 +994,6 @@
                         <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.0" />
                       </linearGradient>
                     </defs>
-
-                    <!-- Horizontal Grid lines -->
                     <g class="grid-lines">
                       <line x1="35" y1="20" x2="445" y2="20" stroke="rgba(255,255,255,0.06)" />
                       <text x="25" y="24" text-anchor="end" fill="#64748b" font-size="9">80</text>
@@ -993,12 +1006,8 @@
                       <line x1="35" y1="140" x2="445" y2="140" stroke="rgba(255,255,255,0.06)" />
                       <text x="25" y="144" text-anchor="end" fill="#64748b" font-size="9">0</text>
                     </g>
-
-                    <!-- Attack Path (Red/Pink) -->
-                    <!-- Coordinates corresponding to Oct 12-18 peaks -->
                     <path d="M45,130 L105,100 L165,120 L225,50 L285,115 L345,85 L405,105 L435,115 L435,140 L45,140 Z" fill="url(#attackFillGrad)" />
                     <path d="M45,130 L105,100 L165,120 L225,50 L285,115 L345,85 L405,105 L435,115" fill="none" stroke="#f43f5e" stroke-width="2" />
-                    <!-- Points -->
                     <circle cx="45" cy="130" r="3" fill="#f43f5e" />
                     <circle cx="105" cy="100" r="3" fill="#f43f5e" />
                     <circle cx="165" cy="120" r="3" fill="#f43f5e" />
@@ -1006,11 +1015,8 @@
                     <circle cx="285" cy="115" r="3" fill="#f43f5e" />
                     <circle cx="345" cy="85" r="3" fill="#f43f5e" />
                     <circle cx="405" cy="105" r="3" fill="#f43f5e" />
-
-                    <!-- Defense Path (Cyan/Blue) -->
                     <path d="M45,135 L105,125 L165,95 L225,80 L285,105 L345,60 L405,110 L435,120 L435,140 L45,140 Z" fill="url(#defenseFillGrad)" />
                     <path d="M45,135 L105,125 L165,95 L225,80 L285,105 L345,60 L405,110 L435,120" fill="none" stroke="#0ea5e9" stroke-width="2" />
-                    <!-- Points -->
                     <circle cx="45" cy="135" r="3" fill="#0ea5e9" />
                     <circle cx="105" cy="125" r="3" fill="#0ea5e9" />
                     <circle cx="165" cy="95" r="3" fill="#0ea5e9" />
@@ -1031,51 +1037,68 @@
                 </div>
               </div>
 
-              <!-- Defense Learning Progress -->
+              <!-- Negative Scoring Analysis -->
               <div class="dash-panel analytics-chart-card">
                 <div class="panel-header">
-                  <h3 class="panel-title">Defense Learning Progress</h3>
-                  <div class="traffic-legend">
-                    <span class="legend-item"><i class="dot dot-cyan"></i> Detection ↑</span>
-                    <span class="legend-item"><i class="dot dot-green"></i> Containment ↑</span>
+                  <h3 class="panel-title">Negative Scoring Analysis</h3>
+                </div>
+                <div class="neg-score-metrics">
+                  <div class="neg-metric-card neg-metric-red">
+                    <div class="neg-metric-label">Critical Host Compromise</div>
+                    <div class="neg-metric-value">-60</div>
+                  </div>
+                  <div class="neg-metric-card neg-metric-orange">
+                    <div class="neg-metric-label">Critical Breaches</div>
+                    <div class="neg-metric-value neg-orange">-40</div>
+                  </div>
+                  <div class="neg-metric-card neg-metric-yellow">
+                    <div class="neg-metric-label">Data Exfiltration</div>
+                    <div class="neg-metric-value neg-yellow">-25</div>
                   </div>
                 </div>
+              </div>
+            </div>
 
+            <!-- Bottom Row: Penalty Progression + Top Penalty Contributors -->
+            <div class="analytics-charts-row">
+              <!-- Penalty Progression line chart -->
+              <div class="dash-panel analytics-chart-card">
+                <div class="panel-header">
+                  <h3 class="panel-title">Penalty Progression</h3>
+                  <div class="traffic-legend">
+                    <span class="legend-item"><i class="dot dot-red"></i> Cumulative Penalty</span>
+                  </div>
+                </div>
                 <div class="chart-canvas-wrap">
                   <svg class="analytics-line-svg" viewBox="0 0 460 170" preserveAspectRatio="none">
-                    <!-- Horizontal Grid lines -->
+                    <defs>
+                      <linearGradient id="penaltyFillGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#ef4444" stop-opacity="0.0" />
+                        <stop offset="100%" stop-color="#ef4444" stop-opacity="0.25" />
+                      </linearGradient>
+                    </defs>
                     <g class="grid-lines">
                       <line x1="45" y1="20" x2="445" y2="20" stroke="rgba(255,255,255,0.06)" />
-                      <text x="35" y="24" text-anchor="end" fill="#64748b" font-size="9">100%</text>
+                      <text x="38" y="24" text-anchor="end" fill="#64748b" font-size="9">0</text>
                       <line x1="45" y1="50" x2="445" y2="50" stroke="rgba(255,255,255,0.06)" />
-                      <text x="35" y="54" text-anchor="end" fill="#64748b" font-size="9">75%</text>
+                      <text x="38" y="54" text-anchor="end" fill="#64748b" font-size="9">-50</text>
                       <line x1="45" y1="80" x2="445" y2="80" stroke="rgba(255,255,255,0.06)" />
-                      <text x="35" y="84" text-anchor="end" fill="#64748b" font-size="9">50%</text>
+                      <text x="38" y="84" text-anchor="end" fill="#64748b" font-size="9">-100</text>
                       <line x1="45" y1="110" x2="445" y2="110" stroke="rgba(255,255,255,0.06)" />
-                      <text x="35" y="114" text-anchor="end" fill="#64748b" font-size="9">25%</text>
+                      <text x="38" y="114" text-anchor="end" fill="#64748b" font-size="9">-150</text>
                       <line x1="45" y1="140" x2="445" y2="140" stroke="rgba(255,255,255,0.06)" />
-                      <text x="35" y="144" text-anchor="end" fill="#64748b" font-size="9">0%</text>
+                      <text x="38" y="144" text-anchor="end" fill="#64748b" font-size="9">-200</text>
                     </g>
-
-                    <!-- Detection Trend (Cyan/Blue) -->
-                    <path d="M55,115 L115,100 L175,90 L235,80 L295,70 L355,58 L415,45" fill="none" stroke="#0ea5e9" stroke-width="2.5" />
-                    <circle cx="55" cy="115" r="3.5" fill="#0ea5e9" />
-                    <circle cx="115" cy="100" r="3.5" fill="#0ea5e9" />
-                    <circle cx="175" cy="90" r="3.5" fill="#0ea5e9" />
-                    <circle cx="235" cy="80" r="3.5" fill="#0ea5e9" />
-                    <circle cx="295" cy="70" r="3.5" fill="#0ea5e9" />
-                    <circle cx="355" cy="58" r="3.5" fill="#0ea5e9" />
-                    <circle cx="415" cy="45" r="3.5" fill="#0ea5e9" />
-
-                    <!-- Containment Trend (Green/Teal) -->
-                    <path d="M55,130 L115,120 L175,110 L235,100 L295,95 L355,80 L415,65" fill="none" stroke="#10b981" stroke-width="2.5" />
-                    <circle cx="55" cy="130" r="3.5" fill="#10b981" />
-                    <circle cx="115" cy="120" r="3.5" fill="#10b981" />
-                    <circle cx="175" cy="110" r="3.5" fill="#10b981" />
-                    <circle cx="235" cy="100" r="3.5" fill="#10b981" />
-                    <circle cx="295" cy="95" r="3.5" fill="#10b981" />
-                    <circle cx="355" cy="80" r="3.5" fill="#10b981" />
-                    <circle cx="415" cy="65" r="3.5" fill="#10b981" />
+                    <!-- Penalty line trending downward (0 to -200) -->
+                    <path d="M55,20 L115,30 L175,48 L235,70 L295,95 L355,115 L415,138 L445,140 L445,20 L55,20 Z" fill="url(#penaltyFillGrad)" />
+                    <path d="M55,20 L115,30 L175,48 L235,70 L295,95 L355,115 L415,138" fill="none" stroke="#ef4444" stroke-width="2.5" />
+                    <circle cx="55" cy="20" r="3.5" fill="#ef4444" />
+                    <circle cx="115" cy="30" r="3.5" fill="#ef4444" />
+                    <circle cx="175" cy="48" r="3.5" fill="#ef4444" />
+                    <circle cx="235" cy="70" r="3.5" fill="#ef4444" />
+                    <circle cx="295" cy="95" r="3.5" fill="#ef4444" />
+                    <circle cx="355" cy="115" r="3.5" fill="#ef4444" />
+                    <circle cx="415" cy="138" r="3.5" fill="#ef4444" />
                   </svg>
                   <div class="chart-dates-row">
                     <span>Oct 12</span>
@@ -1088,128 +1111,47 @@
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Bottom Row: 2 Donut Distribution Charts -->
-            <div class="analytics-donuts-row">
-              <!-- Attack Type Distribution -->
-              <div class="dash-panel donut-card">
+              <!-- Top Penalty Contributors horizontal bar chart -->
+              <div class="dash-panel analytics-chart-card">
                 <div class="panel-header">
-                  <h3 class="panel-title">Attack Type Distribution</h3>
+                  <h3 class="panel-title">Top Penalty Contributors</h3>
                 </div>
-                <div class="donut-content-layout">
-                  <div class="donut-chart-wrap">
-                    <svg class="donut-svg" viewBox="0 0 160 160">
-                      <!-- Total 342, Circumference: 2 * PI * 55 = 345.57 -->
-                      <!-- SQLi: 28% = 96.76, RCE: 20% = 69.11, XSS: 18% = 62.2, Brute Force: 16% = 55.29, PrivEsc: 10% = 34.56, Others: 8% = 27.65 -->
-                      <!-- SQL Injection (Blue): 28% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#3b82f6" stroke-width="22" stroke-dasharray="96.76 248.81" stroke-dashoffset="0" />
-                      <!-- RCE (Red/Pink): 20% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#ef4444" stroke-width="22" stroke-dasharray="69.11 276.46" stroke-dashoffset="-96.76" />
-                      <!-- XSS (Orange): 18% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#f97316" stroke-width="22" stroke-dasharray="62.2 283.37" stroke-dashoffset="-165.87" />
-                      <!-- Brute Force (Yellow/Amber): 16% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#eab308" stroke-width="22" stroke-dasharray="55.29 290.28" stroke-dashoffset="-228.07" />
-                      <!-- Privilege Escalation (Purple): 10% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#a855f7" stroke-width="22" stroke-dasharray="34.56 311.01" stroke-dashoffset="-283.36" />
-                      <!-- Others (Green/Teal): 8% -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#10b981" stroke-width="22" stroke-dasharray="27.65 317.92" stroke-dashoffset="-317.92" />
-                    </svg>
-                    <div class="donut-center-text">
-                      <div class="donut-big-val">342</div>
-                      <div class="donut-sub-label">Attacks</div>
+                <div class="hbar-chart">
+                  <div class="hbar-row">
+                    <div class="hbar-label">Critical Host Compromise</div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill hbar-red" style="width:28%"></div>
                     </div>
+                    <div class="hbar-pct">28%</div>
                   </div>
-
-                  <!-- Legend -->
-                  <div class="donut-legend-grid">
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#3b82f6;"></span>
-                      <span class="legend-label-name">SQL Injection</span>
-                      <span class="legend-pct">28%</span>
+                  <div class="hbar-row">
+                    <div class="hbar-label">Data Exfiltration</div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill hbar-pink" style="width:25%"></div>
                     </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#ef4444;"></span>
-                      <span class="legend-label-name">RCE</span>
-                      <span class="legend-pct">20%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#f97316;"></span>
-                      <span class="legend-label-name">XSS</span>
-                      <span class="legend-pct">18%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#eab308;"></span>
-                      <span class="legend-label-name">Brute Force</span>
-                      <span class="legend-pct">16%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#a855f7;"></span>
-                      <span class="legend-label-name">Privilege Escalation</span>
-                      <span class="legend-pct">10%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#10b981;"></span>
-                      <span class="legend-label-name">Others</span>
-                      <span class="legend-pct">8%</span>
-                    </div>
+                    <div class="hbar-pct">25%</div>
                   </div>
-                </div>
-              </div>
-
-              <!-- Defense Actions Distribution -->
-              <div class="dash-panel donut-card">
-                <div class="panel-header">
-                  <h3 class="panel-title">Defense Actions Distribution</h3>
-                </div>
-                <div class="donut-content-layout">
-                  <div class="donut-chart-wrap">
-                    <svg class="donut-svg" viewBox="0 0 160 160">
-                      <!-- Total 256 Actions, Circumference: 345.57 -->
-                      <!-- Block IP: 32% = 110.58 -->
-                      <!-- Isolate Container: 24% = 82.94 -->
-                      <!-- Reinforce Token: 18% = 62.20 -->
-                      <!-- Update Rules: 14% = 48.38 -->
-                      <!-- Alert: 12% = 41.47 -->
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#3b82f6" stroke-width="22" stroke-dasharray="110.58 234.99" stroke-dashoffset="0" />
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#10b981" stroke-width="22" stroke-dasharray="82.94 262.63" stroke-dashoffset="-110.58" />
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#eab308" stroke-width="22" stroke-dasharray="62.2 283.37" stroke-dashoffset="-193.52" />
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#f97316" stroke-width="22" stroke-dasharray="48.38 297.19" stroke-dashoffset="-255.72" />
-                      <circle cx="80" cy="80" r="55" fill="none" stroke="#ef4444" stroke-width="22" stroke-dasharray="41.47 304.1" stroke-dashoffset="-304.1" />
-                    </svg>
-                    <div class="donut-center-text">
-                      <div class="donut-big-val">256</div>
-                      <div class="donut-sub-label">Actions</div>
+                  <div class="hbar-row">
+                    <div class="hbar-label">Repeated Failed Attempts</div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill hbar-orange" style="width:20%"></div>
                     </div>
+                    <div class="hbar-pct">20%</div>
                   </div>
-
-                  <!-- Legend -->
-                  <div class="donut-legend-grid">
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#3b82f6;"></span>
-                      <span class="legend-label-name">Block IP</span>
-                      <span class="legend-pct">32%</span>
+                  <div class="hbar-row">
+                    <div class="hbar-label">Policy Violations</div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill hbar-yellow" style="width:10%"></div>
                     </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#10b981;"></span>
-                      <span class="legend-label-name">Isolate Container</span>
-                      <span class="legend-pct">24%</span>
+                    <div class="hbar-pct">10%</div>
+                  </div>
+                  <div class="hbar-row">
+                    <div class="hbar-label">Lateral Movement</div>
+                    <div class="hbar-track">
+                      <div class="hbar-fill hbar-purple" style="width:6%"></div>
                     </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#eab308;"></span>
-                      <span class="legend-label-name">Reinforce Token</span>
-                      <span class="legend-pct">18%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#f97316;"></span>
-                      <span class="legend-label-name">Update Rules</span>
-                      <span class="legend-pct">14%</span>
-                    </div>
-                    <div class="donut-legend-row">
-                      <span class="legend-color-dot" style="background:#ef4444;"></span>
-                      <span class="legend-label-name">Alert</span>
-                      <span class="legend-pct">12%</span>
-                    </div>
+                    <div class="hbar-pct">6%</div>
                   </div>
                 </div>
               </div>
@@ -1217,17 +1159,11 @@
           </section>
 
           <!-- ================================================================= -->
-          <!-- TAB 4: REPORTS (Panel 4 from image.png)                           -->
+          <!-- TAB 4: REPORTS                                                     -->
           <!-- ================================================================= -->
           <section id="tab-reports" class="dash-tab-content">
             <div class="reports-container-card">
-              <!-- Sub-tabs: Simulation Reports & Performance Reports -->
-              <div class="reports-subtab-bar">
-                <button class="reports-subtab active" data-subtab="simulation">Simulation Reports</button>
-                <button class="reports-subtab" data-subtab="performance">Performance Reports</button>
-              </div>
-
-              <!-- Reports Table -->
+              <!-- Reports Table (no sub-tab bar) -->
               <div class="table-responsive">
                 <table class="dash-table reports-table" id="reports-table">
                   <thead>
@@ -1237,6 +1173,7 @@
                       <th>Date</th>
                       <th>Duration</th>
                       <th>Status</th>
+                      <th>Negative Penalty Score</th>
                       <th style="text-align: right;">Actions</th>
                     </tr>
                   </thead>
@@ -1247,6 +1184,7 @@
                       <td class="font-semibold text-white">Simulation Report - Run 5</td>
                       <td class="text-muted">Oct 18, 2026</td>
                       <td class="text-muted">30 min</td>
+                      <td><span class="penalty-score-badge">-125</span></td>
                       <td><span class="status-badge-pill badge-success">Completed</span></td>
                       <td style="text-align: right;">
                         <button class="btn-table-action btn-view-report" data-id="1">View</button>
@@ -1256,9 +1194,10 @@
                     <!-- Report 2 -->
                     <tr data-report-id="2">
                       <td class="text-muted font-mono">2</td>
-                      <td class="font-semibold text-white">Attack Analysis Report</td>
+                      <td class="font-semibold text-white">Simulation Report - Run 4</td>
                       <td class="text-muted">Oct 17, 2026</td>
                       <td class="text-muted">45 min</td>
+                      <td><span class="penalty-score-badge">-80</span></td>
                       <td><span class="status-badge-pill badge-success">Completed</span></td>
                       <td style="text-align: right;">
                         <button class="btn-table-action btn-view-report" data-id="2">View</button>
@@ -1268,9 +1207,10 @@
                     <!-- Report 3 -->
                     <tr data-report-id="3">
                       <td class="text-muted font-mono">3</td>
-                      <td class="font-semibold text-white">Defense Performance</td>
+                      <td class="font-semibold text-white">Simulation Report - Run 3</td>
                       <td class="text-muted">Oct 16, 2026</td>
                       <td class="text-muted">30 min</td>
+                      <td><span class="penalty-score-badge">-210</span></td>
                       <td><span class="status-badge-pill badge-success">Completed</span></td>
                       <td style="text-align: right;">
                         <button class="btn-table-action btn-view-report" data-id="3">View</button>
@@ -1280,9 +1220,10 @@
                     <!-- Report 4 -->
                     <tr data-report-id="4">
                       <td class="text-muted font-mono">4</td>
-                      <td class="font-semibold text-white">System Vulnerabilities</td>
+                      <td class="font-semibold text-white">Simulation Report - Run 2</td>
                       <td class="text-muted">Oct 15, 2026</td>
                       <td class="text-muted">25 min</td>
+                      <td><span class="penalty-score-badge">-45</span></td>
                       <td><span class="status-badge-pill badge-success">Completed</span></td>
                       <td style="text-align: right;">
                         <button class="btn-table-action btn-view-report" data-id="4">View</button>
@@ -1292,9 +1233,10 @@
                     <!-- Report 5 -->
                     <tr data-report-id="5">
                       <td class="text-muted font-mono">5</td>
-                      <td class="font-semibold text-white">Simulation Report - Run 4</td>
+                      <td class="font-semibold text-white">Simulation Report - Run 1</td>
                       <td class="text-muted">Oct 14, 2026</td>
                       <td class="text-muted">40 min</td>
+                      <td><span class="penalty-score-badge">-95</span></td>
                       <td><span class="status-badge-pill badge-success">Completed</span></td>
                       <td style="text-align: right;">
                         <button class="btn-table-action btn-view-report" data-id="5">View</button>
@@ -1308,7 +1250,7 @@
           </section>
 
           <!-- ================================================================= -->
-          <!-- TAB 5: EXPORT (Panel 5 from image.png)                            -->
+          <!-- TAB 5: EXPORT                                                      -->
           <!-- ================================================================= -->
           <section id="tab-export" class="dash-tab-content">
             <div class="export-main-card">
@@ -1316,7 +1258,6 @@
               <div class="export-section">
                 <h3 class="export-section-title">Select Data to Export</h3>
                 <div class="export-checkbox-list">
-                  <!-- Checkbox 1 -->
                   <label class="export-checkbox-row">
                     <input type="checkbox" id="exp-event-logs" checked />
                     <span class="custom-checkbox">
@@ -1330,7 +1271,6 @@
                     </div>
                   </label>
 
-                  <!-- Checkbox 2 -->
                   <label class="export-checkbox-row">
                     <input type="checkbox" id="exp-network-traffic" checked />
                     <span class="custom-checkbox">
@@ -1344,7 +1284,6 @@
                     </div>
                   </label>
 
-                  <!-- Checkbox 3 -->
                   <label class="export-checkbox-row">
                     <input type="checkbox" id="exp-system-metrics" checked />
                     <span class="custom-checkbox">
@@ -1358,7 +1297,6 @@
                     </div>
                   </label>
 
-                  <!-- Checkbox 4 -->
                   <label class="export-checkbox-row">
                     <input type="checkbox" id="exp-analytics-data" checked />
                     <span class="custom-checkbox">
@@ -1372,7 +1310,6 @@
                     </div>
                   </label>
 
-                  <!-- Checkbox 5 -->
                   <label class="export-checkbox-row">
                     <input type="checkbox" id="exp-simulation-report" checked />
                     <span class="custom-checkbox">
@@ -1436,7 +1373,7 @@
   </div>
 
   <!-- ========================================================================= -->
-  <!-- MODALS (Report Viewer, Report Generator, Demo Video, Documentation)      -->
+  <!-- MODALS                                                                     -->
   <!-- ========================================================================= -->
 
   <!-- Report Viewer Modal -->
@@ -1449,37 +1386,133 @@
         </div>
         <button class="btn-close-modal" id="btn-close-report-modal">&times;</button>
       </div>
+      <!-- Report Modal Tabs -->
+      <div class="report-modal-tabs">
+        <button class="report-modal-tab active" data-report-tab="executive">Executive Summary</button>
+        <button class="report-modal-tab" data-report-tab="timeline">Attack Timeline</button>
+        <button class="report-modal-tab" data-report-tab="penalty">Penalty Breakdown</button>
+        <button class="report-modal-tab" data-report-tab="findings">Findings</button>
+        <button class="report-modal-tab" data-report-tab="recommendations">Recommendations</button>
+      </div>
       <div class="modal-body report-modal-body">
-        <div class="report-summary-box">
-          <div class="report-score-stat">
-            <span class="label">Defense Resilience Score</span>
-            <span class="val text-green">91.4%</span>
+        <!-- Executive Summary Tab -->
+        <div class="report-tab-panel active" id="report-tab-executive">
+          <div class="report-summary-box">
+            <div class="report-score-stat">
+              <span class="label">Total Attacks</span>
+              <span class="val text-white">42</span>
+            </div>
+            <div class="report-score-stat">
+              <span class="label">Detected</span>
+              <span class="val text-green">89%</span>
+            </div>
+            <div class="report-score-stat">
+              <span class="label">Compromised Hosts</span>
+              <span class="val text-orange">1</span>
+            </div>
+            <div class="report-score-stat">
+              <span class="label">Negative Penalty Score</span>
+              <span class="val text-red">-125</span>
+            </div>
           </div>
-          <div class="report-score-stat">
-            <span class="label">Total Infiltrations Attempted</span>
-            <span class="val text-red">48</span>
-          </div>
-          <div class="report-score-stat">
-            <span class="label">Successful Mitigations</span>
-            <span class="val text-blue">44 (91.7%)</span>
-          </div>
-          <div class="report-score-stat">
-            <span class="label">MTTD / MTTR</span>
-            <span class="val text-purple">1.2s / 2.4s</span>
+          <h4 class="modal-section-heading">Executive Summary</h4>
+          <p class="modal-text">
+            During this 30-minute autonomous simulation exercise run by CyberAlly, Red Team agents launched chained multi-stage penetration attacks against the DMZ and internal microservices. The decentralized MARL Blue Team autonomously deployed host isolation, firewall policy updates, and token reinforcement within an average containment time of 1.8 seconds. A cumulative negative penalty score of -125 was recorded based on critical host compromises, data exfiltration attempts, and policy violations.
+          </p>
+
+          <h4 class="modal-section-heading" style="margin-top:20px;">Penalty Breakdown</h4>
+          <div class="modal-penalty-bars">
+            <div class="mp-row">
+              <span class="mp-label">Critical Host Compromise</span>
+              <div class="mp-track"><div class="mp-fill fill-red" style="width:60%;"></div></div>
+              <span class="mp-val text-red">-60</span>
+            </div>
+            <div class="mp-row">
+              <span class="mp-label">Data Exfiltration</span>
+              <div class="mp-track"><div class="mp-fill fill-red" style="width:35%;"></div></div>
+              <span class="mp-val text-red">-25</span>
+            </div>
+            <div class="mp-row">
+              <span class="mp-label">Repeated Failed Attempts</span>
+              <div class="mp-track"><div class="mp-fill fill-orange" style="width:25%;"></div></div>
+              <span class="mp-val text-orange">-20</span>
+            </div>
+            <div class="mp-row">
+              <span class="mp-label">Policy Violations</span>
+              <div class="mp-track"><div class="mp-fill fill-orange" style="width:18%;"></div></div>
+              <span class="mp-val text-orange">-15</span>
+            </div>
+            <div class="mp-row">
+              <span class="mp-label">Lateral Movement</span>
+              <div class="mp-track"><div class="mp-fill fill-yellow" style="width:10%;"></div></div>
+              <span class="mp-val text-yellow">-5</span>
+            </div>
           </div>
         </div>
 
-        <h4 class="modal-section-heading">Executive Summary</h4>
-        <p class="modal-text">
-          During this 30-minute autonomous simulation exercise, Red Team agents launched chained multi-stage penetration attacks against the DMZ and internal microservices. The decentralized MARL Blue Team autonomously deployed host isolation, firewall policy updates, and token reinforcement within an average containment time of 1.8 seconds.
-        </p>
+        <!-- Attack Timeline Tab -->
+        <div class="report-tab-panel" id="report-tab-timeline">
+          <h4 class="modal-section-heading">Attack Timeline</h4>
+          <ul class="report-incident-list">
+            <li><strong>14:02:11</strong> - RedAgent-1 executed blind SQLi on JuiceShop checkout parameter. BlueAgent-2 dynamically deployed rule <code>DENY_URI_REGEX_SQLI</code> on perimeter firewall.</li>
+            <li><strong>14:11:45</strong> - Exploit chained to CVE-2023-38606 on Web Server container. BlueAgent-4 performed immediate zero-trust container isolation and spawned a pristine replica.</li>
+            <li><strong>14:20:03</strong> - Distributed brute-force login attempted on DVWA administrative endpoints. BlueAgent-1 applied IP rate limiting and enforced token revocation.</li>
+            <li><strong>14:27:18</strong> - Lateral movement detected between JuiceShop and WebSrv subnets. BlueAgent-3 applied microsegmentation policy.</li>
+          </ul>
+        </div>
 
-        <h4 class="modal-section-heading">Key Incidents &amp; Autonomous Responses</h4>
-        <ul class="report-incident-list">
-          <li><strong>14:02:11</strong> - RedAgent-1 executed blind SQLi on JuiceShop checkout parameter. BlueAgent-2 dynamically deployed rule <code>DENY_URI_REGEX_SQLI</code> on perimeter firewall.</li>
-          <li><strong>14:11:45</strong> - Exploit chained to CVE-2023-38606 on Web Server container. BlueAgent-4 performed immediate zero-trust container isolation and spawned a pristine replica.</li>
-          <li><strong>14:20:03</strong> - Distributed brute-force login attempted on DVWA administrative endpoints. BlueAgent-1 applied IP rate limiting and enforced token revocation.</li>
-        </ul>
+        <!-- Penalty Breakdown Tab -->
+        <div class="report-tab-panel" id="report-tab-penalty">
+          <h4 class="modal-section-heading">Penalty Breakdown</h4>
+          <div class="penalty-breakdown-list">
+            <div class="penalty-item">
+              <span class="penalty-item-label">Critical Host Compromise</span>
+              <span class="penalty-item-val text-red">-40</span>
+            </div>
+            <div class="penalty-item">
+              <span class="penalty-item-label">Data Exfiltration</span>
+              <span class="penalty-item-val text-red">-25</span>
+            </div>
+            <div class="penalty-item">
+              <span class="penalty-item-label">Repeated Failed Attempts</span>
+              <span class="penalty-item-val text-orange">-20</span>
+            </div>
+            <div class="penalty-item">
+              <span class="penalty-item-label">Policy Violations</span>
+              <span class="penalty-item-val text-orange">-30</span>
+            </div>
+            <div class="penalty-item">
+              <span class="penalty-item-label">Lateral Movement</span>
+              <span class="penalty-item-val text-red">-10</span>
+            </div>
+            <div class="penalty-item penalty-total">
+              <span class="penalty-item-label"><strong>Total</strong></span>
+              <span class="penalty-item-val text-red"><strong>-125</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Findings Tab -->
+        <div class="report-tab-panel" id="report-tab-findings">
+          <h4 class="modal-section-heading">Key Findings</h4>
+          <ul class="report-incident-list">
+            <li>JuiceShop remained the primary attack surface — 62% of all attack vectors targeted its checkout and authentication endpoints.</li>
+            <li>BlueAgent-2 demonstrated the highest containment rate (94%) among all defense agents during this run.</li>
+            <li>Critical host compromise events were reduced by 18% compared to Simulation Run 4, indicating improving MARL policy convergence.</li>
+            <li>Data exfiltration occurred in 3 of 48 attack chains, all originating from the DVWA subnet before Blue agents applied egress filtering.</li>
+          </ul>
+        </div>
+
+        <!-- Recommendations Tab -->
+        <div class="report-tab-panel" id="report-tab-recommendations">
+          <h4 class="modal-section-heading">Recommendations</h4>
+          <ul class="report-incident-list">
+            <li>Increase observation window for BlueAgent-1 to reduce response latency on brute-force login detection from 2.1s to under 1.5s.</li>
+            <li>Introduce micro-segmentation policies for the DVWA subnet to prevent lateral movement to the Web Server zone.</li>
+            <li>Retrain Blue Team policies with higher penalty weighting on data exfiltration events (-35 vs current -25) to prioritize egress filtering.</li>
+            <li>Consider expanding the Red Team repertoire with RCE chains targeting CVEs in the internal RPC microservices layer.</li>
+          </ul>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary-dark" id="btn-modal-close">Close</button>
@@ -1517,6 +1550,7 @@
             <label><input type="checkbox" checked /> Attack Progression Timeline</label>
             <label><input type="checkbox" checked /> MARL Reward &amp; Loss Curves</label>
             <label><input type="checkbox" checked /> Network Telemetry Packets</label>
+            <label><input type="checkbox" checked /> Penalty Breakdown</label>
           </div>
         </div>
       </div>
@@ -1532,7 +1566,7 @@
     <div class="modal-window">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">CyberRangeAI Demonstration</h3>
+          <h3 class="modal-title">CyberAlly Demonstration</h3>
           <p class="modal-subtitle">Autonomous LLM Red Team vs MARL Blue Team in action</p>
         </div>
         <button class="btn-close-modal" id="btn-close-demo-modal">&times;</button>
@@ -1558,18 +1592,20 @@
     <div class="modal-window report-modal-window">
       <div class="modal-header">
         <div>
-          <h3 class="modal-title">CyberRangeAI Architecture Documentation</h3>
+          <h3 class="modal-title">CyberAlly Architecture Documentation</h3>
           <p class="modal-subtitle">CAGE-4 Simulation, Autonomous LLM Red Team &amp; MARL Blue Agents</p>
         </div>
         <button class="btn-close-modal" id="btn-close-doc-modal">&times;</button>
       </div>
       <div class="modal-body doc-modal-body">
         <h4 class="modal-section-heading">1. System Overview</h4>
-        <p class="modal-text">CyberRangeAI provides a closed-loop autonomous cyber warfare simulator combining large language model (LLM) agents for offensive threat generation and multi-agent reinforcement learning (MARL) for defense orchestration.</p>
+        <p class="modal-text">CyberAlly provides a closed-loop autonomous cyber warfare simulator combining large language model (LLM) agents for offensive threat generation and multi-agent reinforcement learning (MARL) for defense orchestration.</p>
         <h4 class="modal-section-heading">2. Red Team Engine</h4>
         <p class="modal-text">Uses iterative prompting and threat graph decomposition to synthesize realistic attack vectors against containerized subnets, executing SQLi, RCE, and lateral movement.</p>
         <h4 class="modal-section-heading">3. Decentralized MARL Defense</h4>
         <p class="modal-text">Zone-specific Blue agents operate with partial observability, coordinating through decentralized policies to isolate compromised nodes, enforce microsegmentation, and patch zero-day vulnerabilities.</p>
+        <h4 class="modal-section-heading">4. Negative Penalty Scoring</h4>
+        <p class="modal-text">CyberAlly tracks a cumulative negative penalty score across each simulation run. Critical host compromises, data exfiltration events, policy violations, lateral movement, and repeated failed attempts each contribute negative scores to drive Blue Team policy improvement.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-primary-gradient" id="btn-close-doc">Got It</button>
