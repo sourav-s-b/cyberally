@@ -1,0 +1,4 @@
+{
+  "base_commit": "04f48ea32b6564271fa274b89b78b5b80c106af7",
+  "purpose": "Preserve the source identity of the mixed-Red investigator PPO run for checkpoint resume. The only later commit before pause changed docs/status/blue.md."
+}
