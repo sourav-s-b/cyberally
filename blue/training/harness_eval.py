@@ -168,7 +168,9 @@ def episode(policy, seed, steps, trace_path, red_agent="discovery"):
                                         "penalty_events": events}) + "\n")
             if terminated or truncated:
                 break
+    n_hosts = sum(len(env.hostnames[a]) for a in BLUE_AGENTS)
     result = {"return": total, "ticks": env._tick, "repair_requests": repairs,
+              "coverage": len(analyses) / max(n_hosts, 1),
               "max_analyses_one_host": max(analyses.values(), default=0),
               "completed_ages": {a: completed_investigation_age_summary(env, a) for a in BLUE_AGENTS},
               "guard": getattr(policy, "guard_stats", lambda: {})(),

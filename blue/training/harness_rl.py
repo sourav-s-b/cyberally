@@ -95,6 +95,31 @@ def env_kwargs(red_agent):
     return kw
 
 
+def resolve_red_agents(args):
+    """Resolve one fixed Red or a per-episode Red mixture.
+
+    The regime is an environment setting, not a policy input. A supplied
+    --red-agents list takes precedence over the legacy --red-agent option.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    configured = getattr(args, "red_agents", None)
+    names = list(configured) if configured else [args.red_agent]
+    if not names or any(name not in RED_AGENTS for name in names):
+        raise ValueError("unknown or empty Red-agent list: %r" % names)
+    if len(set(names)) != len(names):
+        raise ValueError("Red-agent list must not contain duplicates")
+    return names
+
+
+def episode_red_schedule(names, count, seed):
+    """Balanced, deterministic regime schedule for one PPO iteration."""
+    if count < 1:
+        raise ValueError("episode count must be positive")
+    schedule = [names[i % len(names)] for i in range(count)]
+    np.random.default_rng(seed).shuffle(schedule)
+    return schedule
+
+
 def build_reward_hook(args):
     """Training-only state shaping, or None when the arm is unshaped.
 
@@ -125,7 +150,7 @@ def validate_resume(old, current, checkpoint, checkpoint_exists=True):
         raise ValueError("resume checkpoint is missing")
     keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr",
             "bonus", "temp", "max_age", "ml_inputs", "train_seeds",
-            "red_agent", "state_shaping", "state_shaping_weight",
+            "red_agent", "red_agents", "state_shaping", "state_shaping_weight",
             "state_shaping_cap", "policy_version", "reference_mass",
             "reference_temp", "reference_kl_coef", "max_update_kl")
     old_config = old.get("config", {})
@@ -158,6 +183,7 @@ def train(args):
     import torch as th
     from blue.training import harness_anchor as anchor
     check_seeds(args.train_seeds)
+    red_agents = resolve_red_agents(args)
     if args.iters < 1 or args.eps_per_iter < 1 or args.temp <= 0:
         raise ValueError("invalid training budget")
     if args.policy_version not in (CURRENT_POLICY, anchor.VERSION):
@@ -176,13 +202,19 @@ def train(args):
     out.mkdir(parents=True, exist_ok=True)
     if (out / "manifest.json").exists() and not args.resume:
         raise FileExistsError("use a new run directory; never overwrite an experiment")
+    run_config = vars(args).copy()
+    run_config["red_agent"] = red_agents[0] if len(red_agents) == 1 else "mixed"
+    run_config["red_agents"] = red_agents if len(red_agents) > 1 else None
     manifest = {"version": VERSION, "features": list(ACTOR_NAMES),
                 "scorer_sha256": scorer.sha256, "scorer": scorer.path,
-                "config": vars(args), "gamma": mg.GAMMA,
+                "config": run_config, "gamma": mg.GAMMA,
                 "source_commit": source_identity(),
                 "source_status": subprocess.check_output(
                     ["git", "status", "--porcelain"], text=True).splitlines(),
-                "env_kw": env_kwargs(args.red_agent), "status": "started",
+                "env_kw": ({name: env_kwargs(name) for name in red_agents}
+                           if len(red_agents) > 1 else env_kwargs(red_agents[0])),
+                "red_agents": red_agents,
+                "status": "started",
                 "runtime": {"python": platform.python_version(), **{
                     p: package_version(p) for p in (
                     "numpy", "scipy", "torch", "scikit-learn", "gym", "gymnasium")}},
@@ -196,7 +228,8 @@ def train(args):
                     "training_only": True,
                     "evaluation_uses": "native",
                 },
-                "red_agent": args.red_agent,
+                "red_agent": (red_agents[0] if len(red_agents) == 1
+                              else "mixed"),
                 "checkpoint_semantics": "new actor geometry; legacy checkpoints incompatible",
                 "policy_version": args.policy_version}
     # Pin actual dirty source bytes, not just HEAD.
@@ -229,16 +262,23 @@ def train(args):
         policy = HarnessPolicy(rec, max_age=args.max_age, record_requests=args.diagnostics)
         returns, shaped_returns, interventions = [], [], []
         episode_diagnostics = []
+        episode_regimes = episode_red_schedule(
+            red_agents, args.eps_per_iter,
+            args.seed * 100003 + iteration + 1)
+        returns_by_regime = {name: [] for name in red_agents}
         for e in range(args.eps_per_iter):
             seed = args.train_seeds[(iteration * args.eps_per_iter + e) % len(args.train_seeds)]
+            red_agent = episode_regimes[e]
             result = mg.run_team_episode(policy, seed, args.steps, hook=rec,
                                          recorder=rec,
                                          reward_hook=reward_hook,
-                                         **env_kwargs(args.red_agent))
+                                         **env_kwargs(red_agent))
             print(f"iteration={iteration+1} episode={e+1} seed={seed} "
+                  f"red={red_agent} "
                   f"return={result['return']} "
                   f"shaped={result['shaped_return']}", flush=True)
             returns.append(result["return"])
+            returns_by_regime[red_agent].append(result["return"])
             shaped_returns.append(result["shaped_return"])
             interventions.append(policy.guard_stats())
             if args.diagnostics:
@@ -266,6 +306,9 @@ def train(args):
             for r, sr in zip(returns, shaped_returns) if r
         ] if args.state_shaping != "off" else []
         row = {"iteration": iteration + 1, "returns": returns,
+               "red_agents": episode_regimes,
+               "returns_by_regime": {
+                   name: values for name, values in returns_by_regime.items()},
                "shaped_returns": shaped_returns,
                "mean_shaping_ratio": (float(np.mean(shape_ratio))
                                       if shape_ratio else None),
@@ -363,6 +406,11 @@ def main():
                     help="training attacker. 'discovery' reproduces the "
                          "main32 checkpoints; 'finite' is the bounded "
                          "attacker that can punish a broken sweep")
+    ap.add_argument("--red-agents", nargs="+", default=None,
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="balanced per-episode training mixture; hidden from "
+                         "the actor. Takes precedence over --red-agent")
     ap.add_argument("--state-shaping", default="off",
                     choices=("off", "detection", "confirm", "both"),
                     help="TRAINING-ONLY state-based shaping. 'off' is the "

@@ -179,3 +179,18 @@ untouched — `8301-8400`, `8401+` and `8501+` stay clear.
   in `environment/patches/` (third_party itself is gitignored).
 - Suites: sim 112 passed / 7 skipped; train 22+ passed. No privileged state
   in any actor/mask/scorer (audited); native reward is the only score.
+
+## Mixed Finite/Discovery investigator PPO (2026-10-25)
+
+C0 completed on 14 Finite episodes with zero qualifying coverage, recovery, or
+verification failures. No second specialist is justified by that screen. The
+next frozen experiment keeps the coordinator's response, verification,
+coverage, and safety rules fixed and trains only the investigation hook using
+fresh PPO episodes balanced between Finite and Discovery; Red identity is not
+an actor input. Configuration and source hashes are in
+`blue/configs/mixed-red-investigator-ppo-20261025.json`; the paired evaluation
+and gate are in `scripts/blue_mixed_red_investigator_eval.sh` and
+`blue.training.harness_mixed_red_analysis`. Train seeds 7600–7612 and eval
+seeds 7641–7656 were both reported free by `seed_audit` immediately before the
+freeze. Training has not yet started. Checkpoints and logs remain ignored under
+`blue/results/mixed_red_investigator_ppo_20261025/`.
