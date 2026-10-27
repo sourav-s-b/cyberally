@@ -1,5 +1,443 @@
 # Blue session update
 
+## OP3 v5 complete: DEV GATE FAILED (2026-10-24)
+
+Branch `blue/contract-suite`; frozen source commit `c2c6cb6`, logged npz
+SHA-256 `23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41`,
+guard report SHA-256 `3225431df4e1396d67d7a82e74536236881932debb385fb8228edc9bc77fce1c`.
+The v5 freeze and every run result are recorded in
+`docs/proposals/manifests/op3-awdc-logs-8433-v5.json` and
+`docs/proposals/manifests/op3-awdc-logs-8433-v5-results.json`.
+
+- All three extraction seeds (0, 1, 2) completed within the four-hour
+  per-seed cap; 12 actor checkpoint hashes and 12 dev eval hashes were
+  verified. G2 passed each time (BC mean −4189.10 vs guard −127.80;
+  no forward leak).
+- BC, AWDC-1, AWDC-2 and final all had mean return **−4189.10** and
+  **zero Analyse coverage** on the 20 dev seeds, for every extraction
+  seed. Every eval cell is identical to G1's Sleep-arm cell for that
+  simulator seed. The saved final actors choose Sleep for all five agents
+  on the checked first tick of dev seed 8445, despite 26–119 legal
+  actions per agent. On sampled *logged* free-choice states, AWDC-1 and
+  BC disagree on about half of choices: the learned weights differ but
+  do not break the on-policy initial Sleep trap.
+- The frozen OP2 paired bootstrap was reused with label `jsrl` mapped to
+  OP3 `final` only for that script's CLI. Final minus guard: **−4061.30**
+  native return points, CI95 **[−4607.35, −3509.33]** (20 paired seeds;
+  10 000 resamples, rng 20261022). OP3 H1 threshold is guard −1.0 =
+  −128.80; **FAILED**. The confirm suite 8481–8500 stays **CLOSED**;
+  no confirm-seed audit or evaluation was run.
+- Validation: 6 focused OP3 tests passed, real 128-row logged-data
+  critic backward/finite-weight smoke passed, all 12 actor/eval hashes,
+  data hash, source commit and dev seed sets verified. No retuning or
+  code change occurred between v5 rng seeds. The result applies to
+  this extraction recipe, not to all offline learning methods.
+
+Next concrete task: design and pre-register a **new** experiment that
+prevents the initial all-Sleep policy lock, retaining the untouched
+confirm-suite boundary. PR checklist: Blue-owned files only; frozen
+source/artifact hashes and seed lists recorded; role status updated;
+runtime logs and model weights remain outside Git. Risk: the critic's
+8-action sampled logsumexp is an approximation. Dependent branch changes:
+none.
+
+## OP3 v5 pre-run freeze (historical)
+
+Branch `blue/contract-suite`; exact tested dependency commit `8704522` for the
+Blue wrapper/logging stack, with OP3 logging artifact SHA-256
+`23ea65a346eaa98ec81e3b3614cc5ffb2155f2b9186fa1933095569173c28f41`.
+Origin was fetched this session; `origin/main` has no commits ahead of this
+branch. The v5 freeze and repairs are in
+`docs/proposals/manifests/op3-awdc-logs-8433-v5.json`.
+
+The v4 seed-0 extraction finished in 1973 seconds and emitted BC, AWDC-1,
+AWDC-2 and final evals, but **the result is invalid**: every checkpoint had
+the Sleep arm's dev mean −4189.10. Inspection found that the mask expression
+set *legal and illegal* logits to −1e9, while V(s) averaged Q values with
+−inf entries for illegal actions. The resulting weights all clipped at 20.
+Do not pool or reuse v4's evals with v5. Preserve the old output as defect
+evidence (directory `extract_s0_v4_invalid/`). This corrects the earlier
+interpretation below that the Sleep behavior was necessarily caused by the
+logged-action mixture; that claim is unsupported by a valid BC extraction.
+
+v5 repairs legal-logit masking, valid-action averaging and per-state weight
+normalization, next-state TD masks, and the conservative logsumexp gradient.
+It also saves hashed actor checkpoints, verifies G2 immediately after BC,
+and records exact artifact hashes/seed lists. Logging, dev seeds, guard
+reference (−127.80), alpha/tau/clip, actor/critic sizes and extraction rng
+seeds remain fixed. Tests run: 6 focused OP3 tests passed; a real 128-row
+logged-data batch completed TD backward and gave finite normalized weights.
+
+Next: commit this new freeze before executing rng 0; if G2 passes, complete
+rng 0/1/2, run the frozen paired analysis, then record H1 and leave the
+confirm suite 8481–8500 closed unless the preregistered gate passes. Risks:
+the conservative sampled-action critic is noisy and the 3-epoch BC may still
+prefer Sleep; report those measured outcomes rather than retuning v5. No
+dependent branch changes are required. PR checklist: role-owned files only,
+source/data/guard hashes pinned, focused tests green, dev/confirm seed
+separation retained, model weights and runtime logs remain outside Git.
+
+## OP3 logging done + historical extraction notes (2026-10-22)
+
+- **Logging PASS COMPLETE**: 72 episodes (12 train seeds × guard/lancer/
+  sleep/random×3 policy seeds), 28 728 ticks / 143 640 agent-rows, ~500 MB
+  compressed npz (`blue/results/op3_awdc_logs_v1/logged.npz`, sha16
+  `23ea65a346eaa98e`), wallclock 23 min (< 3 h cap), G1 in-script gates
+  never tripped. Manifest: `logging_manifest.json`.
+- **OP3 freeze** committed (`2c22ee1`) BEFORE logging: source-file shas,
+  real obs width 867 (skeleton's 510 recorded as wrong), env hash
+  identical to the OP2 stack, G2 leak-abort rule, extraction prereg
+  (actor/critic classes, ALPHA_CONSERV 0.1, TAU_W 1.0, weight clip [0,
+  20], checkpoints BC-init/AWDC-1/AWDC-2/final, budget caps). Extraction
+  software shas appended (`04e5928`) after logging but BEFORE any
+  extraction run (constants unchanged).
+- **Extraction s0** launched (`--rng-seed 0`): BC 3 epochs done (CE loss
+  ~16-18, not declining — the logs are sleep-token-heavy ON PURPOSE via
+  the scripted behaviours; BC-init eval currently in progress and its
+  early dev returns are sleep-degenerate). G2 leak-gate (BC ahead of
+  guard by > +1) is NOT expected to trip — but its inverse reading,
+  BC far behind, is NOT an abort condition and the critic + AWDC
+  weighting stages are the point of extraction. Watch for critic fit
+  completion and the four checkpoints. The G2 formal conclusion gets
+  recorded when the BC eval finishes (20/20 seeds).
+- Tests: test_op3_logging (2, including byte-identical rerun) and
+  test_op3_offline (staged-row/shape/critic-weight contracts) green;
+  smoke ran the fit paths on synthetic dims before commit.
+
+Next: after s0's four checkpoints — extraction rng seeds 1/2 (per
+freeze), then op2_dev_analysis on labels {bc, awdc_1, awdc_2, final}
+averaged across rng vs guard −127.8 (tau −1.0 per OP3 H1 rule: success
+= guard minus 1.0). Confirm block only on dev-gate pass + fresh audit.
+
+## OP2 executed to completion: DEV GATE FAILED — negative result recorded (2026-10-22)
+
+The user launched training via `op2_pipeline.sh all` (server-install fix
+`665ea96` — empty-array expansion had killed the first launch under set -u).
+All six trainings completed WITHOUT any mid-run config change (G2 honored):
+
+- jsrl_s0/s1/s2 and noguide_s0/s1/s2, ~16 min each, coverage 1.00 in every
+  iteration; guide-window share fell 0.86 → 0.62 as the schedule decayed.
+- Dev eval (learned arm only, 20 paired seeds, red `finite`) and the frozen
+  analysis (`op2_dev_analysis.py`) ran to completion:
+  **jsrl − guard −401.68 CI95 [−509.32, −306.81]**;
+  noguide − guard **−178.68** [−233.92, −130.20];
+  jsrl − noguide **−223.00** [−309.00, −148.22]. Gate TAU=0.0: FAILED,
+  all three CIs wholly negative.
+- The warm-start made the actor WORSE than its own no-guide ablation.
+  jsrl_s0's eval (−1077…−1830 on several seeds) is catastrophically worse
+  than its own training-window returns (−150…−360): the greedy-deploy
+  vs temperature-1-sampled-rollout mismatch is suspect #1 for any later
+  diagnostic pass (suspects recorded in the results record JSON).
+- Per prereg reporting rules: recorded as-is, no salvage, **confirm block
+  8481–8500 NOT opened** (seed_audit never run for it this stage). A
+  committed artifacts/record file lives at
+  `docs/proposals/manifests/op2-jsrl-guide-8433-results.json` with the
+  verdict, guard means (−127.8), contrasts, artifact hashes and named
+  suspects; gitignored outputs remain in
+  `blue/results/op2_jsrl_guide_v1/`. One decisive positive of the stage:
+  the whole pre-registered machinery (freeze → gate → fresh guard →
+  paired stats) worked end-to-end and correctly rejected a bad treatment.
+- Suspect list, NOT excuses: (1) deploy-time behavior shifted far from the
+  rollout distribution; (2) the guide window may crowd out exactly the
+  learner exposure the sparse-onset region needs; (3) 12×4 budget too
+  small — recorded as an honest prereg NEGATIVE, not a proof of
+  impossibility; any follow-up must re-freeze a NEW run_id.
+
+Remote: branch pushed (origin at `665ea96` + this recording commit).
+Next: OP3 (offline RL per `op3-awdc-logs-skeleton-20261022.json`) is the
+user's previously chosen sequential next stage; the behaviour-logging
+pass on train seeds (fresh, ≤3 h) is its first concrete task.
+
+## G1 gate result: complete, PASSED (2026-10-22)
+
+`blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json` — 4 arms × 20
+dev seeds (8445–8464), 400 steps, red `finite`, max_age 80.0, all returns
+finite. git_commit `41d18ad423e1` (current HEAD);
+`env_info_sha256 82d05804b3a1d58b…` — this fills the freeze JSON's
+`wrapper_env_info_sha256` slot via the referenced report.
+
+Means (native returns): **guard −127.80**, lancer −144.25, random
+−722.70, sleep −4189.10. Paired: lancer −16.45 vs guard (max-age rescue
+over plain lancer), random −594.9, sleep −4061.3.
+
+G1 gate check → PASSED (report present, complete, finite). **Training
+remains deferred by the user**; `blue/training/op2_pipeline.sh all`
+(detached) is the exact resume point. Dev-window 8445–8464 has now been
+consumed once by the G1 re-measure (allocated role: control evaluation,
+per freeze) — the paired dev eval after training reuses the same window.
+
+## OP2 pre-training prep complete (2026-10-22, user: training starts later)
+
+All machinery up to (but not including) the training launch is committed;
+user explicitly deferred the training runs. G1 re-measure was running in
+the background (setsid-detached) through this step and was NOT restarted.
+
+- **Cross-stack eval trap fixed** in `cmd_eval` (`blue/training/
+  mappo_guide.py`): it evaluated with the module-level `ENV_KW`
+  (hardcoded `red_agent: discovery`) instead of the `--red-agent` flag —
+  a trained-on-`finite` policy would have been scored against the WRONG
+  red. Fix: eval builds `env_kw` from the flag (default discovery
+  preserves old behavior). Found the same class of issue once before the
+  freeze; the fix predates any real dev-eval.
+- **`--eval-arms learned`** added to `cmd_eval` (default unchanged: all
+  four arms). The frozen analysis needs only the `learned` cells (guard
+  control comes from the G1 report); skipping the 3 baseline arms × 20
+  seeds × 6 models saves ~3 h.
+- **Empty-buffer training guard** in `cmd_train`: with the guide window
+  covering all episodes (smoke with steps=8, h0=5) there are zero learner
+  rows and `ppo_central_update` crashed on `np.stack([])`. Now logs
+  "no learner decisions…" and skips the update. Real runs (400 steps)
+  unaffected.
+- **`blue/training/op2_dev_analysis.py`** COMMITTED (this is the fixed
+  analysis frozen prereg names): reads G1 guard cells + any number of
+  cmd_eval JSONs, computes per-seed mean across rng dirs, paired
+  per-seed percentile bootstrap (10000 resamples, `default_rng(20261022)`),
+  gate point TAU=0.0 plus CI-cross-zero flag; verified on synthetic data
+  (expected signs and zeroes recovered; first version had an aggregation
+  bug — list of per-row dicts — producing n=0, fixed and re-smoked).
+- **`blue/training/op2_pipeline.sh`** added: train (6 SEQUENTIAL runs:
+  3 jsrl + 3 noguide; resume via --resume-from if a run crashed
+  mid-way; matches the frozen prereg config verbatim — no annealing,
+  min-coverage 0.0, seeds by --seed, train 8433–8444, steps/iters/eps
+  per prereg) → eval (learned arm only, 20 dev seeds, red finite) →
+  analyze (op2_dev_analysis vs G1 guard). Run detached with setsid.
+  bash -n clean; NOT executed on real seeds (training deferred).
+- Validated: test_jsrl_guide + test_mappo_guide + test_eval_parallel
+  22 passed; tiny train+eval smoke under red finite produced sane
+  manifest/eval JSONs; `git diff --check` clean.
+
+State / next: when the user says go —
+`blue/training/op2_pipeline.sh all` detached; the G1 report gate is
+checked first (dev_analysis would fail loudly on missing/empty report
+cells). Report numbers go to
+`blue/results/op2_jsrl_guide_v1/dev_analysis.json`; seeding rule and
+confirm-block mechanics unchanged from the freeze.
+
+## OP2 frozen: JSRL shrinking-guide implementation + prereg freeze (2026-10-22)
+
+Branch `blue/contract-suite`, base `7ac8886`, user chose sequential execution:
+OP2 (JSRL) first, then OP3 (offline RL). Everything below is on this branch;
+OP3 has NOT started.
+
+Implementation (all code changed on the branch, tests green before commit):
+
+- **Guide mechanism** in `blue/training/mappo_guide.py`:
+  `guide_steps_for_iter(it, h0, decay, floor) -> max(h0·decay^(it-1), floor)`
+  (1-based, h0 falsy disables); `run_team_episode(..., guide_policy=None,
+  guide_steps=0)` switches per-tick between guide and learner when the tick
+  is inside the window, attributing guide ticks to `n_guide` +
+  `forced_cats["guide"]` while keeping the recorder clean (no PPO rows from
+  guide decisions). Guide is `OrderedPolicy(scorer=LancerValues(
+  fruitless_decay=0.5), max_age=80.0)`, hook stays None. `cmd_train`
+  constructs the guide, schedules per-iteration windows, threads
+  `red_agent` into the env kwargs, logs per-iter rows with `n_guide` /
+  `guide_steps` and pins a `guide` block plus `red_agent` in
+  `pilot_manifest.json`. CLI flags: `--guide-h0` (None=off) /
+  `--guide-decay` 0.6 / `--guide-floor` 10 / `--guide-max-age` 80.0 /
+  `--red-agent` discovery|finite; older callers missing the new attrs
+  default via getattr (backward compatible, red discovery preserved).
+- **Re-specified arms (recorded in the freeze)**: the skeleton's guard
+  reference came from the finite_red_anchor pilot stack (`blue/harness`
+  + `gpt_harness/scorer.pkl`, source commit 2f44db1). This tip has no
+  `blue/harness`, so guide AND control were re-specified branch-native as
+  the same policy family — ordered lancer + max-age-80 coverage guard,
+  red `finite`. Performance numbers cross-stack (guard −150.21, lancer
+  −151.79 on 7665–7688) are context only; the dev-window guard re-measure
+  (G1) is the control used for gating.
+- **`blue/training/harness_guide_remeasure.py`**: committed G1 runner.
+  Guard/lancer/sleep/random arms over the dev window (8445–8464), 400
+  steps, red `finite`, native returns only, with git provenance and
+  `env_info_sha256`; report written to
+  `blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json`.
+- **`blue/tests_blue/test_jsrl_guide.py`**: schedule monotonicity/floor +
+  disabled-identity (byte-equal episode without guide kwargs) +
+  full-window zero-PPO-rows + post-window row attribution (rows carry
+  `env._tick >= 2`, i.e. only decisions after the window) + cmd_train
+  manifest pins (guide block, red_agent, per-iter `guide_steps` 5 → 3).
+  Note: `env._tick` is 0-based at decision time (loop tick − 1), so
+  assertions compare against `env._tick`, not the loop index.
+
+Validation this step:
+
+- `test_jsrl_guide.py` + `test_mappo_guide.py` + `test_zone_priority.py` +
+  `test_response_variants.py` + `test_legacy_ordering_gate.py`: 23 passed.
+- G0 re-check at this state: `test_contract_cold.py` 8/8 (13.9 s).
+- `git diff --check` clean; all three manifest JSONs parse.
+- Fix-ups during testing: `hidden=64` needed in tests (phase3 body width),
+  `n_guide`/`forced_cats` asserted against `r["ticks"]` (the native
+  scenario can end one tick early vs `steps`), getattr defaults in
+  `cmd_train`.
+
+Freeze record:
+
+- Frozen prereg:
+  `docs/proposals/manifests/op2-jsrl-guide-8433-final.json`
+  (status FROZEN-PRE-RUN; seeds 8433–8444 train / 8445–8464 dev / spare
+  8465–8480 / confirm 8481–8500 gate-opened-only; curriculum
+  H_i = max(200·0.6^(i−1), 10); rng seeds 0/1/2; stats rule per the
+  conventions doc; source shas recorded for wrapper/baselines/masking/
+  ordered/mappo_guide/residual/scorer/harness_remeasure + the two test
+  files; `.venv-train/bin/python` sha; G1 report path).
+- Seed audit re-run immediately before the freeze —
+  `--check 8433 8500` → FREE (68 seeds, unchanged from the first audit).
+- G1 re-measure launched detached (setsid) after the first attempt was
+  killed by a tool timeout (process-group kill; nohup insufficient —
+  use `setsid nohup ... &` for any run expected to outlive one tool call).
+
+State / next task:
+
+- When `guard_remeasure/report.json` exists (4×20 cells), G1 gate checks
+  completes and the three training runs launch (`--seed 0/1/2`,
+  `--train-seeds 8433..8444`, `--iters 12 --eps-per-iter 4 --steps 400`,
+  guide flags per freeze, `--red-agent finite`, out
+  `blue/results/op2_jsrl_guide_v1/jsrl_s{0,1,2}`), sequential/one process.
+- Then dev eval (8445–8464) vs G1 guard with the frozen stats rule; the
+  8481–8500 block needs a fresh seed audit before opening.
+- OP3 stays second: fresh behaviour-logging pass on train seeds before
+  any extraction (per its skeleton).
+
+## OP2/OP3 prereg skeletons + seed audit (2026-10-22)
+
+Branch `blue/contract-suite` (same worktree). Docs-only, no runs launched.
+Deliverables: seed audit, two pre-registration skeleton JSONs, one conventions
+doc:
+
+- **Seed audit**: `python -m blue.training.seed_audit --check 8433 8500` —
+  **FREE, no recorded consumption** (68 seeds; 112 used seeds found from
+  structured sources). This is the last audited-free window.
+- **Skeletons** (docs/proposals/manifests/, both parse-clean, explicitly
+  mark status "skeleton, not frozen"):
+  `op2-jsrl-guide-skeleton-20261022.json` — JSRL shrinking-horizon guide
+  warm-start (guard as frozen guide, H_i = max(200·0.6^i, 10), mappo_guide
+  harness, 4 arms incl. no-guide ablation, ≤6 h torch CPU); needs nothing new
+  except a guide-injection point in the rollout loop.
+  `op3-awdc-logs-skeleton-20261022.json` — masking-aware offline extraction
+  (BC init + AWAC-family advantage-weighted extraction with CQL-style
+  critic, no online stage); **the prereg's central data finding: no
+  transition logs exist under the current wrapper obs contract**
+  (offline_logs_14* are 872-dim legacy-obs; bc_demos_rr lack rewards; only
+  scorer-row npz are current-era) so OP3 requires a fresh behaviour-logging
+  pass (60–120 eps on train seeds, ≤3 h) before extraction (≤4 h); legacy
+  872-dim conversion explicitly rejected; historical IQL numbers stay
+  historical.
+- **Conventions doc** `docs/research/op2-op3-prereg-skeletons-20261022.md`:
+  shared seed allocation (train 8433–8444 / dev 8445–8464 / spare
+  8465–8480 / confirm-on-gate 8481–8500 — the margin experiment's
+  confirm-block-only-on-gate-pass pattern), stats rule (paired per-seed
+  bootstrap n=10000 rng_seed=20261022, ReBRAC-style multi-seed reporting),
+  gates G0 (cold-contract audit green at frozen commit) / G1 / G2, and the
+  explicit freeze checklist (source shas + `get_env_info()` hash, commit
+  before first rollout, fresh seed_audit immediately before opening 8481+).
+
+Validation: docs-only diff — `git diff --check` clean; both JSONs parsed
+successfully; no tests run (none required; no code touched in this step).
+PR checklist: three new doc files; no code change in this step; no schema,
+reward, or topology change; no dependent branches. The freeze checklist must
+be executed before any run launches; if the user freezes OP2 first, the
+guide-injection implementation lands on this branch and is tested before
+freeze. Next concrete task: user picks OP2 / OP3 / sequential-both; the
+freeze checklist then produces the committed frozen prereg files.
+
+## Training-test triage (2026-10-22)
+
+Branch `blue/contract-suite` (same worktree as the OP1 audit). The 7
+pre-existing failures on tip `7ac8886` were diagnosed; two distinct root
+causes, both fixed on this branch. Full suite via `.venv-train`:
+**279 passed, 1 skipped, 0 failed in 11:00** (baseline was 264/7/1 + the 8
+new cold-contract tests).
+
+1. `test_eval_parallel.py` (4 failures: pool_matches_serial,
+   cross_worker_determinism, spawn_matches_serial,
+   pool_result_cache_serves_identical) — real code defect:
+   `blue/policies/eval_parallel.py:205` calls `mp.get_context(start_method)`
+   but `multiprocessing` was never imported here, so `run_pool` crashes on
+   ANY cache miss (fresh worktrees have an empty `blue/.cache/`; the
+   author's machine was served pre-populated cache hits, hiding the bug).
+   Fix is one line: `import multiprocessing as mp` with the other stdlib
+   imports. All 7 tests in that file now pass in 30.7 s.
+2. `test_risk_ablation.py::test_risk_factory_selects_the_right_model` (missing
+   `blue/results/risk_model_v2.pkl` via `RiskPriority`),
+   `test_risk_ablation.py::test_feature_dim_is_15_in_both_arms` (missing
+   `blue/results/scorer_mlp.npz` via `build_actor`) and
+   `test_mappo_guide.py::test_resume_continues_from_saved_state` (same
+   scorer artifact via `phase3_model`) — not code defects: both artifacts are
+   gitignored trained checkpoints, present in the main checkout (verified:
+   those 3 tests pass there, `-p no:cacheprovider --basetemp=/tmp/opencode/...`
+   with no cache writes) and absent in any fresh worktree.
+   Fix on this branch, two parts: explicit skip-guards with reasons
+   (`_require_artifacts` in `test_risk_ablation.py`; inline skip in
+   `test_mappo_guide.py`) so fresh worktrees report "gitignored artifact(s)
+   absent" as a skip instead of a FileNotFoundError; and untracked copies of
+   the two artifacts into this worktree's `blue/results/` so this machine
+   still exercises them fully (not committed — this is local-only state and
+   that is intentional).
+
+Behavioral note for review: the skip-guards change failure→skip semantics for
+3 artifact-backed tests in artifact-less environments. This is the honest
+status (a fresh clone cannot run load-tests for weights it does not have),
+but reviewers should confirm they prefer explicit skips over failures there;
+alternative is a documented no-guard policy. No production/runtime code
+outside `eval_parallel.py` imports changed; no schema/reward/topology change;
+no seed block consumed.
+
+Validation: `pytest blue/tests_blue/test_risk_ablation.py
+test_mappo_guide.py test_eval_parallel.py test_contract_cold.py -q` — 31
+passed in 57.8 s; then full `pytest blue/tests_blue -q` — 279 passed,
+1 skipped, 11:00. `git diff --check` clean. Dependent branches: none, but
+`main` and any worktree-based flow inherit the `eval_parallel.py` crash on
+cache miss — that fix should ride the next Blue PR; teams with populated
+`blue/.cache/` were silently unaffected. Next concrete task: OP2/OP3 choice
+(pre-registration + seed-audit 8433–8499), now unblocked since the harness
+test suite is green.
+
+## OP1 wrapper cold-contract audit (2026-10-22)
+
+Branch `blue/contract-suite` (worktree `worktrees/contract`), based at `7ac8886`
+(same tip as `blue/web-research-20261022`; user selected OP1 from that research
+report's one-pagers). Deliverable: `blue/tests_blue/test_contract_cold.py` —
+8 tests, 17.4 s, all passing, running the **unmodified native scenario**
+(native red agent, no mock substitution), unlike `test_foundation.py` which
+mocks red/green for determinism.
+
+What the audit establishes on this tip (OP1 acceptance check from
+`docs/research/web-research-20261022.md`): every enabled mask slot decodes to
+an owned host that the simulator action space supports, for all 5 agents at
+every step of full native episodes (no slot for a non-existent host);
+masked-random policy actions are always masked-in; seed 7629 reproduces the
+native episode byte-identically across two runs (actions, rewards, terminal
+flags, pre-step state); off-mask choices are coerced to Sleep and never become
+pending; extreme indices (1e6, -3) do not crash or corrupt; concurrent pending
+Analyse actions across all 5 agents attribute to their own (agent, host) pair;
+a successful Remove enters VERIFY (never CLEAN), historical artifacts are not
+kept as current measurements, and the follow-up Analyse is a distinct
+observed-verification fact; privileged reads (`_compromised_set`,
+`count_compromised`) leave `get_state()` bytes unchanged and agree on counts;
+the native horizon end reports `terminated=True, truncated=False` with
+`info["episode_limit"]` truthful and rejects further steps until reset; reset
+clears all pending state. No reserved seed block consumed (seed 7629 is the
+already-spent baseline seed); no code outside the test file changed.
+
+Pre-existing failures found while baselining this tip (unchanged by this
+work; 7 of 272 suite tests, all torch/training-harness, not wrapper-contract):
+4x `test_eval_parallel.py` (pool_matches_serial, cross_worker_determinism,
+spawn_matches_serial, pool_result_cache_serves_identical);
+`test_mappo_guide.py::test_resume_continues_from_saved_state`;
+`test_risk_ablation.py` (risk_factory_selects_the_right_model,
+feature_dim_is_15_in_both_arms). 264 passed, 1 skipped, 10:49 full-suite
+baseline. These need diagnosis before OP2/OP3 training work relies on them.
+
+Validation: `pytest blue/tests_blue/test_contract_cold.py` — 8 passed
+(OPENBLAS_NUM_THREADS=1, `.venv-train` python, PYTHONPATH=repo root);
+`git diff --check` clean. PR checklist: single new test file, no
+runtime/config/schema/reward change, no dependent branch changes; the 7
+pre-existing failures live in `blue/training/` code and should be triaged
+where that code is being changed, not here. Risks: native-red determinism
+assertions depend on scenario identity — if the simulator snapshot changes,
+the byte-identical episode test is the first thing that should flag it (this
+is intended). Next concrete task: triage the 7 pre-existing training-test
+failures, or proceed to OP2/OP3 pre-registration + seed-audit of 8433–8499
+(user decision pending).
+
 ## Research audit (2026-10-03)
 
 Branch `blue/mappo-training` at `a6eab7e`; exact main dependency

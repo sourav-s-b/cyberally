@@ -1,0 +1,65 @@
+{
+  "run_id": "op2-jsrl-guide-8433-20261022",
+  "status": "SKELETON-PRE-registration (not frozen; no run yet). Freezing rule: parameters below are final BEFORE any training run; freeze adds source-file shas and a git commit, and nothing may change after the first rollout.",
+  "family": "JSRL shrinking-horizon scripted-guide warm start",
+  "citations": {
+    "primary": "JSRL arXiv 2204.02372 (Uchendu et al., ICML 2023): guide policy acts during an early shrinking window, exploration policy takes over; guide-step counts form a curriculum.",
+    "supporting": "Kickstarting arXiv 1803.03835 (guide-only fast-start OK; decay schedules already in paper). Sensitivity arm only, not primary.",
+    "research_context": "docs/research/web-research-20261022.md OP2; budget feasibility verdict in same doc."
+  },
+  "hypothesis": {
+    "H1_dev": "JSRL warm-started residual policy beats the frozen guard heuristic by mean native return >= 0 on dev seeds (paired, 20 seeds). H0: mean paired difference <= 0.",
+    "H1_confirm": "reproduce on fresh confirm seeds; exploratory until then."
+  },
+  "arms": {
+    "control_scripted": "guard heuristic, frozen implementation, measured fresh on the dev window before any training (never privileged)",
+    "treatment_jsrl": "PPO residual policy warm-started by the frozen guard as guide, shrinking guide window",
+    "ablation_noguide": "same PPO config, no guide window (random init); isolates warm-start-specific effect",
+    "sensitivity_kickstarting": "same PPO config, kickstarting bonus on frozen guide Action logits, geometric beta decay (secondary, exploratory)"
+  },
+  "curriculum_prereg": {
+    "guide": "guard (frozen scripted); guide actions restricted to simulator-valid masks only; guide NEVER sees privileged state",
+    "guide_steps_h0": 200,
+    "decay_factor_d": 0.6,
+    "floor_h_min": 10,
+    "schedule": "guide window per PPO iteration i: H_i = max(H0 * d^i, H_min) for i from 1; guide acts for the first H_i steps of each episode, exploration policy the rest",
+    "reason": "H0=200 balances sparse reward onset (~step 135 first nonzero) against transfer decay; d=0.6 gives full handover by iteration 5; floor avoids zero-credit floor collapse"
+  },
+  "training_prereg": {
+    "harness": "blue/training/mappo_guide.py (existing central-critic PPO harness)",
+    "iterations_max": 12,
+    "episodes_per_iteration": 4,
+    "horizon": 400,
+    "max_update_kl": 0.02,
+    "train_rng_seeds": [0, 1, 2],
+    "fresh_rollouts_required": true,
+    "shaping": null,
+    "mask_mode": "validity",
+    "common_reward": true,
+    "wallclock_cap_hours": 6
+  },
+  "seed_ledger_audit_passed": "8433-8500 FREE per blue.training.seed_audit --check 8433 8500 (68 seeds); 112 used seeds walked from structured sources",
+  "seed_allocation_prereg": {
+    "train_and_rollouts": "8433-8444 (12)",
+    "dev_eval": "8445-8464 (20)",
+    "spare": "8465-8480 (16)",
+    "confirm_gate_opened_only": "8481-8500 (20); must NOT be used before the dev gate passes; audit again immediately before opening",
+    "rule": "training seeds never overlap any eval set; the dev/confirm split is frozen here; no post-hoc reassignment"
+  },
+  "metrics_prereg": ["native_return", "worst_per_tick_reward", "sleep_fraction", "repair_requests"],
+  "stats_prereg": "paired per-seed percentile bootstrap n=10000, rng_seed 20261022, vs frozen control guard only. No multi-arm correction; ablation/sensitivity arms are secondary and reported as estimates only. Stop interpretation: treatment + CIs vs guard lower bound >= TAU_PREREG = 0.0.",
+  "gates_prereg": [
+    "G0: cold-contract audit (blue/tests_blue/test_contract_cold.py, 8/8) green on the frozen commit BEFORE training (currently green on this tip)",
+    "G1: guard re-measure on the dev window with the frozen wrapper; record report.json path in results manifest; log guard's mean.paired-difference targets only from that report",
+    "G2: wrapper get_env_info() hash recorded in run manifest at training start; must not drift mid-run"
+  ],
+  "stop_rules_prereg": [
+    "no curriculum/hyper-parameter changes mid-run",
+    "contract defect discovered mid-run: abort, record, do not salvage the run",
+    "if wallclock or iteration cap is hit without a determinable result: report the truncation as the outcome; no optional extra seeds"
+  ],
+  "reporting_rules_prereg": "report negatives as negatives (margin-bounded-deploy precedent); no optional post-stop seeds; confirm block opens only by explicit user-visible prereg check on seed_audit output; no variance claims without the paired bootstrap specified here",
+  "op1_dependencies_passed": true,
+  "op3_dependencies_passed": false,
+  "compute_note": "torch CPU single-node; expected <6h; run on this worktree only under .venv-train"
+}

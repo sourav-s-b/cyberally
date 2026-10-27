@@ -19,6 +19,7 @@ Usage (train venv, repo root):
 import argparse
 import json
 import os
+import random
 import sys
 
 import numpy as np
@@ -36,9 +37,33 @@ DEFAULT_TRAIN_SEEDS = [7706, 7707, 7708, 7709]
 DEFAULT_EVAL_SEEDS = [7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705]
 
 
-def _risk():
+def _risk(ablation="real"):
+    """The risk model used as RL input.
+
+    ``ablation="zero"`` substitutes a stub that reports P(compromised)=0 for
+    every host. This is the control arm for "does the ML risk score help?":
+    feature width stays 15, the Phase-3 body still loads, and the actor is
+    identical in every other respect. Only the VALUES in column 15 change.
+    """
+    if ablation == "zero":
+        return ZeroRisk()
     from blue.policies.hybrid import RiskPriority
     return RiskPriority(model_path=RISK_MODEL)
+
+
+class ZeroRisk(object):
+    """Stand-in for RiskPriority that reports no compromise evidence.
+
+    Implements only what `host_rows_15` calls. Deliberately does NOT reuse
+    the real model: the point is that the RL agent receives no risk
+    information at all, not that it receives a well-informed score of zero.
+    """
+
+    def _predict_all(self, env, agent):
+        return {h: 0.0 for h in env.hostnames[agent]}
+
+    def __call__(self, env, agent, host):
+        return 0.0
 
 
 def host_rows_15(env, agent, cands, risk):
@@ -130,9 +155,35 @@ def build_actor(hidden=64):
     return actor
 
 
+def env_kwargs(red_agent):
+    """Training/eval env kwargs for the requested attacker.
+
+    ``mappo_guide.ENV_KW`` hardcodes ``red_agent="discovery"``. The LLM-Red
+    evaluation showed that regime cannot punish a broken investigation policy,
+    so it is not a valid optimisation target. The attacker is therefore an
+    explicit choice, recorded in the manifest, rather than a constant.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    if red_agent not in RED_AGENTS:
+        raise ValueError("unknown red_agent %r; known: %s"
+                         % (red_agent, sorted(RED_AGENTS)))
+    kw = dict(mg.ENV_KW)
+    kw["red_agent"] = red_agent
+    return kw
+
+
 def cmd_train(args):
     import torch as th
     from blue.policies.ordered import LancerValues, OrderedPolicy
+    # Seed BEFORE constructing any model. Previously these calls sat after
+    # build_actor/build_central_critic, so the initial weights of both nets
+    # were drawn from whatever state the RNG happened to be in and only the
+    # *subsequent* randomness was controlled. That makes an "init" claim
+    # unreproducible: rerunning with --seed 0 gave different starting
+    # weights (observed 2026-10-06 while auditing the +4.50 run).
+    th.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
     actor = build_actor(hidden=args.hidden)
     # Central critic over the joint Blue-visible context (5 pooled 14-dim
     # means + tick) - unchanged dimension, so the tested
@@ -140,23 +191,30 @@ def cmd_train(args):
     critic = mg.build_central_critic(hidden=args.hidden)
     opt = th.optim.Adam(list(actor.parameters())
                         + list(critic.parameters()), lr=args.lr)
-    th.manual_seed(args.seed)
-    np.random.seed(args.seed)
-    risk = _risk()
+    risk = _risk(args.risk_ablation)
     os.makedirs(args.out, exist_ok=True)
     hist = []
     cycle = list(args.train_seeds)
+    # The guard is part of the policy being trained, not an evaluation-time
+    # add-on. It was hardcoded False here while --sweep-guard was honoured
+    # only in cmd_eval, so every checkpoint the project owns was fitted in
+    # the unguarded regime that the LLM-Red evaluation identified as
+    # invalid: the learner may re-pick the same host every tick, which is
+    # the agent-3 trap. Training and evaluating in the same regime is
+    # required for the checkpoint to match the policy it is scored as.
+    train_guard = args.sweep_guard == "strict"
     for it in range(1, args.iters + 1):
         gen = th.Generator().manual_seed(args.seed * 100003 + it)
         rec = RiskRecorder(actor, args.bonus, gen, temp=args.temp,
                             risk=risk, min_proba=args.train_min_proba)
         pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
-                            guard=False)
+                            guard=train_guard)
         rets = []
         for e in range(args.eps_per_iter):
             seed = cycle[(it * args.eps_per_iter + e) % len(cycle)]
             r = mg.run_team_episode(pol, seed, args.steps, hook=rec,
-                                    recorder=rec, **mg.ENV_KW)
+                                    recorder=rec,
+                                    **env_kwargs(args.red_agent))
             rets.append(r["return"])
         st = mg.ppo_central_update(actor, critic, opt, rec.rows,
                                    bonus=args.bonus)
@@ -173,7 +231,18 @@ def cmd_train(args):
     with open(os.path.join(args.out, "pilot_manifest.json"), "w") as f:
         json.dump({"algo": "risk-as-feature residual PPO (14+1 cols)",
                    "iters_done": len(hist), "feat_dim": FEAT_DIM,
-                   "risk_model": RISK_MODEL, "temp": args.temp,
+                   "risk_model": (RISK_MODEL if args.risk_ablation == "real"
+                                  else "ZERO (ablation: no risk input)"),
+                   "risk_ablation": args.risk_ablation,
+                   "sweep_guard": args.sweep_guard,
+                   "trained_with_guard": train_guard,
+                   "red_agent": args.red_agent,
+                   "seed": args.seed,
+                   "iters": args.iters,
+                   "eps_per_iter": args.eps_per_iter,
+                   "lr": args.lr,
+                   "steps": args.steps,
+                   "temp": args.temp,
                    "train_min_proba": args.train_min_proba,
                    "train_seeds": args.train_seeds, "hist": hist}, f,
                   indent=1)
@@ -268,34 +337,47 @@ def cmd_eval(args):
     actor.load_state_dict(th.load(os.path.join(args.model_dir, "actor.th"),
                                   map_location="cpu", weights_only=False))
     actor.eval()
-    risk = _risk()
+    # Evaluation MUST use the same ablation the checkpoint was trained with,
+    # otherwise the "no risk information" arm is scored with risk injected.
+    risk = _risk(args.risk_ablation)
     out = {}
     gates = [("conf%s" % t, RiskConfidentGate(
         RiskGreedyHook(actor, args.bonus, risk), t))
         for t in args.gate_thresholds]
     for name, ghook in [("lancer", None), ("greedy", None)] + gates:
         for seed in args.eval_seeds:
+            # fresh policy per arm/seed: the policy carries per-episode state
+            # Lancer arm is always unguarded: it is the reference behaviour
+            # and its own cursor provides the coverage discipline.
             pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
-                                guard=False)
+                                guard=(args.sweep_guard == "strict"
+                                       and name != "lancer"))
             hook = ghook
             if name == "greedy":
                 hook = RiskGreedyHook(actor, args.bonus, risk)
             r = mg.run_team_episode(pol, seed, args.steps, hook=hook,
-                                    **mg.ENV_KW)
+                                    **env_kwargs(args.red_agent))
             out.setdefault(name, {})[seed] = r["return"]
             print(f"{name:6s} seed={seed} {r['return']:+.0f}", flush=True)
     base = out["lancer"]
     summ = {}
     for name in ["greedy"] + ["conf%s" % t
                               for t in args.gate_thresholds]:
-        d = [out[name][s] - base[s] for s in args.eval_seeds]
-        m = sum(d) / len(d)
-        se = (sum((x - m) ** 2 for x in d) / (len(d) - 1)) ** 0.5 / len(d) ** 0.5
-        summ[f"{name}_minus_lancer"] = {"mean": m,
-                                        "ci95": [m - 2.365 * se,
-                                                 m + 2.365 * se]}
+        from blue.training.remote_train import ci95_of
+        c = ci95_of([out[name][s] - base[s] for s in args.eval_seeds])
+        summ[f"{name}_minus_lancer"] = {"mean": c["paired_mean"],
+                                        "sd": c["sd"], "n": c["n"],
+                                        "t_crit95": c["t_crit95"],
+                                        "ci95": c["ci95"]}
     with open(args.out, "w") as f:
-        json.dump({"cells": out, "summary": summ}, f, indent=1)
+        json.dump({"cells": out, "summary": summ,
+                   "risk_ablation": args.risk_ablation,
+                   "red_agent": args.red_agent,
+                   "sweep_guard": args.sweep_guard,
+                   "risk_model": (RISK_MODEL if args.risk_ablation == "real"
+                                  else "ZERO (ablation: no risk input)"),
+                   "eval_seeds": list(args.eval_seeds),
+                   "steps": args.steps}, f, indent=1)
     for k, v in summ.items():
         print(f"{k}: {v['mean']:+.2f} CI[{v['ci95'][0]:+.1f},"
               f"{v['ci95'][1]:+.1f}]")
@@ -316,6 +398,24 @@ def main():
                     help="record a decision for PPO only if the pick's "
                          "risk proba >= this (0 = train on all)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="attacker. 'discovery' reproduces every historical "
+                         "Blue number but cannot punish a broken "
+                         "investigation policy; 'finite' is the bounded "
+                         "attacker the LLM-Red work requires as a floor")
+    ap.add_argument("--sweep-guard", choices=("off", "strict"),
+                    default="off",
+                    help="coverage guard on the learner sweep. off = the "
+                         "actor may re-pick the same host every tick (the "
+                         "regime that produced the agent-3 trap); strict = "
+                         "rank only among hosts unvisited this sweep, which "
+                         "is the mechanism Lancer uses to escape it")
+    ap.add_argument("--risk-ablation", choices=("real", "zero"),
+                    default="real",
+                    help="real = use the learned risk score as RL input; "
+                         "zero = hold column 15 at 0.0 (control arm)")
     ap.add_argument("--train-seeds", type=int, nargs="*",
                     default=list(DEFAULT_TRAIN_SEEDS))
     ap.add_argument("--eval-seeds", type=int, nargs="*",

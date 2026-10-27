@@ -148,3 +148,35 @@ untouched — `8301-8400`, `8401+` and `8501+` stay clear.
   in `environment/patches/` (third_party itself is gitignored).
 - Suites: sim 112 passed / 7 skipped; train 22+ passed. No privileged state
   in any actor/mask/scorer (audited); native reward is the only score.
+
+## Fresh 24-seed LLM-Red block, 2026-10-13
+
+Branch `blue/llmred-fresh24`, off `opencode/blue-diagnosis` at `de37afe`.
+Completed an evaluation that had crashed at 43/48 episodes; added resume
+support and finished it. Lancer vs the coverage-guarded actor on seeds
+7641-7664, paired, 400 steps, pinned `llama3.1:8b` digest:
+
+| contrast | mean | 95% CI (df=23) | seeds won |
+|---|---:|---|---:|
+| actor_guard - Lancer | +120.6 | [+1.4, +239.8] | 16/24 |
+
+Suggestive, not settled: one checkpoint, one training seed, lower bound
+barely clear of zero. On this block the two arms remediate and confirm at
+the same rate, so the earlier "guard raises remediation 39 -> 67" mechanism
+does not reproduce at 24 seeds.
+
+**Caveat that must travel with this number.** Rows 0-42 of the underlying
+run were produced by an uncommitted working-tree variant of
+`llmred_eval.py` that existed only in the `cyberally-opencode` worktree and
+was lost when that worktree was removed. Those rows carry a `recovered_from`
+field present in no committed version. Rows 43-47 were produced by committed
+code at `de37afe`. A clean 48-episode re-run is the only way to retire this.
+Details and hashes in
+[`blue-llmred-evaluation.md`](blue-llmred-evaluation.md).
+
+Next Blue task: retrain with the coverage guard active **during training**.
+`blue/training/risk_actor.py` hardcodes `guard=False` in the training policy
+while honouring `--sweep-guard` only at evaluation, so every checkpoint so far
+was trained in the regime the LLM-Red work identified as invalid. Retrain
+under finite Red first, on a fresh seed block, with the training seed as the
+unit of inference.

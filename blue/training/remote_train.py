@@ -55,7 +55,42 @@ from blue.training import mappo_guide as mg
 from blue.training import risk_actor as ra
 
 EVAL_SEEDS = [7629, 7630, 7640, 7701, 7702, 7703, 7704, 7705]
-T = 2.365  # t critical, df=7 (paired dev eval)
+# t critical values for 95% two-sided paired intervals, indexed by df.
+# Previously this was a single constant (2.365, df=7) applied to EVERY eval,
+# including the 4-seed mid-run checks. That made 4-seed intervals far too
+# narrow: the real df=3 multiplier is 3.182. Understating the interval width
+# on a noisy metric makes noise look like signal, which is exactly how a
+# "best subset" checkpoint gets over-claimed.
+_T95 = {1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447,
+        7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228}
+
+
+def t_crit95(n):
+    """95% two-sided t multiplier for n paired observations.
+
+    Indexed by df = n - 1, so a 4-seed check uses t(df=3) = 3.182. Larger n
+    uses the df=10 value, already within 0.01 of the normal quantile.
+    """
+    if n is None or n < 2:
+        return float("nan")
+    return _T95.get(int(n) - 1, _T95[10])
+
+
+def ci95_of(diffs):
+    """Paired mean difference with a correctly-sized 95% interval."""
+    d = [float(x) for x in diffs]
+    n = len(d)
+    if n < 2:
+        m = d[0] if n else float("nan")
+        return {"paired_mean": m, "sd": float("nan"),
+                "ci95": [float("nan"), float("nan")], "n": n,
+                "t_crit95": float("nan")}
+    m = float(np.mean(d))
+    sd = float(np.std(d, ddof=1))
+    se = sd / (n ** 0.5)
+    tc = t_crit95(n)
+    return {"paired_mean": m, "sd": sd,
+            "ci95": [m - tc * se, m + tc * se], "n": n, "t_crit95": tc}
 
 
 def git_rev():
@@ -130,21 +165,29 @@ def evaluate(actor, seeds, steps, bonus, temp_eval=0.0):
     risk = ra._risk()
     base, greedy = [], []
     for seed in seeds:
-        pol = OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
-                            guard=False)
-        rb = mg.run_team_episode(pol, seed, steps, **mg.ENV_KW)
+        # A FRESH policy object per arm. The policy holds per-episode scoring
+        # state; sharing one instance across the Lancer run and the actor run
+        # lets state from the first arm leak into the second and makes the
+        # pairing only nominally paired.
+        rb = mg.run_team_episode(
+            OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                          guard=False),
+            seed, steps, **mg.ENV_KW)
         hook = ra.RiskGreedyHook(actor, bonus, risk)
-        rg = mg.run_team_episode(pol, seed, steps, hook=hook, **mg.ENV_KW)
+        rg = mg.run_team_episode(
+            OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5),
+                          guard=False),
+            seed, steps, hook=hook, **mg.ENV_KW)
         base.append(rb["return"])
         greedy.append(rg["return"])
-    d = [g - b for g, b in zip(greedy, base)]
-    m = float(np.mean(d))
-    se = float(np.std(d, ddof=1)) / (len(d) ** 0.5)
-    return {"paired_mean": m, "sd": float(np.std(d, ddof=1)),
-            "ci95": [m - T * se, m + T * se],
-            "wins": int(sum(1 for x in d if x > 0)), "n": len(d),
-            "lancer_mean": float(np.mean(base)),
-            "actor_mean": float(np.mean(greedy))}
+    out = ci95_of([g - b for g, b in zip(greedy, base)])
+    out["wins"] = int(sum(1 for g, b in zip(greedy, base) if g > b))
+    out["lancer_mean"] = float(np.mean(base))
+    out["actor_mean"] = float(np.mean(greedy))
+    out["per_seed"] = [{"seed": int(s), "lancer": float(b),
+                        "actor": float(g)}
+                       for s, b, g in zip(seeds, base, greedy)]
+    return out
 
 
 def save_ckpt(out, actor, critic, opt, gen_state, it, track=None):
@@ -239,6 +282,15 @@ def main():
 
     os.makedirs(cli.out, exist_ok=True)
     metrics_path = os.path.join(cli.out, "metrics.jsonl")
+    # Seed BEFORE constructing the nets. build_actor() loads a Phase-3 body
+    # but leaves parts of the head randomly initialised, so seeding after
+    # construction leaves the start point uncontrolled (see the matching fix
+    # in risk_actor.cmd_train). Note --resume deliberately restores the RNG
+    # state saved in the checkpoint afterwards, so a resumed run continues the
+    # original stream instead of restarting it.
+    th.manual_seed(cli.seed)
+    np.random.seed(cli.seed)
+    random.seed(cli.seed)
     actor = ra.build_actor(hidden=cli.hidden)
     critic = mg.build_central_critic(hidden=cli.hidden)
     opt = th.optim.Adam(list(actor.parameters())

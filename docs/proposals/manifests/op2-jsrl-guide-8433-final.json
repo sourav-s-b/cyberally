@@ -1,0 +1,96 @@
+{
+  "run_id": "op2-jsrl-guide-8433-20261022",
+  "status": "FROZEN-PRE-RUN (design locked before any training rollout; G1 re-measure launched; training not yet started). Any parameter change from here requires a NEW run_id and a new freeze.",
+  "supersedes": "docs/proposals/manifests/op2-jsrl-guide-skeleton-20261022.json (skeleton)",
+  "family": "JSRL shrinking-horizon scripted-guide warm start",
+  "citations": {
+    "primary": "JSRL arXiv 2204.02372 (Uchendu et al., ICML 2023)",
+    "supporting": "Kickstarting arXiv 1803.03835 (decay already in paper); Hierarchical Kickstarting arXiv 2207.11584",
+    "research_context": "docs/research/web-research-20261022.md OP2; docs/research/op2-op3-prereg-skeletons-20261022.md"
+  },
+  "hypothesis": {
+    "H1_dev": "JSRL warm-started residual policy beats the frozen guide-equivalent heuristic by mean paired native return >= 0 on dev seeds (20 seeds). H0: mean paired difference < 0.",
+    "H1_confirm": "reproduce on the 8481-8500 block; exploratory until then."
+  },
+  "arms": {
+    "control_guide_eq": "guide_lancer_maxage80: OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5), max_age=80.0), hook=None, red_agent='finite' — this is the SAME construction as the JSRL guide, measured fresh on the dev window (arm exists only as control: guide-equivalent score on fresh seeds)",
+    "treatment_jsrl": "mappo_guide PPO (guide window per curriculum) + recorded PPO rows from learner-only decisions",
+    "ablation_noguide": "mappo_guide PPO identical config with --guide-h0 unset",
+    "sensitivity_kickstarting": "NOT IMPLEMENTED on this tip; declared exploratory for a later prereg amendment only if jsrl vs ablation shows sign of warm-start effect (no auto-run)",
+    "baseline_checks": "sleep + masked-random arms run with the guard re-measure for the noise floor (AGENTS.md includes Sleep/random rule)"
+  },
+  "re_spec_note": "The skeleton's 'guard' reference came from finite_red_anchor pilot (scorer.pkl + blue/harness at source commit 2f44db1). This branch tip has no blue/harness; rather than cross-branch imports, guide/control are re-specified branch-native as ordered-lancer + max-age-80 coverage guard, red finite. Pilot guards' mean -150.21/lancer -151.79 on 7665-7688 are RECORDED CONTEXT FROM A DIFFERENT STACK and are NOT control values here.",
+  "curriculum_prereg": {
+    "formula": "H_i = max(200 * 0.6^(i-1), 10) INTEGER floor, i is 1-based iteration number",
+    "h0": 200, "decay": 0.6, "floor": 10,
+    "reason": "H0=200 keeps the guide over the ~step-135 sparse-onset region; complete handover by iteration 5; floor avoids zero-credit collapse"
+  },
+  "training_prereg": {
+    "harness": "blue/training/mappo_guide.py cmd_train (central-critic PPO; guide-window mechanism +CLI flags --guide-h0/--guide-decay/--guide-floor/--guide-max-age/--red-agent added on this branch)",
+    "called_with": {
+      "train_seeds": [8433, 8434, 8435, 8436, 8437, 8438, 8439, 8440, 8441, 8442, 8443, 8444],
+      "steps": 400, "iters": 12, "eps_per_iter": 4,
+      "hidden": 64, "lr": 3e-4, "bonus": 1.0, "temperature": 1.0,
+      "temp_end": null, "seed": 0, "min_coverage": 0.0, "min_agree": 0.0,
+      "max_kl": 10.0, "phase3_model": "blue/results/scorer_mlp.npz",
+      "guide_h0": 200, "guide_decay": 0.6, "guide_floor": 10,
+      "guide_max_age": 80.0, "red_agent": "finite",
+      "out": "blue/results/op2_jsrl_guide_v1/jsrl_s{seed}"
+    },
+    "train_rng_seeds": [0, 1, 2],
+    "rng_seed_note": "one command per rng seed: --seed 0/1/2, out dir suffixed accordingly; the mean across rng seeds is the treatment estimate (ReBRAC-style multi-seed reporting)",
+    "fresh_rollouts_required": true,
+    "shaping": null, "mask_mode": "validity", "common_reward": true,
+    "max_update_kl": 0.02,
+    "wallclock_cap_hours": 6
+  },
+  "g1_remeasure_prereg": {
+    "seeds": [8445, 8446, 8447, 8448, 8449, 8450, 8451, 8452, 8453, 8454,
+              8455, 8456, 8457, 8458, 8459, 8460, 8461, 8462, 8463, 8464],
+    "steps": 400, "arms": ["guard", "lancer", "sleep", "random"],
+    "max_age": 80.0, "red_agent": "finite",
+    "report_path": "blue/results/op2_jsrl_guide_v1/guard_remeasure/report.json (after run completes)",
+    "gate": "report exists with 4x20 cells and finite returns; the dev-window guard mean is the ONLY control value for treatment comparisons"
+  },
+  "seed_ledger": {
+    "audit": "python -m blue.training.seed_audit --check 8433 8500 -> 8433-8500 FREE (68 seeds), recorded before freeze",
+    "allocation": {
+      "train_and_rollouts": "8433-8444 (12)",
+      "dev_eval": "8445-8464 (20)",
+      "spare": "8465-8480 (16)",
+      "confirm_gate_opened_only": "8481-8500 (20)"
+    }
+  },
+  "metrics_prereg": ["native_return", "worst_per_tick_reward", "sleep_fraction", "repair_requests"],
+  "stats_prereg": "paired per-seed percentile bootstrap n=10000 rng_seed 20261022 between jsrl mean-across-rng-seeds and G1 guard per-seed returns; secondary ablation (noguide) reported as estimate only. Gate: TAU_PREREG = 0.0.",
+  "gates_prereg": [
+    "G0 cold-contract audit green at the frozen commit: blue/tests_blue/test_contract_cold.py 8/8 passed 2026-10-22 on this worktree",
+    "G1 guide re-measure report present and complete (launch begun; gate check before training starts)",
+    "G2 no mid-run config change; dirty_tree manifest records state"
+  ],
+  "dev_eval_prereg": "after training: eval mode cmd_eval with --eval-seeds 8445..8464 --steps 400 --red-agent finite per trained dir; primary contrast 'learned_minus_guard' computed from these returns vs G1 guard (fixed analysis script, rng 20261022)",
+  "stop_rules_prereg": [
+    "no curriculum/hyper-parameter change mid-run",
+    "contract defect: abort and record, no salvage",
+    "hard wallclock/iteration truncation reported as outcome"
+  ],
+  "reporting_rules_prereg": "negatives reported as negatives; confirm block 8481-8500 opens only after a user-visible seed_audit --check 8481 8500",
+  "frozen_source_shas_sha256": {
+    "blue/core/wrapper.py": "dea1a81c42bcfe68a33ced8eef51abf0425d7efb716bf2b58245728228623d1e",
+    "blue/core/baselines.py": "e0958ab090ba60f7fa74188b4efc1d438cdbaef21def18cbe1af2ee05c49d8fa",
+    "blue/core/masking.py": "8d8c81d7c5d6f2aeca2b9a6b0c4d53cfb3021d2bd0a122b98fff685d0385b4bf",
+    "blue/policies/ordered.py": "5cbe5602bee0f3b2206924fd0c87e128ff08ee271065f9bf6c78ccc0c81a8ca3",
+    "blue/training/mappo_guide.py": "8204e50300100f8e0ec5c1a26a527022e0f289a112b9f7529e7fa34b56ce9a64",
+    "blue/training/residual.py": "038a0f9f2507736b4ffa664250e57bf13041ac797280ff29f39a85272568eebc",
+    "blue/training/scorer.py": "0a1b4bc17a3ba6ee8c7b1cc78dfc28d06c0c5376f282ef2942230205d0c5ec81",
+    "blue/training/harness_guide_remeasure.py": "7f75089ebfcf52de1ce6f10faeb70a84e1a0b061d98d19bf13fc0260102866c9",
+    ".venv-train/bin/python": "f7c6210eb40fadcd3c2889dddd24a15fc2c9f926aec5a03bf9da66e12d581526"
+  },
+  "frozen_test_shas_sha256": {
+    "blue/tests_blue/test_contract_cold.py": "f8bd612cfc8f106fe7c6be5f977697c34ed90db0a6396f1e286793914577f997",
+    "blue/tests_blue/test_jsrl_guide.py": "81fff28a7d80193b55dfd84fa6dacc33dd4ff06b37c3b5d5ca75c0dcfe8a0201"
+  },
+  "base_commit": "7ac88861970744f5328d60434cbb07734c3a522c",
+  "python": "3.12.10 (.venv-train, torch 2.14.1+cpu)",
+  "wrapper_env_info_sha256": "recorded by G1 report (env_info_sha256 field) — training runs use the same env_kw construction as the re-measure"
+}
