@@ -2046,3 +2046,13 @@ recorded: the filter biases the gradient (selected-experience update, not
 standard PPO over the full buffer) and thresholds were chosen after
 inspecting a collapse seed, so +4.50 stays exploratory. Plan for the
 improvement path: `docs/plans/risk-actor-next.md`.
+
+Execution note for the hybrid evaluation: `architecture_compare.evaluate()`
+loops over every supplied `--eval-seeds` value under each Red regime. The long
+launcher therefore evaluates all 16 preselected seeds (8401–8416) for
+Discovery and again for Finite, rather than splitting them into 8 per regime
+as the proposal intended. This was noticed after the first 11 Discovery pairs
+had printed. No seed was added or selected based on returns; the actual run is
+more extensive (16 seeds per regime per training RNG), and reports will use
+that actual count. Treat it as an evaluation-budget deviation, not as the
+original 8-per-regime protocol.

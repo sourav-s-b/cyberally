@@ -15,7 +15,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-
+ppt/
 # Credentials and machine-local settings
 .env
 .env.*
