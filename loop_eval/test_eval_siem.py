@@ -20,7 +20,8 @@ import pytest
 _LOOP_EVAL = Path(__file__).resolve().parent
 _ROOT = _LOOP_EVAL.parent
 _BLUE = _ROOT / "blue"
-for p in (_LOOP_EVAL, _BLUE):
+_CAGE = _ROOT / "cage-challenge-4"
+for p in (_LOOP_EVAL, _BLUE, _CAGE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 

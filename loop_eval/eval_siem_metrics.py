@@ -441,16 +441,16 @@ def _print_summary_table(summary: dict) -> None:
     print(f"{'='*60}")
     rows = [
         ("Mean cumulative return",        summary["mean_cumulative_return"],          ""),
-        ("Mean MTTD (ticks)",             summary["mean_mttd_ticks"],                 "↓ better"),
-        ("Mean MTTC (ticks)",             summary["mean_mttc_ticks"],                 "↓ better"),
-        ("Mean response time (ticks)",    summary["mean_response_time_ticks"],        "↓ better"),
+        ("Mean MTTD (ticks)",             summary["mean_mttd_ticks"],                 "[lower is better]"),
+        ("Mean MTTC (ticks)",             summary["mean_mttc_ticks"],                 "[lower is better]"),
+        ("Mean response time (ticks)",    summary["mean_response_time_ticks"],        "[lower is better]"),
         ("Mean alerts issued",            summary["mean_total_alerts"],               ""),
         ("Mean remediations (Remove)",    summary["mean_total_remediations"],         ""),
         ("Mean restores",                 summary["mean_total_restores"],             ""),
         ("Mean analyses",                 summary["mean_total_analyses"],             ""),
-        ("Mean compromised hosts (final)",summary["mean_compromised_final"],          "↓ better"),
-        ("Mean root-compromised (final)", summary["mean_root_compromised_final"],     "↓ better"),
-        ("Mean service availability",     summary["mean_service_availability_pct"],   "% ↑ better"),
+        ("Mean compromised hosts (final)",summary["mean_compromised_final"],          "[lower is better]"),
+        ("Mean root-compromised (final)", summary["mean_root_compromised_final"],     "[lower is better]"),
+        ("Mean service availability",     summary["mean_service_availability_pct"],   "% [higher is better]"),
     ]
     for label, value, unit in rows:
         if value is None:
