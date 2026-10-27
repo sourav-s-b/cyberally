@@ -51,6 +51,18 @@ available without it.
 On Windows PowerShell, use `.\.venv-train\Scripts\python.exe -m blue.dashboard_server`.
 If `.venv-train` does not exist, set it up with the project's training and
 simulator dependencies before launching; do not install them into the system Python.
+For bundled learned models, install the scorer's pinned dependencies into that
+same environment before starting the server:
+
+```sh
+./.venv-train/bin/python -m pip install -r blue/harness/requirements.txt
+```
+
+On Windows, use `.\.venv-train\Scripts\python.exe -m pip install -r blue\harness\requirements.txt`.
+The bundled scorer requires `scikit-learn==1.7.2`. A missing `sklearn._loss`
+module usually means these dependencies were installed into a different Python
+environment or the scikit-learn install is incomplete. Simulator baselines do
+not require this optional scorer dependency.
 If the dashboard starts with a different interpreter, saved checkpoints are
 reported as unavailable (a neutral notice) while the baselines remain usable.
 
