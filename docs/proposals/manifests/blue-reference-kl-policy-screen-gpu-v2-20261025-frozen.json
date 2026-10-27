@@ -1,0 +1,154 @@
+{
+  "experiment": "blue-reference-kl-policy-screen-20261025-gpu-v2",
+  "status": "FROZEN-PRE-RUN",
+  "source_commit": "a94093a740b367fa1331254f609eb69e16da0daa",
+  "source_sha256": {
+    "blue/training/architecture_compare.py": "09641c7bc74b487a469449370c9609abc5a581094d6d1a5f5a2cc6b6d8e1ea9f",
+    "blue/training/policy_reference_analysis.py": "c1123986fe919993b1dc3cba9e2af9a8c16c5155e88729dc081971c95f6810e2",
+    "blue/training/policy_reference_screen_gpu.sh": "983c3a87348edef636992ed8b7d0b9737682ff78c4403f6b3025cc08fe03c145",
+    "blue/harness/learning.py": "bbb4895ceff5599c5c6fcbbfa57a4fbcfa32710218f2347266e3b2c00f871649",
+    "blue/harness/redesign.py": "eea1f44f4ea6e9f6a391a32d781406acff5fcd2d456c3b60167e59e0e2910071",
+    "blue/training/harness_redesign.py": "ea06ac6b9d7b76d67bb16fe36a7fa78fddad5f97fb7453b16fc3c191d3f70de2",
+    "blue/harness/attention_actor.py": "90fdc405b21fea7ca0e8cbc762068a37c9726e1e6c9f23cce66108408d52f9cb",
+    "blue/harness/routed_hybrid_actor.py": "5142413ee9833b86b352404f2534ec977f1157b6005910cd1cdc7219faea9e72",
+    "blue/harness/features.py": "67957adb657df9252419ace212bad14b74c1368e503b728dc12ffd6ad76f8d60",
+    "blue/harness/policy.py": "e7b3bbd1a03906a3e9ed5fcae286a5dfc3eced9075c761dea6c1e2a30cbe0d8e",
+    "blue/harness/scoring.py": "dbacad5de265884b413b45e0c6faf8b584c06b65dc6fb7dc76afab2d50c28ccb",
+    "blue/harness/numerics.py": "9b7c3625c29ef516e516983eadd15752b2ff9268042411f702a408b21a7677b5",
+    "blue/training/event_time_rl.py": "10f5505b4ace8fcdfe863fd9ed67f22288b9a747c05dec7023dd6fc28a8ff42e",
+    "blue/training/mappo_guide.py": "9ee933904c1ff386958df748f910a307ea4e8483a03a63494e1918296746e785",
+    "blue/core/wrapper.py": "dea1a81c42bcfe68a33ced8eef51abf0425d7efb716bf2b58245728228623d1e",
+    "blue/policies/ordered.py": "5cbe5602bee0f3b2206924fd0c87e128ff08ee271065f9bf6c78ccc0c81a8ca3",
+    "docs/proposals/blue-reference-kl-policy-screen-gpu-v2-20261025.md": "b454553677eb76a92fbbb4a84dca2a93e814553c51a09cec27b08ad19879096a"
+  },
+  "supersedes_execution": "blue-reference-kl-policy-screen-20261025-frozen.json; CPU attempt aborted after 3 episodes before first optimizer update, no checkpoint used",
+  "question": "Does persistent KL(reference || current) at coefficient 0.1 improve the fixed 0.5 SetActor/attention policy relative to existing PPO?",
+  "arms": {
+    "ppo": {
+      "reference_kl_coef": 0.0
+    },
+    "reference": {
+      "reference_kl_coef": 0.1
+    }
+  },
+  "shared_config": {
+    "arch": "fixed",
+    "rng_seeds": [
+      0,
+      1
+    ],
+    "iterations": 6,
+    "episodes_per_iteration": 4,
+    "steps": 400,
+    "actor_epochs": 4,
+    "critic_epochs": 4,
+    "minibatch": 256,
+    "cpu_threads": 1,
+    "device": "cuda:0",
+    "actor_lr": 0.003,
+    "critic_lr": 0.0003,
+    "bonus": 1.0,
+    "temperature": 0.5,
+    "gamma": 0.99,
+    "gae_lambda": 1.0,
+    "explore": 0.5,
+    "clip": 0.2,
+    "entropy_coef": 0.0,
+    "old_policy_target_kl": 0.02,
+    "red_schedule": "alternating Discovery/Finite"
+  },
+  "train_env_seeds": {
+    "rng0": [
+      7754,
+      7755,
+      7756,
+      7757,
+      7758,
+      7759,
+      7760,
+      7761
+    ],
+    "rng1": [
+      7762,
+      7763,
+      7764,
+      7765,
+      7766,
+      7767,
+      7768,
+      7769
+    ]
+  },
+  "development_seeds": [
+    7770,
+    7771,
+    7772,
+    7773,
+    7774,
+    7775,
+    7776,
+    7777
+  ],
+  "seed_audit": "7754-7777 FREE immediately before freeze; v1-abort seeds 7730-7753 excluded; CUDA smoke used previously consumed seed 8417 only",
+  "runtime": {
+    "python": "3.12.14",
+    "torch": "2.14.1+cu130",
+    "cuda_available": true,
+    "cuda_device": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+    "torch_threads": 1,
+    "packages": {
+      "numpy": "2.5.3",
+      "scipy": "1.18.1",
+      "scikit-learn": "1.7.2",
+      "gym": "0.26.2",
+      "gymnasium": "0.28.1",
+      "pygame": "2.5.2",
+      "joblib": "1.6.0",
+      "cloudpickle": "3.1.2",
+      "networkx": "3.2.1",
+      "sympy": "1.14.0",
+      "typing-extensions": "4.16.0",
+      "prettytable": "3.9.0",
+      "pyyaml": "6.0.1",
+      "pillow": "12.3.0"
+    }
+  },
+  "gpu_update_smoke": {
+    "status": "passed",
+    "method": "synthetic fixed-actor PPO update with reference KL on CUDA",
+    "reference_kl": 0.0008071861229836941
+  },
+  "cuda_rollout_smoke": {
+    "status": "passed",
+    "seed": 8417,
+    "red": "discovery",
+    "ticks": 2,
+    "actor_decisions": 5,
+    "recorded_rows": 5,
+    "purpose": "verify GPU actor/critic inference, sampling and CPU rollout-row transfer; seed already consumed by prior architecture screen"
+  },
+  "scorer_sha256": "ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd",
+  "qwen_context": {
+    "kernel": "souravsreekumar02/cyberally-qwen-event-time-rl-resume",
+    "archive_sha256": "7f8233bc8a77b68dbff729edcd7f9f88e2932c9d411d6d22385b1c852d1f89b4",
+    "qwen_model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "training_only_means": {
+      "GAE_0.9_five_rngs": -162.8,
+      "MC_1.0_five_rngs": -165.6
+    },
+    "interpretation": "held-out results absent; keep lambda=1.0 to isolate policy update"
+  },
+  "outcomes": {
+    "primary": "paired native-return Reference-KL minus PPO by Red and training RNG",
+    "secondary": [
+      "own untrained policy",
+      "strict Lancer",
+      "coverage and decisions",
+      "old-policy KL/reference KL",
+      "lower-tail return summaries"
+    ],
+    "verified_remediation": "not exposed by current evaluator"
+  },
+  "claim": "two training RNG descriptive screen only; no confirmation or superiority claim",
+  "output": "blue/results/policy_reference_kl_v2_gpu/"
+}

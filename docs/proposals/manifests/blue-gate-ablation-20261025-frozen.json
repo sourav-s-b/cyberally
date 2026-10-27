@@ -1,0 +1,116 @@
+{
+  "experiment": "blue-gate-ablation-v1",
+  "status": "FROZEN-PRE-RUN",
+  "question": "Does a learned state-conditioned SetActor/attention gate outperform a fixed 0.5 blend at the same MAPPO budget?",
+  "source_commit": "a94093a740b367fa1331254f609eb69e16da0daa",
+  "source_files_sha256": {
+    "blue/training/architecture_compare.py": "11ccca1fdfb1cb40093c8adc2a075722047ed99de498bb7d6dfc6909d74145ea",
+    "blue/training/architecture_gate_ablation.sh": "5d6bcaa2d38dc4c0a74551860e11cb67602106fa7b8ac87140589e1756ab060a",
+    "blue/harness/routed_hybrid_actor.py": "5142413ee9833b86b352404f2534ec977f1157b6005910cd1cdc7219faea9e72",
+    "blue/harness/attention_actor.py": "90fdc405b21fea7ca0e8cbc762068a37c9726e1e6c9f23cce66108408d52f9cb",
+    "blue/harness/redesign.py": "0777a052fea0c4427d36582d2426f12b45604cc29b5ca87b110bd4af3528ba43",
+    "blue/harness/learning.py": "f40e61002861acb2c2ba8fbf860c8b1f5c228f943cebb16fd49238070d706b8c",
+    "blue/harness/features.py": "67957adb657df9252419ace212bad14b74c1368e503b728dc12ffd6ad76f8d60",
+    "blue/harness/policy.py": "e7b3bbd1a03906a3e9ed5fcae286a5dfc3eced9075c761dea6c1e2a30cbe0d8e",
+    "blue/harness/scoring.py": "dbacad5de265884b413b45e0c6faf8b584c06b65dc6fb7dc76afab2d50c28ccb",
+    "blue/harness/numerics.py": "9b7c3625c29ef516e516983eadd15752b2ff9268042411f702a408b21a7677b5",
+    "blue/training/event_time_rl.py": "10f5505b4ace8fcdfe863fd9ed67f22288b9a747c05dec7023dd6fc28a8ff42e",
+    "blue/training/harness_redesign.py": "3ae2e1c9a168d048a487aed46d5ae4d3aafe9336cf76bc49755c3b47d613e264",
+    "blue/training/mappo_guide.py": "9ee933904c1ff386958df748f910a307ea4e8483a03a63494e1918296746e785",
+    "blue/core/wrapper.py": "dea1a81c42bcfe68a33ced8eef51abf0425d7efb716bf2b58245728228623d1e",
+    "blue/policies/ordered.py": "5cbe5602bee0f3b2206924fd0c87e128ff08ee271065f9bf6c78ccc0c81a8ca3",
+    "blue/tests_blue/test_attention_actor.py": "82f171e3525ae61ff619f48cd1e6150d23a19c1f75ad214a243097ec92f44910",
+    "docs/proposals/blue-gate-ablation-experiment-20261025.md": "c044a70869283e826d74846db70fb3aa7e4e8b84a12cf6d4a386708a036472b5"
+  },
+  "seed_audit": "used seeds discovered: 162\n\nrange 8417-8432 (16 seeds):\n  FREE - no recorded consumption\nused seeds discovered: 162\n\nrange 8465-8480 (16 seeds):\n  FREE - no recorded consumption\n",
+  "arms": [
+    "set",
+    "fixed",
+    "hybrid"
+  ],
+  "training": {
+    "rng_seeds": [
+      0,
+      1
+    ],
+    "iterations": 6,
+    "episodes_per_iteration": 4,
+    "episodes_per_arm_rng": 24,
+    "steps": 400,
+    "train_env_seeds": {
+      "rng0": [
+        8465,
+        8466,
+        8467,
+        8468,
+        8469,
+        8470,
+        8471,
+        8472
+      ],
+      "rng1": [
+        8473,
+        8474,
+        8475,
+        8476,
+        8477,
+        8478,
+        8479,
+        8480
+      ]
+    },
+    "red_schedule": "alternating Discovery/Finite; each 8-seed block cycles three times",
+    "torch_threads_per_worker": 1,
+    "parallel_workers": 3
+  },
+  "evaluation": {
+    "seeds": [
+      8417,
+      8418,
+      8419,
+      8420,
+      8421,
+      8422,
+      8423,
+      8424,
+      8425,
+      8426,
+      8427,
+      8428,
+      8429,
+      8430,
+      8431,
+      8432
+    ],
+    "red_agents": [
+      "discovery",
+      "finite"
+    ],
+    "control_policies": [
+      "strict_lancer",
+      "untrained",
+      "learned"
+    ],
+    "eval_seed_ids_per_regime_rng_arm": 16
+  },
+  "primary_contrasts": [
+    "hybrid minus fixed by Red and RNG",
+    "each learned arm minus its own untrained control",
+    "each learned arm minus strict Lancer"
+  ],
+  "reporting": [
+    "per RNG and Red regime",
+    "paired mean, median, IQM, wins, lower-tail return, 95% paired bootstrap interval"
+  ],
+  "limitations": "Two training RNGs are a descriptive screen, not confirmation. No pooled 64-seed-row claim of 64 independent trained models.",
+  "runtime": {
+    "python": "3.12.14",
+    "torch": "2.14.1+cpu",
+    "numpy": "2.5.3",
+    "torch_threads_per_worker": 1,
+    "cuda_available": false
+  },
+  "scorer": "blue/results/event_time_rl/scorer.pkl",
+  "scorer_sha256": "ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd",
+  "execution_note": "PyTorch is the CPU build in this venv (CUDA unavailable); three isolated single-thread workers are used. The laptop RTX 3050 is present but not used; simulator rollout dominates and no device-specific acceleration was frozen."
+}

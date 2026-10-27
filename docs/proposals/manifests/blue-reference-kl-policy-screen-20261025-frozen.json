@@ -1,0 +1,122 @@
+{
+  "experiment": "blue-reference-kl-policy-screen-20261025",
+  "status": "FROZEN-PRE-RUN",
+  "source_commit": "a94093a740b367fa1331254f609eb69e16da0daa",
+  "source_sha256": {
+    "blue/training/architecture_compare.py": "bac798a5dd8e68d329000df8b414dff51f15b66b450e064be87c6dd8d0f33864",
+    "blue/training/policy_reference_analysis.py": "c1123986fe919993b1dc3cba9e2af9a8c16c5155e88729dc081971c95f6810e2",
+    "blue/training/policy_reference_screen.sh": "b6172990dc7fdd37f44a3a3fdfc0019ee7563238d9798c65d351ab0b65cbd2d6",
+    "blue/harness/learning.py": "ebb021866f4e1fb3daf9942735a3d35166ebc576f0a5e338d37573dcfa6c5a2a",
+    "blue/harness/attention_actor.py": "90fdc405b21fea7ca0e8cbc762068a37c9726e1e6c9f23cce66108408d52f9cb",
+    "blue/harness/routed_hybrid_actor.py": "5142413ee9833b86b352404f2534ec977f1157b6005910cd1cdc7219faea9e72",
+    "blue/harness/redesign.py": "0777a052fea0c4427d36582d2426f12b45604cc29b5ca87b110bd4af3528ba43",
+    "blue/harness/features.py": "67957adb657df9252419ace212bad14b74c1368e503b728dc12ffd6ad76f8d60",
+    "blue/harness/policy.py": "e7b3bbd1a03906a3e9ed5fcae286a5dfc3eced9075c761dea6c1e2a30cbe0d8e",
+    "blue/harness/scoring.py": "dbacad5de265884b413b45e0c6faf8b584c06b65dc6fb7dc76afab2d50c28ccb",
+    "blue/harness/numerics.py": "9b7c3625c29ef516e516983eadd15752b2ff9268042411f702a408b21a7677b5",
+    "blue/training/event_time_rl.py": "10f5505b4ace8fcdfe863fd9ed67f22288b9a747c05dec7023dd6fc28a8ff42e",
+    "blue/training/harness_redesign.py": "3ae2e1c9a168d048a487aed46d5ae4d3aafe9336cf76bc49755c3b47d613e264",
+    "blue/training/mappo_guide.py": "9ee933904c1ff386958df748f910a307ea4e8483a03a63494e1918296746e785",
+    "blue/core/wrapper.py": "dea1a81c42bcfe68a33ced8eef51abf0425d7efb716bf2b58245728228623d1e",
+    "blue/policies/ordered.py": "5cbe5602bee0f3b2206924fd0c87e128ff08ee271065f9bf6c78ccc0c81a8ca3",
+    "docs/proposals/blue-reference-kl-policy-screen-20261025.md": "05343ce088dd0fb2e01754a8332ad49390065dab0dd8d258f7a5ffbd5528290b"
+  },
+  "question": "Does persistent KL(reference || current) at coefficient 0.1 improve the fixed 0.5 SetActor/attention policy relative to the current PPO update?",
+  "arms": {
+    "ppo": {
+      "reference_kl_coef": 0.0
+    },
+    "reference": {
+      "reference_kl_coef": 0.1
+    }
+  },
+  "shared_config": {
+    "arch": "fixed",
+    "rng_seeds": [
+      0,
+      1
+    ],
+    "iterations": 6,
+    "episodes_per_iteration": 4,
+    "steps": 400,
+    "actor_epochs": 4,
+    "critic_epochs": 4,
+    "minibatch": 256,
+    "threads": 1,
+    "actor_lr": 0.003,
+    "critic_lr": 0.0003,
+    "bonus": 1.0,
+    "temperature": 0.5,
+    "gamma": 0.99,
+    "gae_lambda": 1.0,
+    "explore": 0.5,
+    "clip": 0.2,
+    "entropy_coef": 0.0,
+    "target_kl": 0.02,
+    "red_schedule": "alternating Discovery/Finite",
+    "device": "CPU"
+  },
+  "train_env_seeds": {
+    "rng0": [
+      7730,
+      7731,
+      7732,
+      7733,
+      7734,
+      7735,
+      7736,
+      7737
+    ],
+    "rng1": [
+      7738,
+      7739,
+      7740,
+      7741,
+      7742,
+      7743,
+      7744,
+      7745
+    ]
+  },
+  "development_seeds": [
+    7746,
+    7747,
+    7748,
+    7749,
+    7750,
+    7751,
+    7752,
+    7753
+  ],
+  "seed_audit": "7730-7753 FREE on 2026-10-25 immediately before freeze; training/evaluation disjoint; reserved blocks avoided",
+  "outcomes": {
+    "primary": "paired native-return Reference-KL minus PPO by Red and training RNG",
+    "secondary": [
+      "against own untrained policy",
+      "against strict Lancer",
+      "coverage and learned/forced decisions",
+      "old-policy KL and reference KL",
+      "return lower-tail summaries"
+    ],
+    "limitation": "the current harness does not expose verified-remediation counts"
+  },
+  "qwen_context": {
+    "kernel": "souravsreekumar02/cyberally-qwen-event-time-rl-resume",
+    "archive_sha256": "7f8233bc8a77b68dbff729edcd7f9f88e2932c9d411d6d22385b1c852d1f89b4",
+    "qwen_model_digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "training_only_means": {
+      "GAE_0.9_five_rngs": -162.8,
+      "MC_1.0_five_rngs": -165.6
+    },
+    "interpretation": "separate LLM-Red training runs without held-out policy comparison; keep lambda=1 to isolate KL treatment"
+  },
+  "scorer_sha256": "ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd",
+  "runtime": {
+    "python": "3.12.14",
+    "torch": "2.14.1+cpu",
+    "numpy": "2.5.3",
+    "sklearn": "1.7.2",
+    "cuda_available": false
+  },
+  "claim": "two training RNG descriptive screen; no confirmation claim; advance only under the frozen proposal criteria"
+}

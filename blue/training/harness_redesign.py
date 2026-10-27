@@ -55,11 +55,15 @@ class Recorder(RedesignHook):
             F,base,mask,teacher,p=self.distribution(env,agent,cands,scored)
             idx=int(torch.multinomial(p,1,generator=self.generator))
             joint=central_context(env,self.scorer,agent,self.cache)
-            value=float(self.critic(torch.from_numpy(joint)))
+            cdevice=next(self.critic.parameters()).device
+            value=float(self.critic(torch.from_numpy(joint).to(cdevice)).item())
         self.total+=1;self.agree+=int(idx==teacher);self.sampled_disagree+=int(idx!=teacher)
         self.per_agent[agent]=self.per_agent.get(agent,0)+1
-        self.rows.append({'feats':F.numpy(),'base':base.numpy(),'mask':mask.numpy(),
-            'old_probs':p.numpy(),'joint':joint,'choice':idx,'teacher':teacher,
+        self.rows.append({'feats':F.detach().cpu().numpy(),
+            'base':base.detach().cpu().numpy(),
+            'mask':mask.detach().cpu().numpy(),
+            'old_probs':p.detach().cpu().numpy(),'joint':joint,
+            'choice':idx,'teacher':teacher,
             'tick':env._tick,'agent':agent,'value':value})
         return cands[idx]
 

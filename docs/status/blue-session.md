@@ -2691,3 +2691,267 @@ recorded: the filter biases the gradient (selected-experience update, not
 standard PPO over the full buffer) and thresholds were chosen after
 inspecting a collapse seed, so +4.50 stays exploratory. Plan for the
 improvement path: `docs/plans/risk-actor-next.md`.
+
+## Scripted Red recheck and task-modular architecture preparation (2026-10-24)
+
+The Qwen event-time main comparison is paused on `blue/event-time-rl` at the
+user's request. `main_mc_s0` (lambda 1.0, training RNG 0) has **7/12
+iterations** durably checkpointed. The trainer and launcher were stopped after
+iteration 7 completed; `checkpoint.pt`, `manifest.json`, and `actor.th` are
+present, with no temporary checkpoint file. The restartable
+`blue/training/event_time_main.sh` resumes this run from the saved optimizer
+and RNG state, then continues the remaining runs. No final evaluation has run.
+
+At the user's request, reran `blue/tests_blue/test_red_variants.py`: **3
+passed**, including construction/stepping of both scripted `discovery` and
+`finite` Red and the Sleep-Red sanity check. Also attempted the upstream
+1,000-step FiniteStateRed regression at
+`CybORG/Tests/test_cc4/test_heuristic_agents.py::test_issue_finite_state_agent`;
+pytest could not collect that directory because its `conftest.py` imports
+optional `ray`, absent from this training venv. No dependency was installed.
+
+Architecture prep is a draft, not a new training run:
+`docs/proposals/blue-task-modular-architecture-20261024.md`. It separates
+host/topology representation, own-action outcome memory, (interface-gated)
+teammate-message attention, and centralized counterfactual credit. The first
+comparison proposed is current `SetActor` vs a small masked host-attention
+encoder, with the strict guard, action scope, reward, credit method and budget
+held fixed. The message channel is currently absent, so no communication model
+can be fairly compared until an explicit Blue message interface exists. Do
+do not start architecture training before the ten-run event-time comparison
+resumes, finishes, and is analyzed so its credit target can be frozen.
+
+## Architecture comparison implementation prep, 2026-10-25
+
+Per the user's direction, Qwen's long-running event-time comparison is left for
+Kaggle cloud execution. The local `blue/event-time-rl` worktree has no Qwen
+trainer running; its restartable checkpoint remains at 7/12 iterations of the
+first run. No Kaggle transfer or cloud job was launched from this worktree.
+
+Prepared a separate candidate actor at
+`blue/harness/attention_actor.py`: one masked self-attention block over valid
+Analyse candidates, using the existing Blue-visible candidate features and
+heuristic base scores. It implements the same residual-scoring API as
+`SetActor` without changing the frozen Qwen actor or its runner. At the
+proposed settings it has 18,649 parameters versus 19,009 for SetActor, and
+starts with zero residual. Targeted tests for teacher-mixture parity,
+equivariance, invalid-candidate masking, gradients, and empty sets pass. The architecture proposal now fixes
+the first contrast and comparison controls; it also records that a separate
+episode-level discovery/finite Red factory is needed because the frozen Qwen
+runner only accepts LLM/Finite.
+
+Validation run on 2026-10-25: `test_attention_actor.py` and
+`test_red_variants.py` — **8 passed**. `git diff --check` passed. No training
+or Qwen code was run. Next: build a separate comparison runner that supports
+balanced episode-level discovery/finite sampling and both actor factories;
+freeze credit assignment only after Kaggle finishes and reports the Qwen
+comparison. Then preregister fresh seeds and run the small pilot before any
+confirmation block.
+
+
+## Architecture pilot and Qwen cloud transfer, 2026-10-25
+
+The user directed us to move the paused Qwen comparison to Kaggle, implement
+the architecture comparison runner, and run it without blocking on Qwen. The
+local Qwen checkpoint remains unchanged at 7/12 iterations in `main_mc_s0`;
+it was packaged into a private Kaggle dataset. Kaggle kernel v5 reached training
+but failed its frozen model identity check because it installed latest Ollama,
+not the required 0.40.0. Kernel v7 is now running with the official Ollama
+v0.40.0 Linux release archive pinned by SHA256 and a model identity probe.
+No resumed Qwen training result is available yet; poll
+`souravsreekumar02/cyberally-qwen-event-time-rl-resume`.
+
+Implemented `blue/training/architecture_compare.py` and
+`blue/training/architecture_pilot.sh`; the runner compares the existing
+SetActor against a candidate-set self-attention actor on balanced Discovery and
+Finite episodes, same strict Lancer comparator, and two training RNGs. The
+attention actor consumes the complete redesign feature vector, starts at zero
+residual, and has 19,027 parameters versus 19,009 for SetActor. The first
+attention attempt exposed a feature-dimension mismatch; corrected it, reran the
+attention arms, and preserved the failed partial directory separately.
+
+The pilot completed (2 training RNGs per architecture, 2 evaluation seeds per
+Red type). Descriptive learned-minus-Lancer mean differences: SetActor
+Discovery +6.75 / Finite -33.50; attention Discovery -1.00 / Finite -9.00.
+The eval seeds are shared across runs and this sample is too small to rank
+architectures or claim improvement. Detailed values are in the ignored result
+artifact `blue/results/architecture_cmp_v1/summary.json`; per-run reports and
+checkpoints remain under that results directory. Targeted tests:
+`test_attention_actor.py` + `test_red_variants.py`, **8 passed**; pilot launcher
+exited 0 after all four eval reports were written.
+
+Next: retrieve Kaggle v7 logs. If the exact Ollama/model identity checks pass,
+let the frozen Qwen launcher resume and later download its result artifact for
+analysis. If the identity still differs, inspect the printed actual model
+digest and stop rather than silently changing the freeze. Architecture next step
+is to use the pilot only to refine a preregistered, larger comparison; do not
+open confirmation seeds from these outcomes.
+
+Kaggle check, 2026-10-25 18:11 local: authenticated Kaggle CLI reports
+`souravsreekumar02/cyberally-qwen-event-time-rl-resume` as `RUNNING`. The
+current pulled kernel source includes the exact Ollama 0.40.0/model checks,
+adds both repository and CybORG paths to `PYTHONPATH`, and invokes the frozen
+launcher to resume `main_mc_s0` at iteration 8/12 before proceeding through
+remaining arms. `kaggle kernels output` returned no artifacts while the job is
+running, so current training iteration and fresh logs cannot be verified yet.
+
+Poll at 2026-10-25 18:40 local: Kaggle still reports `RUNNING`; output download
+still returns no artifacts. Kaggle's listing retains lastRunTime 09:24 UTC, but
+the status API provides no reliable completion ETA or live progress. Locally,
+the gate ablation has completed all RNG 0 training/evaluations. RNG 1 is at
+SetActor 4/6 iterations and fixed/hybrid 3/6; all three training workers remain
+active. RNG 1 evaluations are pending; estimated local completion is about
+50–65 minutes from this poll. RNG 0 paired evaluation means favor fixed blend
+over untrained by +8.1 Discovery / +10.0 Finite, but medians are +0.5 / 0 and
+win counts 8/16 / 7/16. The learned gate is +4.3 / −14.8 by mean with medians
+−1.5 / −4.5. This is one training RNG and the fixed-blend means are tail
+sensitive, so the screen remains inconclusive until RNG 1 finishes.
+
+## Situation-routed hybrid longer run, 2026-10-25
+
+The next architecture uses both candidate mechanisms through a learned global
+state gate: `g(s)` blends SetActor and candidate-attention residual scores for
+each decision state. The gate sees masked mean/max candidate evidence, Lancer
+score mean/spread, and candidate count. At initialization it is 0.5 and both
+branches emit zero residual; during training the gate and both branches update
+through the existing MAPPO loss. Evaluation records the attention-branch gate
+weight per free decision.
+
+Frozen protocol: 2 training RNGs, 6 iterations each, 4 balanced 400-tick
+Discovery/Finite episodes per iteration (24 unique training environment seeds
+per RNG; 48 total); 8 held-out evaluation seeds per regime (16 total), with
+strict Lancer and untrained-hybrid controls. Seed audit cleared 8253–8300 for
+training and 8401–8416 for evaluation. Primary comparison is paired native
+return against strict Lancer within each Red regime; the two-RNG study remains
+descriptive and cannot open confirmation seeds. Preregistration is
+`docs/proposals/blue-routed-hybrid-architecture-20261025.md`.
+
+Implementation: `blue/harness/routed_hybrid_actor.py`, plus `hybrid` support in
+`blue/training/architecture_compare.py` and restartable
+`blue/training/architecture_hybrid_long.sh`. A synthetic forward/backward and
+gate-capture smoke passed. The full two-RNG training/evaluation run has now
+completed: 6/6 iterations per RNG, 16 evaluation seeds in each of Discovery
+and Finite per RNG. This is twice the 8-per-regime count in the frozen proposal;
+the evaluator iterated over all 16 seeds in both regimes. No seed IDs beyond
+the audited 8401–8416 block were used. Kaggle Qwen transfer is also active at
+kernel v8 after adding the repository's CybORG path to the exact-runtime/model
+identity probe; no Qwen resume outcome is confirmed yet.
+
+Completed hybrid paired summaries (means are native-return differences):
+
+| RNG / Red | learned − Lancer | learned − untrained hybrid | median / wins for learned − untrained |
+|---|---:|---:|---:|
+| 0 / Discovery | +11.4 | +12.1 | +6.5 / 10 of 16 |
+| 1 / Discovery | +1.6 | +8.9 | +2.5 / 8 of 16 |
+| 0 / Finite | +31.6 | +14.6 | +9.5 / 10 of 16 |
+| 1 / Finite | +39.9 | +9.2 | +1.0 / 9 of 16 |
+
+Pooled across 64 seed/RNG/regime rows, learned-minus-untrained mean is +11.2,
+median +5.5, IQM +6.7, with 37/64 wins. These 64 rows are not 64 independent
+training runs: there are only two trained RNGs. Large learned-minus-Lancer
+gains include stochastic-control jackpots; e.g. Finite seed 8407 under RNG 1
+returned -543 for Lancer, -128 for untrained hybrid and -127 for learned
+hybrid. Gate capture also shows strong RNG dependence: attention-weight means
+are about 0.60 for RNG 0 and 0.08 for RNG 1, but nearly unchanged between Red
+regimes within each RNG. Thus the gate did not demonstrate a reproducible
+Discovery/Finite routing distinction. Raw reports and gate captures are in
+ignored `blue/results/architecture_hybrid_long_v1/evaluations/`.
+
+## Value-aware router follow-up plan, 2026-10-25
+
+Added proposed plan `docs/proposals/blue-value-aware-router-experiment-20261025.md`.
+It compares SetActor PPO with a categorical value-aware mixture over SetActor,
+candidate attention, and the fixed Lancer prior; it adds a branch-conditioned
+team critic and a three-head uncertainty estimate. The plan requires finishing
+the current hybrid run first, implementing and testing a separate runner,
+re-auditing candidate seeds, and treating the two-RNG screen as descriptive.
+Candidate seed blocks 8465–8480 (train) and 8417–8432 (development) currently
+pass `seed_audit --check`; re-run the audit before freezing because reservations
+can change. Primary literature is cited in the plan; uncertainty-aware routing
+is explicitly marked as a proposed adaptation, not an established CAGE4 result.
+
+The complete hybrid results above changed the sequence: before implementing the
+larger value-aware router, first isolate whether an adaptive gate helps. Compare
+SetActor, a fixed 0.5 SetActor/attention blend, and the learned state gate under
+the same PPO budget. Treat learned-minus-untrained hybrid as a required effect
+alongside learned-minus-Lancer. Inspect gate use and branch score disagreement;
+do not add a gate-balance penalty simply to force attention usage.
+
+**Superseded progress note (2026-10-25 15:31 local):** this snapshot predates
+completion of RNG 1 and the final evaluations. The completed results and actual
+16-seed-per-regime count are recorded above.
+
+## Gate utility ablation (2026-10-25, complete)
+
+The completed run is under `blue/results/architecture_gate_ablation_v1/`.
+Frozen plan and source hashes: `docs/proposals/blue-gate-ablation-experiment-20261025.md`
+and `docs/proposals/manifests/blue-gate-ablation-20261025-frozen.json`. It used
+three arms (SetActor, fixed 0.5 SetActor/attention blend, learned gate), two
+training RNGs, 6 iterations × 4 balanced 400-tick episodes per RNG, and paired
+train seeds 8465–8480 / development seeds 8417–8432. All training and
+evaluation cells completed. Focused tests passed: 6 passed in
+`test_attention_actor.py`; runner compile/syntax and `git diff --check` passed.
+
+Paired analysis: `blue/results/architecture_gate_ablation_v1/analysis.json`.
+Learned gate minus fixed blend macro mean is −11.7 native return (−14.25 for
+RNG 0, −9.13 for RNG 1); its mean difference is negative in both Red regimes
+and both training RNGs. Fixed blend minus its untrained control macro mean is
++9.8, with per-RNG macro means +9.03 and +10.56; medians are smaller, so retain
+a tail-sensitivity caveat. Fixed blend minus strict Lancer macro mean is +12.2,
+positive in both RNGs. Only two trained RNGs were evaluated, so this remains a
+descriptive screen, not confirmation of a robust RL improvement.
+
+The learned gate's episode-average attention weight was about 0.659 for RNG 0
+and 0.500 for RNG 1, nearly unchanged across Red regimes; within-episode gate
+standard deviation was about 0.001. The gate behaved almost like a
+training-seed-dependent constant. Full gate traces and branch-score
+disagreement/context were not persisted, so situation-specific routing was
+not demonstrated. Do not add a gate-balance penalty; the next step is either
+retain fixed blend as an RL lead and confirm it with more RNGs, or instrument
+branch disagreement before designing another adaptive router.
+
+The Kaggle Qwen kernel
+`souravsreekumar02/cyberally-qwen-event-time-rl-resume` reports `COMPLETE`.
+Its archive is downloaded to ignored
+`blue/results/event_time_rl/kaggle_output/qwen_eventtime_results.tar.gz` and
+extracted under `.../kaggle_output/extracted/event_time_rl/`; the archive SHA256
+matches the kernel log. Five GAE runs (`lambda=0.9`) averaged -162.8 training
+return per episode, versus -165.6 for five Monte Carlo runs (`lambda=1.0`); all
+reported 1.0 training coverage. The archive contains no held-out evaluations,
+so this is not evidence of generalization or a confirmed GAE advantage. The
+reference-KL policy screen below keeps `lambda=1.0` to isolate its policy-update
+change.
+
+## Persistent-reference policy screen (2026-10-25)
+
+Frozen protocol and exact local source hashes:
+`docs/proposals/manifests/blue-reference-kl-policy-screen-20261025-frozen.json`.
+The experiment compares existing PPO against the same fixed 0.5 SetActor /
+attention policy with an additional persistent `0.1 * KL(reference || current)`
+penalty to the frozen zero-residual Lancer-mixture distribution. Both arms keep
+the existing PPO KL stop and Lancer anchor. Training uses two RNGs, six updates
+per run, 24 balanced 400-tick episodes per RNG, and identical development
+seeds 7746–7753 across Discovery and Finite Red. The seed audit cleared
+7730–7753 immediately before freeze. This two-RNG screen is descriptive only.
+
+The implementation is in `blue/harness/learning.py`, with the run and analysis
+entry points `blue/training/policy_reference_screen.sh` and
+`blue/training/policy_reference_analysis.py`. Verified-remediation counts are
+not available from the current evaluation harness and will not be inferred from
+requested actions. Results are pending.
+
+**Execution correction:** the first local launcher used the CPU-only PyTorch
+build. It was stopped after three PPO seed-7730/7731/7732 episodes, before an
+update or checkpoint; the partial cell is marked aborted in ignored
+`blue/results/policy_reference_kl_v1/models/ppo_s0/manifest.json`. Per the
+standing GPU requirement, v2 uses a separate CUDA-enabled Python environment
+and a fresh audited block 7754–7777. Protocol and source hashes are in
+`docs/proposals/manifests/blue-reference-kl-policy-screen-gpu-v2-20261025-frozen.json`.
+The synthetic PPO GPU update and a short policy rollout passed. The GPU rerun
+is active in `blue/results/policy_reference_kl_v2_gpu/screen.log`; its first
+training episode completed on seed 7754. Initial `nvidia-smi` sample showed 8%
+GPU use and 234 MiB allocated; the CybORG simulator remains CPU-bound.
+PPO RNG 0 iteration 1 has now completed (four episodes, mean return -117.5,
+measured PPO KL 0.00223, no early stop). Critic explained variance is 0.003
+after this first update and will be monitored. Based on ~28 seconds per episode,
+the full four-cell train/evaluate sequence is estimated at about 2.25 hours.
