@@ -1,0 +1,155 @@
+{
+  "arms": [
+    "zero",
+    "risk",
+    "both"
+  ],
+  "training_rng_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "train_episode_seeds": [
+    7706,
+    7707,
+    7708,
+    7709
+  ],
+  "development_eval_seeds": [
+    8221,
+    8222,
+    8223,
+    8224,
+    8225,
+    8226,
+    8227,
+    8228,
+    8229,
+    8230,
+    8231,
+    8232,
+    8233,
+    8234,
+    8235,
+    8236,
+    8237,
+    8238,
+    8239,
+    8240,
+    8241,
+    8242,
+    8243,
+    8244,
+    8245,
+    8246,
+    8247,
+    8248,
+    8249,
+    8250,
+    8251,
+    8252
+  ],
+  "iters": 32,
+  "eps_per_iter": 4,
+  "steps": 400,
+  "reserved_final_seeds": [
+    7809,
+    8200
+  ],
+  "purpose": "Frozen development comparison, all final models; not fresh held-out evaluation",
+  "input_hashes": {
+    "scorer.pkl": "ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd",
+    "golden.npz": "6a5d8f81274f8b5a8c06b16285f00b879fab8df007a8afdfebec96e9fc20981c"
+  },
+  "max_age": 80,
+  "preflight_episode": {
+    "seed": 7706,
+    "return": -1.0,
+    "coverage": 0.7916666666666666,
+    "ticks": 39,
+    "n_actor": 0,
+    "n_forced": 195,
+    "forced_cats": {
+      "urgent": 2,
+      "verification": 96,
+      "lockout_sleep": 97,
+      "idle": 0
+    },
+    "n_decisions": 0
+  },
+  "success_criteria": {
+    "primary_arm": "both",
+    "primary_metric": "native team mean return",
+    "controls_required": [
+      "lancer",
+      "guard"
+    ],
+    "criterion": "For primary both arm, lower endpoints of paired training-seed t95 intervals versus BOTH controls must exceed zero; intersection requirement. n=5 training seeds, df=4. Evaluation episodes shared blocks.",
+    "secondary": "All other arm/control and risk-minus-zero/both-minus-risk intervals descriptive; no selecting winner after results.",
+    "reporting": "All 15 final checkpoints, every episode and tail loss. No score changes, dropped models or best-checkpoint selection.",
+    "runtime": "All arms and baselines under same frozen Python 3.11/NumPy 1.26/Torch 2.2 rebuilt-scorer profile."
+  },
+  "hidden": 64,
+  "lr": 0.0003,
+  "bonus": 0.25,
+  "temp": 0.5,
+  "ml_training_seeds": [
+    7706,
+    7707,
+    7708,
+    7709
+  ],
+  "ml_calibration_seeds": [
+    7701,
+    7702
+  ],
+  "ml_test_seeds": [
+    7703,
+    7704
+  ],
+  "source_base_commit": "243a6fd97dc29d59c7bfc677209d363412f6cc10",
+  "evaluation_note": "8221-8252 previously used development episodes; none claimed unused. Fixed Discovery Red. No fresh final/general-attacker claim.",
+  "source_repository": "https://github.com/sourav-s-b/cyberally.git",
+  "source_commit": "Pinned at packaging after publishing source; see private pilot.json",
+  "compatibility_candidate": "Python 3.11 / NumPy 1.26.4 / SciPy 1.12.0 / Torch 2.2.0; refit on unchanged original dataset",
+  "experiment": "main32",
+  "diagnostics": true,
+  "runtime_profile": "legacy-candidate",
+  "python_version": "3.11.16",
+  "baselines": [
+    "lancer",
+    "guard",
+    "sleep",
+    "random"
+  ],
+  "env_kw": {
+    "temporal_features": [
+      "ages",
+      "belief"
+    ],
+    "include_root_session": true,
+    "red_agent": "discovery"
+  },
+  "runtime_requirements_sha256": "939112817350130e08200d9840cd43b647177efb376d2871c12d1c7b58533085",
+  "runtime_versions": {
+    "numpy": "1.26.4",
+    "scipy": "1.12.0",
+    "torch": "2.2.0+cpu",
+    "scikit-learn": "1.7.2",
+    "gym": "0.26.2",
+    "gymnasium": "0.28.1",
+    "python": "3.11.16"
+  },
+  "ml_validation_test_seeds": [
+    7703,
+    7704,
+    7629,
+    7630,
+    7640,
+    7705,
+    7710,
+    7711
+  ]
+}

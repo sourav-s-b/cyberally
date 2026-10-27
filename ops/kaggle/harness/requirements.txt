@@ -1,0 +1,14 @@
+# Isolated pilot runtime; both Gym APIs are imported by pristine CybORG.
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.7.2
+torch==2.14.1
+joblib==1.5.2
+threadpoolctl==3.6.0
+gym==0.26.2
+gymnasium==0.28.1
+PyYAML==6.0.1
+pygame==2.5.2
+networkx==3.2.1
+prettytable==3.9.0
+setuptools==80.10.2

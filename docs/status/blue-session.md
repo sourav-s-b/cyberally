@@ -609,6 +609,42 @@ report lower-tail episodes and independent training seeds. No messages or review
 requests have been sent to teammates.
 
 
+
+## Architecture long-run preparation (2026-10-12)
+
+Branch `blue/kaggle-architecture-longrun`, based on the reviewed architecture
+screen commit `82632bc`. No remote run has been launched yet. The prepared
+experiment holds the MAPPO-style harness, finite Red, coverage guard, risk
+scorer, and optimizer settings fixed while comparing nine actor configurations:
+MLP 64/128/256/512, attention 128/256, GRU-128, graph-128 and its self-only
+control. MLP-512 and attention-256 add larger candidates. Training uses the
+audited, reserved-for-this-study development block 7730–7800 (71 seeds), with
+32 × 4 on-policy episodes per model and five independent training RNG shards
+(45 models; 5,760 training episodes). The separate evaluation cohort is the
+reused development block 8221–8252, explicitly not held-out evidence; the final
+block 7809–8200 remains untouched.
+
+Both greedy-diagnostic and sampled evaluation are retained. Controls include
+Lancer, coverage guard, Sleep, masked random and the untrained harness. The
+aggregate unit is the independent training RNG seed; the 32 shared evaluation
+episodes are blocked within each model and are not treated as extra training
+replicates. Each training RNG is split into three architecture-group Kaggle jobs
+(fifteen jobs total), each about 768 episodes. The previous architecture screen
+averaged 28.8 seconds per rollout (range 16.5–44.1), implying about 6.1 hours
+per job on average and 9.4 hours at the slowest measured rate, before setup.
+Kaggle packages pin
+the GitHub source commit, runtime lock, scorer and golden prediction hashes, and freeze full seed lists. Preflight stops
+before training if runtime, scorer predictions or the simulator smoke episode
+drift. Kaggle launch remains pending until the code is committed/pushed and
+private dataset/kernel upload succeeds.
+
+The full package schedules 11,520 episodes including evaluation and repeated
+controls. No result or superiority claim exists yet. Outputs/checkpoints
+must remain outside Git. Next: review smoke checks, commit/push this branch,
+prepare private Kaggle inputs, launch fifteen separate CPU shards, download all
+outputs, and aggregate with the training-seed paired intervals.
+
+
 ## Research audit (2026-10-03)
 
 Branch `blue/mappo-training` at `a6eab7e`; exact main dependency

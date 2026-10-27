@@ -1,0 +1,5 @@
+# Opt-in experiment only. Does not change Environment's shared runtime.
+# Requires the existing training environment's numpy/scipy/torch/CybORG.
+scikit-learn==1.7.2
+joblib==1.5.2
+threadpoolctl==3.6.0

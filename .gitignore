@@ -55,3 +55,7 @@ ignore-*
 
 # Local demo runner, not part of the committed harness
 /demo.sh
+
+# Symlinked ignored runtime/artifact storage in isolated worktrees.
+/.venv-train
+/blue/results

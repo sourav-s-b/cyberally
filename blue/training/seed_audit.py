@@ -176,7 +176,14 @@ def untracked_seed_files(exts):
         capture_output=True, text=True)
     files = []
     for rel in out.stdout.splitlines():
-        if not rel or any(d in rel.split("/")[0] for d in SKIP_DIRS):
+        parts = rel.split("/")
+        # Ignored experiment result folders can contain their own virtualenvs.
+        # Prune those at any depth while retaining JSON result/manifests beside
+        # them, since those files are evidence of actual seed consumption.
+        generated = {p.lower() for p in parts}
+        if (not rel or any(d.lower() in generated for d in SKIP_DIRS)
+                or "site-packages" in generated or "dist-packages" in generated
+                or any(p.lower().startswith(".venv") for p in parts)):
             continue
         if any(part in rel.split("/") for part in SKIP_PATH_PARTS):
             continue
