@@ -3008,3 +3008,13 @@ PPO RNG 0 iteration 1 has now completed (four episodes, mean return -117.5,
 measured PPO KL 0.00223, no early stop). Critic explained variance is 0.003
 after this first update and will be monitored. Based on ~28 seconds per episode,
 the full four-cell train/evaluate sequence is estimated at about 2.25 hours.
+
+Execution note for the hybrid evaluation: `architecture_compare.evaluate()`
+loops over every supplied `--eval-seeds` value under each Red regime. The long
+launcher therefore evaluates all 16 preselected seeds (8401–8416) for
+Discovery and again for Finite, rather than splitting them into 8 per regime
+as the proposal intended. This was noticed after the first 11 Discovery pairs
+had printed. No seed was added or selected based on returns; the actual run is
+more extensive (16 seeds per regime per training RNG), and reports will use
+that actual count. Treat it as an evaluation-budget deviation, not as the
+original 8-per-regime protocol.
