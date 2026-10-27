@@ -8,12 +8,14 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import os
 import subprocess
 from pathlib import Path
 
 import numpy as np
 
-from blue.core.baselines import decode_index
+from blue.core.baselines import (MaskedRandomBaseline, SleepBaseline,
+                                 decode_index)
 from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
 from blue.harness.features import BlueFeatures, NAMES, VERSION
 from blue.harness.policy import HarnessPolicy, MLRankingHook
@@ -63,19 +65,32 @@ def penalty_events(env):
     return events
 
 
-def make_policy(arm, args):
+def make_policy(arm, args, seed=0):
+    if arm == "sleep":
+        return SleepBaseline(), None
+    if arm == "masked_random":
+        return MaskedRandomBaseline(seed=seed), None
     if arm == "lancer":
         return OrderedPolicy(scorer=LancerValues(fruitless_decay=0.5)), None
     if arm == "guard":
-        return HarnessPolicy(max_age=args.max_age), None
+        return HarnessPolicy(max_age=args.max_age,
+                             candidate_audit_agent=args.candidate_audit_agent), None
     if arm == "ml":
         scorer = MLScorer(args.scorer)
         return HarnessPolicy(MLRankingHook(scorer), args.max_age), scorer.sha256
     if arm == "actor":
-        hook, manifest = load_hook(args.model_dir, args.scorer)
+        sample = args.actor_mode == "sampled"
+        sampling_seed = (args.sample_seed_base + seed * 37) if sample else None
+        hook, manifest = load_hook(args.model_dir, args.scorer,
+                                   candidate_audit_agent=args.candidate_audit_agent,
+                                   sample=sample, sample_seed=sampling_seed)
+        if sample:
+            # Include training RNG identity without using simulator randomness.
+            hook.generator.manual_seed(sampling_seed + manifest["config"]["seed"] * 100003)
         if args.max_age != manifest["config"]["max_age"] or args.steps != manifest["config"]["steps"]:
             raise ValueError("actor evaluation must use its frozen harness/horizon")
-        return HarnessPolicy(hook, args.max_age), manifest["actor_sha256"]
+        return HarnessPolicy(hook, args.max_age,
+                             candidate_audit_agent=args.candidate_audit_agent), manifest["actor_sha256"]
     if arm in ("legacy", "legacy_guard"):
         import torch as th
         from blue.training import risk_actor as ra
@@ -91,9 +106,10 @@ def make_policy(arm, args):
     raise ValueError("unknown policy arm")
 
 
-def episode(policy, seed, steps, trace_path):
+def episode(policy, seed, steps, trace_path, red_agent="discovery"):
     from blue.training.risk_data import true_compromised
-    env = CC4MARLEnv(seed=seed, steps=steps, **mg.ENV_KW)
+    from blue.training.harness_rl import env_kwargs
+    env = CC4MARLEnv(seed=seed, steps=steps, **env_kwargs(red_agent))
     env.reset(seed=seed)
     policy.reset()
     pipe = BlueFeatures()
@@ -123,6 +139,9 @@ def episode(policy, seed, steps, trace_path):
                                   "request": request,
                                   "features": ([float(x) if np.isfinite(x) else None for x in row]
                                                if row is not None else None)}
+                candidate_audit = getattr(policy, "last_candidate_audit", None)
+                if candidate_audit is not None:
+                    records[agent]["candidate_audit"] = copy.deepcopy(candidate_audit)
             _, reward, terminated, truncated, _ = env.step(actions)
             reward = float(reward[0])
             total += reward
@@ -149,10 +168,13 @@ def episode(policy, seed, steps, trace_path):
                                         "penalty_events": events}) + "\n")
             if terminated or truncated:
                 break
+    n_hosts = sum(len(env.hostnames[a]) for a in BLUE_AGENTS)
     result = {"return": total, "ticks": env._tick, "repair_requests": repairs,
+              "coverage": len(analyses) / max(n_hosts, 1),
               "max_analyses_one_host": max(analyses.values(), default=0),
               "completed_ages": {a: completed_investigation_age_summary(env, a) for a in BLUE_AGENTS},
-              "guard": policy.guard_stats(), "blue_trace": str(trace_path),
+              "guard": getattr(policy, "guard_stats", lambda: {})(),
+              "blue_trace": str(trace_path),
               "privileged_diagnostic": str(privileged_path)}
     env.close()
     return result
@@ -161,26 +183,54 @@ def episode(policy, seed, steps, trace_path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seeds", type=int, nargs="+", default=[8241, 8229])
-    ap.add_argument("--arms", nargs="+", choices=("lancer", "guard", "ml", "legacy", "legacy_guard", "actor"),
+    ap.add_argument("--arms", nargs="+", choices=("lancer", "sleep", "masked_random", "guard", "ml", "legacy", "legacy_guard", "actor"),
                     default=["lancer", "legacy", "legacy_guard", "ml"])
     ap.add_argument("--steps", type=int, default=400)
     ap.add_argument("--max-age", type=float, default=80)
     ap.add_argument("--scorer", default="blue/results/gpt_harness/scorer.pkl")
     ap.add_argument("--legacy-model", default="blue/results/ablation_risk/real_s0")
     ap.add_argument("--model-dir", default=None)
+    ap.add_argument("--actor-mode", choices=("greedy", "sampled"), default="greedy")
+    ap.add_argument("--sample-seed-base", type=int, default=900000)
+    ap.add_argument("--candidate-audit-agent", choices=BLUE_AGENTS, default=None,
+                    help="record Blue-visible sweep candidate scores and counterfactual ranks for one agent")
     ap.add_argument("--out", default="blue/results/gpt_harness/diagnostic")
+    ap.add_argument("--read-only-lancer-cache", action="store_true",
+                    help="never write the shared Lancer baseline; fail if a "
+                         "seed is missing. Use for concurrent model jobs so "
+                         "only the dedicated lancer step writes it.")
+    ap.add_argument("--lancer-cache", default=None,
+                    help="shared Lancer baseline cache, keyed by attacker "
+                         "and seed list. Reuse is refused if the requested "
+                         "configuration differs from the cached one.")
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="evaluation attacker. Scoring under 'finite' is "
+                         "the discriminative readout; 'discovery' reproduces "
+                         "the historical main32 cells")
     args = ap.parse_args()
+    if args.actor_mode == "sampled" and any(a != "actor" for a in args.arms):
+        raise SystemExit("sampled actor mode requires only the actor arm")
+    if args.candidate_audit_agent and any(a not in ("actor", "guard") for a in args.arms):
+        raise SystemExit("candidate audit is supported only for actor and guard arms")
     check_seeds(args.seeds)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     if (out / "report.json").exists() or (out / "frozen_config.json").exists():
         raise FileExistsError("use a new evaluation directory")
-    report = {"version": VERSION, "config": vars(args), "env_kw": mg.ENV_KW,
+    from blue.training.harness_rl import env_kwargs
+    report = {"version": VERSION, "config": vars(args),
+              "env_kw": env_kwargs(args.red_agent),
+              "red_agent": args.red_agent,
+              "reward": "native only; state shaping is training-only and is "
+                        "never imported or applied here",
               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
               "claim": "diagnostic mechanism check; no held-out performance claim", "cells": {}}
     report["source_files"] = {str(p): sha256(p) for p in [
         Path(__file__), *sorted(Path("blue/harness").glob("*.py")),
-        Path("blue/training/harness_rl.py"), Path("blue/core/wrapper.py"),
+        Path("blue/training/harness_rl.py"),
+        Path("blue/training/harness_anchor.py"), Path("blue/core/wrapper.py"),
         Path("blue/policies/ordered.py")]}
     report["artifacts_before_run"] = {}
     if any(a in args.arms for a in ("legacy", "legacy_guard")):
@@ -191,11 +241,58 @@ def main():
     if "actor" in args.arms:
         report["artifacts_before_run"][args.model_dir + "/actor.th"] = sha256(Path(args.model_dir) / "actor.th")
     (out / "frozen_config.json").write_text(json.dumps(report, indent=2) + "\n")
+    # The Lancer baseline is deterministic and identical for every model, so
+    # recomputing it per model would burn 24 episodes x N models for nothing.
+    # The cache is keyed by attacker and seed list, and is refused if the
+    # requested configuration does not match what produced it.
+    lancer_cache = {}
+    if args.lancer_cache and args.read_only_lancer_cache \
+            and not Path(args.lancer_cache).exists():
+        raise SystemExit(
+            "Lancer baseline %s does not exist. Compute it first "
+            "(scripts/blue_state_shaping_run.sh lancer <attacker>); a model "
+            "job must never be the writer of the shared baseline."
+            % args.lancer_cache)
+    if args.lancer_cache:
+        cache_path = Path(args.lancer_cache)
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text())
+            key = {"red_agent": args.red_agent, "steps": args.steps,
+                   "seeds": sorted(args.seeds)}
+            if cached.get("key") != key:
+                raise SystemExit(
+                    "lancer cache was produced under a different "
+                    "configuration: %s != %s" % (cached.get("key"), key))
+            lancer_cache = cached["returns"]
+            print(f"lancer: reusing {len(lancer_cache)} cached episodes from "
+                  f"{cache_path}", flush=True)
+
     for arm in args.arms:
         for seed in args.seeds:
-            policy, artifact = make_policy(arm, args)
-            result = episode(policy, seed, args.steps, out / f"{arm}_{seed}.jsonl")
-            result["artifact_sha256"] = artifact
+            if arm == "lancer" and str(seed) in lancer_cache:
+                result = lancer_cache[str(seed)]
+            else:
+                policy, artifact = make_policy(arm, args, seed=seed)
+                result = episode(policy, seed, args.steps,
+                                 out / f"{arm}_{seed}.jsonl",
+                                 red_agent=args.red_agent)
+                result["artifact_sha256"] = artifact
+                if arm == "lancer" and args.lancer_cache:
+                    if args.read_only_lancer_cache:
+                        raise SystemExit(
+                            "lancer cache is read-only and missing seed %s; "
+                            "recompute the baseline instead of writing it "
+                            "from a concurrent model job" % seed)
+                    lancer_cache[str(seed)] = result
+                    # Write atomically: a partially written baseline would be
+                    # silently paired against every model that reads it.
+                    tmp = cache_path.with_suffix(".tmp")
+                    tmp.write_text(json.dumps(
+                        {"key": {"red_agent": args.red_agent,
+                                 "steps": args.steps,
+                                 "seeds": sorted(args.seeds)},
+                         "returns": lancer_cache}, indent=1) + "\n")
+                    os.replace(tmp, cache_path)
             report["cells"].setdefault(arm, {})[str(seed)] = result
             (out / "progress.json").write_text(json.dumps(report, indent=2) + "\n")
             print(f"arm={arm} seed={seed} return={result['return']:+.0f}", flush=True)

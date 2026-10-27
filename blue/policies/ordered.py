@@ -239,6 +239,7 @@ class OrderedPolicy:
 
     def __init__(self, scorer=None, order_fn=None, guard=False, max_age=None,
                  guard_log_limit=200000, record_decisions=False,
+                 record_choices=False,
                  no_restore_escalation=False, no_verify=False):
         self.scorer = scorer
         self.order_fn = order_fn
@@ -251,6 +252,9 @@ class OrderedPolicy:
         self.age_guard = (MaxAgeGuard(max_age, log_limit=guard_log_limit)
                           if self.guard_mode == GUARD_MAX_AGE else None)
         self.record_decisions = bool(record_decisions)
+        # Choice-set logging is cheaper than retaining all candidate scores.
+        # It is opt-in because it is intended for bounded diagnostics only.
+        self.record_choices = bool(record_choices)
         # Response-rule variants for headroom probes. Both default off,
         # which preserves historical behavior exactly (parity tests cover
         # the defaults). no_restore_escalation: CONFIRMED hosts always get
@@ -302,29 +306,59 @@ class OrderedPolicy:
                 if _legal(mask, env, agent, h, "Analyse")]
 
     def _record(self, env, agent, branch, cands, pick, guard_record=None,
-                scores=None, hook_pick=None):
+                scores=None, hook_pick=None, eligible_hosts=None):
         full = self.record_decisions
+        choice_hosts = cands if eligible_hosts is None else eligible_hosts
+        rule = {
+            "sweep_max_age": "oldest_overdue_age_then_hostname",
+            "sweep_hook": "configured_hook_over_eligible_candidates",
+            "sweep_scorer": "highest_score_then_hostname",
+            "order_fn": "configured_order_provider",
+            "parity_cursor": "round_robin_cursor",
+        }.get(branch, branch)
         self.last_decision = {
             "tick": env._tick, "agent": agent, "branch": branch,
             "n_cands": len(cands), "pick": pick,
+            "selected_action": "Analyse", "selected_host": pick,
+            "selection_rule": rule,
             "guard_record": guard_record,
             "guard_eligible": (guard_record["n_overdue"] if guard_record
                                else 0),
             "hook_pick": hook_pick,
             "truncated": not full,
             "cands": list(cands) if full else None,
+            "eligible_choices": ([{"action": "Analyse", "host": h}
+                                  for h in choice_hosts]
+                                 if self.record_choices else None),
             "scores": (None if scores is None or not full
                        else [(float(s), h) for s, h in scores]),
         }
         return pick
 
     def _finish(self, env, agent, pick, branch, cands, guard_record=None,
-                scores=None, hook_pick=None):
+                scores=None, hook_pick=None, eligible_hosts=None):
         if pick is None:
             return 0
         self._record(env, agent, branch, cands, pick, guard_record, scores,
-                     hook_pick)
+                     hook_pick, eligible_hosts)
         return action_index(env, agent, pick, "Analyse")
+
+    def _record_rule_choice(self, env, agent, branch, choices, action, host,
+                            rule):
+        """Record an urgent rule's Blue-visible candidate set, if requested.
+
+        This is diagnostic metadata only. ``choices`` are rule candidates
+        that pass the simulator-valid action mask; they do not imply that the
+        deployed rule ranks them as interchangeable.
+        """
+        if not self.record_choices:
+            return
+        self.last_decision = {
+            "tick": env._tick, "agent": agent, "branch": branch,
+            "selected_action": action, "selected_host": host,
+            "eligible_choices": choices, "selection_rule": rule,
+            "truncated": False, "guard_record": None,
+        }
 
     def _defer(self, env, agent, mask):
         """An urgent rule took the decision; if the max-age guard has
@@ -336,6 +370,7 @@ class OrderedPolicy:
                                                                  mask))
 
     def select(self, env, agent):
+        self.last_decision = None
         tick = getattr(env, "_tick", None)
         if tick is not None:
             if tick < self._tick_seen.get(agent, -1):
@@ -344,11 +379,39 @@ class OrderedPolicy:
         idx = wrapper.BLUE_AGENTS.index(agent)
         mask = env.get_avail_agent_actions(idx)
         if int(mask.sum()) <= 1:
+            if self.record_choices:
+                self.last_decision = {
+                    "tick": env._tick, "agent": agent,
+                    "branch": "pending_wait" if agent in env._awaiting
+                    else "no_action", "selected_action": "Sleep",
+                    "selected_host": None, "eligible_choices": [],
+                    "selection_rule": "only_one_simulator_action_legal",
+                    "truncated": False, "guard_record": None,
+                }
             return 0
         tracker = env.trackers[agent]
         hosts = env.hostnames[agent]
 
         # Rule 1+3: remediate CONFIRMED, escalate on re-detection.
+        remediation_choices = []
+        if self.record_choices:
+            for candidate_host in hosts:
+                if tracker.state.get(candidate_host) != "CONFIRMED":
+                    continue
+                for candidate_action in ("Remove", "Restore"):
+                    if _legal(mask, env, agent, candidate_host,
+                              candidate_action):
+                        remediation_choices.append({
+                            "action": candidate_action,
+                            "host": candidate_host,
+                            "redetected_after_remediation": bool(
+                                tracker.last_analysis.get(candidate_host)
+                                is not None
+                                and tracker.last_remediation.get(candidate_host)
+                                is not None
+                                and tracker.last_analysis[candidate_host]
+                                > tracker.last_remediation[candidate_host]),
+                        })
         for host in hosts:
             if tracker.state.get(host) != "CONFIRMED":
                 continue
@@ -359,12 +422,24 @@ class OrderedPolicy:
             if (re_detected and not self.no_restore_escalation
                     and _legal(mask, env, agent, host, "Restore")):
                 self._defer(env, agent, mask)
+                self._record_rule_choice(
+                    env, agent, "remediation", remediation_choices,
+                    "Restore", host,
+                    "first_confirmed_host; Restore after re-detection")
                 return action_index(env, agent, host, "Restore")
             if _legal(mask, env, agent, host, "Remove"):
                 self._defer(env, agent, mask)
+                self._record_rule_choice(
+                    env, agent, "remediation", remediation_choices,
+                    "Remove", host,
+                    "first confirmed host; Remove when legal")
                 return action_index(env, agent, host, "Remove")
             if _legal(mask, env, agent, host, "Restore"):
                 self._defer(env, agent, mask)
+                self._record_rule_choice(
+                    env, agent, "remediation", remediation_choices,
+                    "Restore", host,
+                    "first confirmed host; Restore fallback")
                 return action_index(env, agent, host, "Restore")
 
         # Rule 2: verify oldest-remediated first (skipped by no_verify).
@@ -375,6 +450,13 @@ class OrderedPolicy:
             host = min(verify,
                        key=lambda h: tracker.last_remediation.get(h) or 0)
             self._defer(env, agent, mask)
+            self._record_rule_choice(
+                env, agent, "verification",
+                [{"action": "Analyse", "host": h,
+                  "last_remediation": tracker.last_remediation.get(h)}
+                 for h in verify],
+                "Analyse", host,
+                "oldest remediated VERIFY host first")
             return action_index(env, agent, host, "Analyse")
 
         # Sweep (guarded or reference).
@@ -395,7 +477,11 @@ class OrderedPolicy:
                 pick, guard_record = self.age_guard.pick(env, agent, cands)
                 if pick is not None:
                     return self._finish(env, agent, pick, "sweep_max_age",
-                                        cands, guard_record=guard_record)
+                                        cands, guard_record=guard_record,
+                                        eligible_hosts=[h for h in cands
+                                            if self.age_guard.age_of(
+                                                env, agent, h)
+                                            > self.age_guard.threshold])
             return self._finish(env, agent,
                                 self._parity_pick(env, agent, cands),
                                 "parity_cursor", cands)
@@ -413,7 +499,10 @@ class OrderedPolicy:
                     env, agent, pick, "sweep_max_age", cands,
                     guard_record=guard_record,
                     scores=([(score_fn(env, agent, h), h) for h in cands]
-                            if self.record_decisions else None))
+                            if self.record_decisions else None),
+                    eligible_hosts=[h for h in cands
+                                    if self.age_guard.age_of(env, agent, h)
+                                    > self.age_guard.threshold])
         if self.hook is not None:
             scored = [(score_fn(env, agent, h), h) for h in cands]
             pick = self.scheduler.pick(

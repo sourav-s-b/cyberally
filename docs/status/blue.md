@@ -1,5 +1,68 @@
 # Blue program summary (general index)
 
+## Fresh 24-seed LLM-Red block, 2026-10-13
+
+Branch `blue/llmred-fresh24`, off `opencode/blue-diagnosis` at `de37afe`.
+Completed an evaluation that had crashed at 43/48 episodes; added resume
+support and finished it. Lancer vs the coverage-guarded actor on seeds
+7641-7664, paired, 400 steps, pinned `llama3.1:8b` digest:
+
+| contrast | mean | 95% CI (df=23) | seeds won |
+|---|---:|---|---:|
+| actor_guard - Lancer | +120.6 | [+1.4, +239.8] | 16/24 |
+
+Suggestive, not settled: one checkpoint, one training seed, lower bound
+barely clear of zero. On this block the two arms remediate and confirm at
+the same rate, so the earlier "guard raises remediation 39 -> 67" mechanism
+does not reproduce at 24 seeds.
+
+**Caveat that must travel with this number.** Rows 0-42 of the underlying
+run were produced by an uncommitted working-tree variant of
+`llmred_eval.py` that existed only in the `cyberally-opencode` worktree and
+was lost when that worktree was removed. Those rows carry a `recovered_from`
+field present in no committed version. Rows 43-47 were produced by committed
+code at `de37afe`. A clean 48-episode re-run is the only way to retire this.
+Details and hashes in
+[`blue-llmred-evaluation.md`](blue-llmred-evaluation.md).
+
+Next Blue task: retrain with the coverage guard active **during training**.
+`blue/training/risk_actor.py` hardcodes `guard=False` in the training policy
+while honouring `--sweep-guard` only at evaluation, so every checkpoint so far
+was trained in the regime the LLM-Red work identified as invalid. Retrain
+under finite Red first, on a fresh seed block, with the training seed as the
+unit of inference.
+
+## Hierarchical specialist C0 audit (2026-10-18)
+
+Working branch: `blue/finite-red-check`, current base/deliverable commit before
+this audit: `c8ecf3c` (`blue: complete finite Red specialist evaluation`). The
+read-only C0 trace audit is documented in
+[`blue-specialist-c0-audit-20261018.md`](../research/blue-specialist-c0-audit-20261018.md)
+and summarized in the [follow-up execution card](../research/blue-followup-execution-card.md).
+The audited artifacts record source commit
+`2f44db117d98791103fd99329005f7d56f84ffe9` and contain six fixed models × 24
+finite-Red development episodes (seeds 7665–7688). They show no coverage gap;
+verification often leaves Blue belief unresolved, but do not establish a
+mistake or supply eligible alternatives for recovery/verification decisions.
+No second specialist was selected and no training/evaluation was launched.
+
+Follow-up prep: structured seed audit found 8285–8300 unused and outside
+declared protected blocks. Smoke-only prefixes on 8285–8286 are excluded; the
+frozen collection uses 8287–8300 (14 full episodes). The development-only screen and exact criteria are
+frozen in `blue/configs/specialist-c0-audit-20261018.json`. Added opt-in
+candidate-choice metadata to `OrderedPolicy` and a no-label collector at
+`blue.training.harness_specialist_c0`; it records proposals, legal masks,
+eligible choices, Blue-visible features, completions, next features, rewards,
+and episode boundaries. No privileged state enters the collector.
+
+Validation: initial C0 evidence pass used six frozen reports and 144 actor
+traces; privileged companions were excluded. Collector plan and 35-tick finite
+Red smoke passed in `.venv-train`; `test_max_age_guard.py`: 32 passed;
+specialist-screen and ordered-parity tests: 5 passed. The 14-episode collection
+on 8287–8300 is not yet launched. Next: freeze these source changes on
+`blue/finite-red-check`, run the bounded collector, then apply the predeclared
+screen. Do not train from a signal alone.
+
 ## Next session: read `blue-handoff-20261004.md` first
 
 [`blue-handoff-20261004.md`](blue-handoff-20261004.md) is the authoritative
@@ -149,34 +212,17 @@ untouched — `8301-8400`, `8401+` and `8501+` stay clear.
 - Suites: sim 112 passed / 7 skipped; train 22+ passed. No privileged state
   in any actor/mask/scorer (audited); native reward is the only score.
 
-## Fresh 24-seed LLM-Red block, 2026-10-13
+## Mixed Finite/Discovery investigator PPO (2026-10-25)
 
-Branch `blue/llmred-fresh24`, off `opencode/blue-diagnosis` at `de37afe`.
-Completed an evaluation that had crashed at 43/48 episodes; added resume
-support and finished it. Lancer vs the coverage-guarded actor on seeds
-7641-7664, paired, 400 steps, pinned `llama3.1:8b` digest:
-
-| contrast | mean | 95% CI (df=23) | seeds won |
-|---|---:|---|---:|
-| actor_guard - Lancer | +120.6 | [+1.4, +239.8] | 16/24 |
-
-Suggestive, not settled: one checkpoint, one training seed, lower bound
-barely clear of zero. On this block the two arms remediate and confirm at
-the same rate, so the earlier "guard raises remediation 39 -> 67" mechanism
-does not reproduce at 24 seeds.
-
-**Caveat that must travel with this number.** Rows 0-42 of the underlying
-run were produced by an uncommitted working-tree variant of
-`llmred_eval.py` that existed only in the `cyberally-opencode` worktree and
-was lost when that worktree was removed. Those rows carry a `recovered_from`
-field present in no committed version. Rows 43-47 were produced by committed
-code at `de37afe`. A clean 48-episode re-run is the only way to retire this.
-Details and hashes in
-[`blue-llmred-evaluation.md`](blue-llmred-evaluation.md).
-
-Next Blue task: retrain with the coverage guard active **during training**.
-`blue/training/risk_actor.py` hardcodes `guard=False` in the training policy
-while honouring `--sweep-guard` only at evaluation, so every checkpoint so far
-was trained in the regime the LLM-Red work identified as invalid. Retrain
-under finite Red first, on a fresh seed block, with the training seed as the
-unit of inference.
+C0 completed on 14 Finite episodes with zero qualifying coverage, recovery, or
+verification failures. No second specialist is justified by that screen. The
+next frozen experiment keeps the coordinator's response, verification,
+coverage, and safety rules fixed and trains only the investigation hook using
+fresh PPO episodes balanced between Finite and Discovery; Red identity is not
+an actor input. Configuration and source hashes are in
+`blue/configs/mixed-red-investigator-ppo-20261025.json`; the paired evaluation
+and gate are in `scripts/blue_mixed_red_investigator_eval.sh` and
+`blue.training.harness_mixed_red_analysis`. Train seeds 7600–7612 and eval
+seeds 7641–7656 were both reported free by `seed_audit` immediately before the
+freeze. Training started from freeze commit `04f48ea32b6564271fa274b89b78b5b80c106af7`. Paused by user after model RNG seed 0 checkpointed iteration 7/8. The process was interrupted during iteration 8 after three episodes; that incomplete iteration will replay on resume. A `snapshot.json` pins the original freeze commit so source validation accepts the checkpoint. The detached launcher is `scripts/blue_mixed_red_investigator_train.sh`; resume with the same launcher, which detects the incomplete manifest and passes `--resume`. Seeds 1–4 remain unstarted. Evaluation is prepared but waits until training finishes. Checkpoints and logs remain ignored under
+`blue/results/mixed_red_investigator_ppo_20261025/`.

@@ -301,3 +301,197 @@ dependency is cdd17647fc6f72cd374801ccf3a05ea379e63749; origin main
 01140fe inspected but not merged. Known risks:reused suites, few calibration
 episodes, bundled design changes, discount/native objective mismatch and
 stochastic exploration ceiling; no deployment or performance claim.
+
+## Finite-Red native-reward gate, 2026-10-15
+
+Six finite-Red models (training RNG seeds 0-5; 32 iterations x 4 rollouts)
+completed under native reward with shaping off. Lancer, Sleep and masked-random
+controls and all actors were evaluated on the shared 24-seed block 7665-7688.
+All manifests, actor/config/scorer metadata and paired report seed lists were
+checked. The source digests were verified against the temporary run source tree
+before it was removed.
+
+Mean actor-minus-Lancer native return by training seed: -45.42, -13.96,
+-10.08, -22.13, -25.17, -68.96. The six-seed mean is -30.95; the training-seed
+95% t interval is [-54.37, -7.54], entirely below zero. This exploratory
+cohort underperforms Lancer on this fixed evaluation block. Do not claim an RL
+improvement or proceed to LLM Red on this evidence. Full episode returns,
+paired differences and tail losses are in ignored
+`blue/results/finite_red_native/analysis.json`; the earlier three-seed result
+is preserved in `analysis_3_seed.json`.
+
+Implementation is on isolated branch `blue/finite-red-check`, based on
+`2f44db1`; 12 focused tests pass, including a real child-process concurrency
+bound and resume drift checks. The original `gpt-blue` worktree and the current
+checkout's dirty research files were preserved. The exact temporary source
+snapshot used for training was removed between sessions; restored implementation
+files in this branch are reviewable but have different source hashes, so this
+branch is not represented as a byte-for-byte reproduction of the six models.
+The initial finite-Red gap diagnosis is recorded below. No commit or push made;
+no teammate notified.
+
+Finite-Red gap diagnosis (2026-10-15): added an ignored same-seed guard-only
+control on all 24 evaluation seeds. Guard-only mean return was -150.21 versus
+Lancer -151.79; the age-80 guard alone does not explain the learned actors'
+loss. Actor-minus-guard mean paired difference across six training seeds was
+-32.53 (training-seed 95% t interval [-55.95, -9.12]). The main associated
+penalty difference was Green Local Work failure, -22.33 native points/episode;
+host exposure was similar. The excess LWF was concentrated in mission phase 1
+(-16.35 points/episode). This is descriptive, not a causal attribution.
+The diagnostic report is
+[`finite-red-native-gap-diagnosis-20261015.md`](../research/finite-red-native-gap-diagnosis-20261015.md);
+reproduction code is `blue.training.harness_finite_diagnose`. Guard traces and
+summary JSON are ignored under `blue/results/finite_red_native_diagnosis/`.
+The control used the restored source at base `2f44db1`: wrapper, policy and
+ordered-policy hashes match the actor reports, while evaluator/training hashes
+do not. The original temporary training source remains unavailable, so the
+comparison is not byte-exact. Follow-up joined phase-1 LWF events to subnet and
+same-host Blue actions: Operational Zone A accounts for -13.06 points/episode
+actor-minus-guard. There were 2.51 such LWF events/episode for actors vs 1.21
+for guard-only; 1.75 actor events/episode followed an `Analyse / UNKNOWN` more
+than 20 ticks earlier (guard-only: 0.88). This association does not establish
+cause. No new training was launched. Next: review the candidate audit below,
+then freeze a matched follow-up protocol before another cohort.
+
+## Candidate-choice audit complete, 2026-10-15
+
+Added opt-in Blue-visible candidate instrumentation to `HarnessPolicy` and the
+actor hook, plus `blue.training.harness_finite_candidate_audit` for a separate
+post-hoc join to privileged event traces. Replayed the six frozen actors on
+seeds 7665-7688. All 144 returns match their stored reports exactly; all
+Blue-agent action/host decisions match across 57,456 ticks. Mean Lancer rank of
+the actor's selected candidate was 6.93 across actor-ranked decisions, and the
+actor disagreed with Lancer 86.2% of the time. For phase-1 Operational Zone A
+LWF events, the actor's latest candidate pick was the event host 23/362 times,
+while Lancer's same-state candidate pick was that host 55/362 times. The
+direction varies by training seed, and divergent trajectories prevent causal
+attribution. Full counts and limits are in
+[`finite-red-native-gap-diagnosis-20261015.md`](../research/finite-red-native-gap-diagnosis-20261015.md);
+ignored candidate reports/traces and `summary.json` are under
+`blue/results/finite_red_candidate_audit/`.
+
+Validation: one-seed smoke retained s0 seed-7665 return (-101); `py_compile`
+and `git diff --check` passed; complete action-trace comparison found zero
+mismatches. No training or commit/push. Current branch: `blue/finite-red-check`
+at base `2f44db1`. Next concrete task: review the candidate audit and decide
+whether to preregister a finite-Red follow-up with a specific residual-control
+change; the existing learner still fails the Lancer gate, so LLM Red remains
+deferred.
+
+## Bounded anchored PPO pilot, 2026-10-15
+
+Completed the approved three-seed, eight-iteration finite-Red development pilot
+on native reward, comparing current residual PPO with a Lancer-anchored
+categorical PPO actor. Both arms trained from fresh rollouts on seeds 7706–7709;
+all six manifests are complete. Fresh Lancer and guard-only controls and all
+12 model/mode reports completed on the matched 24-seed evaluation block
+7665–7688. The exact source snapshot, model/scorer hashes, configs, source
+hashes, report modes and seed lists passed read-only validation. The pilot
+implementation and ignored artifacts are on this isolated branch; no original
+`gpt-blue` or unrelated dirty files were overwritten.
+
+Anchored greedy matched guard-only in all 72 paired episodes and at every Blue
+action/host decision across 28,728 ticks. Its mean native return was −150.21,
+versus Lancer −151.79 and current residual greedy −175.71, −169.04, −211.12
+by training seed. The anchored arm improves on the current residual arm's poor
+greedy outcome but contributes **zero** improvement over guard-only. Anchored
+sampled means were −166.29, −159.08, −157.79, all below Lancer. The frozen
+analysis marks `recommend_confirmation: false`; no RL superiority claim or
+LLM-Red progression is warranted. See
+[`finite-red-anchor-pilot-20261015.md`](../research/finite-red-anchor-pilot-20261015.md)
+for protocol, paired differences, tails and limitations. The evaluation block
+was used before, so these are development results rather than held-out proof.
+
+Validation run: 14 focused tests passed (anchor, resume, worker pool and
+privilege-access behavior), zero-head real-simulator preflight passed 20
+episodes, six train runs and 14 evaluation/control reports completed, frozen
+analysis and an independent
+artifact audit passed, and all 72 greedy anchored action traces matched guard.
+No commit, push, remote experiment, or teammate notification. Current branch:
+`blue/finite-red-check` at `2f44db1`. Next concrete task: audit saved candidate
+logit margins and actor corrections, then preregister one controlled-deviation
+policy change and test it on fresh finite-Red evaluation seeds; keep LLM Red
+deferred.
+
+## Non-PPO method review, 2026-10-15
+
+Reviewed the local A2C/JSRL redesign notes, algorithm shortlist and prior
+experiments, then checked primary sources. Recommended screening synchronous
+A2C with a JSRL-style Lancer guide-prefix curriculum: this changes the update
+rule and how the learner reaches states, while avoiding the fixed per-action
+0.9 anchor that froze greedy behavior in the latest pilot. The existing A2C
+path is opt-in, but its earlier two-iteration/two-episode check matched the
+untrained control and is not evidence of improvement. Discrete SAC remains a
+later candidate because the decision-hook replay needs a verified next
+candidate/mask and pending-action reward contract. No training launched. See
+[`non-ppo-jsrl-a2c-option-20261015.md`](../research/non-ppo-jsrl-a2c-option-20261015.md)
+for sources and a bounded screen protocol. Current branch `blue/finite-red-check`
+at `2f44db1`; next task, if approved by the work plan, is a frozen A2C versus
+guide-A2C development screen on verified fresh finite-Red seeds.
+
+## Finite-Red A2C / guide-prefix screen, 2026-10-15
+
+Completed the v2 frozen screen: three training RNG seeds each for plain A2C
+and guide-prefix A2C, finite Red, native reward, eight iterations, and a shared
+fresh evaluation block of 32 seeds. Shared Lancer, guard-only, Sleep and
+masked-random controls are complete. The paired training-seed 95% intervals
+overlap zero for every model-versus-Lancer/guard comparison and for guide-prefix
+versus plain A2C. Guide-prefix A2C is near Lancer on greedy mean (-0.30 paired
+difference), but the interval is [-25.36, 24.76]; this does not establish a
+win. `recommend_confirmation` is false. Do not advance to LLM Red on this
+evidence; add finite-Red training seeds before any superiority claim.
+
+All six manifests/configs and source hashes, model artifact hashes and matched
+32-seed report lists passed audit. The analyzer also validated baseline/model
+seed alignment. Full estimates and tails are in
+[`non-ppo-jsrl-a2c-option-20261015.md`](../research/non-ppo-jsrl-a2c-option-20261015.md)
+and ignored run artifacts under `blue/results/finite_red_jsrl_a2c_screen_v2/`.
+The earlier partial v1 output remains preserved and excluded. No further
+training was started. Current branch `blue/finite-red-check` at `2f44db1`;
+next task is a fresh finite-Red cohort with additional training RNG seeds,
+then reevaluate the same decision gate before considering LLM Red.
+
+## Finite-Red one-decision intervention diagnostic, 2026-10-15
+
+Added `blue.training.harness_finite_intervention` to mine a frozen set of 20
+actor/Lancer disagreements from the existing Blue-visible candidate audits and
+compare (a) Lancer with one legal actor-selected alternative and (b) the actor
+with one Lancer-choice substitution. Paired controls are cached by policy,
+model and episode seed. The runner rejects used or declared-reserved evaluation
+seeds, checks that paired action histories match through the target decision,
+and reports reach/change status, native-return differences, tails and coverage.
+Privileged event traces remain evaluator-only and are not read by the miner or
+intervention policy.
+
+Focused tests passed (5/5); the real-simulator one-target smoke used the fresh
+development seeds 7689-7693. Both intervention types changed the selected
+choice on all five seeds and every paired trace matched through the target.
+For this single target, Lancer-side mean return difference was 0.0; actor-side
+Lancer substitution averaged +33.6 with a wide 95% interval [-35.7, 102.9].
+Treat this as runner validation only. The 20-target panel was not run; the
+smoke block is now consumed. The intervention, ordered-policy parity and
+harness checks passed 20 tests total. The 20-target panel is now running on
+the audited fresh block 7694-7698 under
+`blue/results/finite_red_intervention_panel_v1/`; the first target's
+Lancer-side pair completed, and its actor-correction pair is next. Work is
+uncommitted on `blue/finite-red-check` at `2f44db1`; unrelated dirty files were
+preserved.
+
+## Guide-prefix A2C tick-0 behavior replay, 2026-10-18
+
+Replayed only the reset-state decision for `blue_agent_1` from all three
+completed guide-prefix A2C checkpoints on the already-used screen block
+9001-9032. Greedy actor choice disagreed with the Lancer-ranked choice on all
+96 model/seed rows: each actor chose the operational-zone router 32/32 times;
+Lancer chose a user host on every row. This confirms that the tick-0
+router-vs-user gap seen in the native residual candidate audit is still
+present in guide-prefix A2C. No environment step, reward, or privileged state
+was read; this is a behavior-only replay on an existing evaluation block, not
+a new performance result. The report, source/model/scorer hashes and per-row
+choices are in the ignored artifact
+`blue/results/finite_red_guide_prefix_tick0_replay_20261018/report.json`.
+The initial replay seed passed the frozen model checks after setting Torch
+threads to the recorded value (1); all three actor manifests and hashes
+validated. No model training or full-episode evaluation was run. DAgger is
+therefore still a plausible next experiment only for improving Lancer-like
+behavior/parity; this trace gives no evidence it would beat Lancer.

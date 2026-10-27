@@ -1,0 +1,119 @@
+{
+  "study_id": "mixed-red-investigator-ppo-20261025",
+  "status": "frozen-before-training",
+  "question": "Does anchored PPO fine-tuning of the Lancer investigation hook improve the age-80 scripted coordinator under a balanced Finite/Discovery training mix?",
+  "policy": {
+    "learned_component": "investigation host ranking only",
+    "method": "anchored-categorical-v1 PPO residual",
+    "initial_greedy_policy": "exact Lancer tie at zero residual",
+    "fixed_components": [
+      "urgent Remove/Restore rules",
+      "verification rule",
+      "age-80 guard",
+      "simulator validity mask",
+      "pending-action safety and fallback"
+    ],
+    "red_identity_in_actor": false,
+    "state_shaping": "off",
+    "transition_replay": false
+  },
+  "training": {
+    "red_agents": [
+      "finite",
+      "discovery"
+    ],
+    "sampling": "balanced per PPO iteration, shuffled by a separate deterministic RNG",
+    "episodes_per_iteration": 4,
+    "episodes_per_red_per_iteration": 2,
+    "iterations": 8,
+    "steps": 400,
+    "train_environment_seeds": [
+      7600,
+      7601,
+      7602,
+      7603,
+      7604,
+      7605,
+      7606,
+      7607,
+      7608,
+      7609,
+      7610,
+      7611,
+      7612
+    ],
+    "model_rng_seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "hidden": 64,
+    "learning_rate": 0.0003,
+    "reference_mass": 0.9,
+    "reference_temperature": 0.5,
+    "reference_kl_coefficient": 0.05,
+    "max_update_kl": 0.02,
+    "max_age": 80,
+    "ml_inputs": "both"
+  },
+  "evaluation": {
+    "red_agents": [
+      "finite",
+      "discovery"
+    ],
+    "environment_seeds": [
+      7641,
+      7642,
+      7643,
+      7644,
+      7645,
+      7646,
+      7647,
+      7648,
+      7649,
+      7650,
+      7651,
+      7652,
+      7653,
+      7654,
+      7655,
+      7656
+    ],
+    "arms": [
+      "trained_investigator_age80",
+      "age80_coordinator",
+      "lancer"
+    ],
+    "primary_contrast": "trained investigator minus age-80 coordinator, separately by Red and equal-weight pooled across Finite and Discovery",
+    "secondary_contrast": "trained investigator minus Lancer"
+  },
+  "success_gate": {
+    "pooled_mean_gain_minimum": 5.0,
+    "pooled_paired_95_percent_interval_lower_bound": "greater_than_zero",
+    "per_red_point_gain_floor": -5.0,
+    "minimum_host_coverage": 0.98,
+    "failure_action": "retain as exploratory; deploy fixed coordinator"
+  },
+  "source_commit": "0dffc4afdc24964c605d3232525ae4e689c73f6e",
+  "source_sha256": {
+    "blue/training/harness_rl.py": "442b9a722cd2c2d81ebcf3e38f2528cd6f38763b3a9f5d16538c568b5846eacf",
+    "blue/harness/policy.py": "62f26749826107c8ea753420694910f36143f93ad16eacffd3b7fc87a00447d6",
+    "blue/harness/features.py": "67957adb657df9252419ace212bad14b74c1368e503b728dc12ffd6ad76f8d60",
+    "blue/training/harness_anchor.py": "5ec42f25f3fc1ee8648b90862b194d0bfea0d7e45e125557e802de1d28c021be",
+    "blue/training/mappo_guide.py": "c49f3a6e397f6d703ead4b216869d981ffce1ff390cf80b67cf77b433e75a1bc",
+    "blue/core/wrapper.py": "662dd402397f8f265e782401f32e3ef05c264883cd208033bbb8c25c955d1b19",
+    "blue/policies/ordered.py": "627b7964ebaf22489395f31605e67190f23bc6dca4c012273d9d04729da26849",
+    "scorer.pkl": "949048797f2b89a5703189c53fb9062a82f056989da931d6c56b177af5073b2a",
+    "blue/training/harness_eval.py": "2dd31baf2f8061e415e8e036b8ae709bc0df34ea665f64f8c6ea409f4269f19a",
+    "blue/training/harness_mixed_red_analysis.py": "c8e8a654b128bd41315d7ec9da666f344997c83966b330cef8fd91dfd01a7939",
+    "scripts/blue_mixed_red_investigator_train.sh": "f1c35f23b06a778c5f7754df7f47f1e8951b39eea5834b2085a96f542633860f",
+    "scripts/blue_mixed_red_investigator_eval.sh": "7d1755fafd1ce31e4cf38b251fa0573032b8f6be1000b91b1d86bc3af1d329de"
+  },
+  "seed_audit": {
+    "train_block_7600_7612_free_immediately_before_freeze": true,
+    "eval_block_7641_7656_free_immediately_before_freeze": true
+  },
+  "artifacts": "blue/results/mixed_red_investigator_ppo_20261025/ (ignored; never commit model weights or rollout logs)"
+}

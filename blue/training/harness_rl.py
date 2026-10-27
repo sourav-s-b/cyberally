@@ -21,6 +21,8 @@ from blue.harness.policy import HarnessActorHook, HarnessPolicy
 from blue.harness.scoring import MLScorer, sha256
 from blue.training import mappo_guide as mg
 
+CURRENT_POLICY = "current-residual-v1"
+
 
 def check_seeds(seeds):
     if not seeds or any(7809 <= s <= 8200 for s in seeds):
@@ -76,6 +78,63 @@ def build_actor(hidden=64):
     return build_nets(feat_dim=len(ACTOR_NAMES), hidden=hidden)[0]
 
 
+def env_kwargs(red_agent):
+    """Training env kwargs for the requested attacker.
+
+    ``mg.ENV_KW`` pins ``red_agent="discovery"``. The main-line LLM-Red work
+    showed that regime cannot punish a broken investigation policy, so it is
+    not a valid optimisation target on its own. The attacker is therefore an
+    explicit, recorded choice rather than a constant.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    if red_agent not in RED_AGENTS:
+        raise ValueError("unknown red_agent %r; known: %s"
+                         % (red_agent, sorted(RED_AGENTS)))
+    kw = dict(mg.ENV_KW)
+    kw["red_agent"] = red_agent
+    return kw
+
+
+def resolve_red_agents(args):
+    """Resolve one fixed Red or a per-episode Red mixture.
+
+    The regime is an environment setting, not a policy input. A supplied
+    --red-agents list takes precedence over the legacy --red-agent option.
+    """
+    from blue.core.wrapper import RED_AGENTS
+    configured = getattr(args, "red_agents", None)
+    names = list(configured) if configured else [args.red_agent]
+    if not names or any(name not in RED_AGENTS for name in names):
+        raise ValueError("unknown or empty Red-agent list: %r" % names)
+    if len(set(names)) != len(names):
+        raise ValueError("Red-agent list must not contain duplicates")
+    return names
+
+
+def episode_red_schedule(names, count, seed):
+    """Balanced, deterministic regime schedule for one PPO iteration."""
+    if count < 1:
+        raise ValueError("episode count must be positive")
+    schedule = [names[i % len(names)] for i in range(count)]
+    np.random.default_rng(seed).shuffle(schedule)
+    return schedule
+
+
+def build_reward_hook(args):
+    """Training-only state shaping, or None when the arm is unshaped.
+
+    None keeps the rollout byte-identical to the historical native-reward
+    path, so an unshaped control arm is not silently reshaped.
+    """
+    if args.state_shaping == "off":
+        return None
+    from blue.harness.state_reward import make_reward_hook
+    return make_reward_hook(term=args.state_shaping,
+                            weight=args.state_shaping_weight,
+                            cap=args.state_shaping_cap,
+                            horizon=args.steps)
+
+
 def source_identity():
     pin = Path("snapshot.json")
     if pin.exists():
@@ -83,11 +142,55 @@ def source_identity():
     return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
 
 
+def validate_resume(old, current, checkpoint, checkpoint_exists=True):
+    """Reject resume when the run identity or objective has drifted."""
+    if old.get("status") == "complete":
+        raise ValueError("cannot resume a completed run")
+    if not checkpoint_exists:
+        raise ValueError("resume checkpoint is missing")
+    keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr",
+            "bonus", "temp", "max_age", "ml_inputs", "train_seeds",
+            "red_agent", "red_agents", "state_shaping", "state_shaping_weight",
+            "state_shaping_cap", "policy_version", "reference_mass",
+            "reference_temp", "reference_kl_coef", "max_update_kl")
+    old_config = old.get("config", {})
+    new_config = current.get("config", {})
+    if any(old_config.get(key) != new_config.get(key) for key in keys):
+        raise ValueError("resume configuration/source/artifact drift")
+    for key in ("source_commit", "source_files", "scorer_sha256", "objective",
+                "red_agent", "state_shaping"):
+        if old.get(key) != current.get(key):
+            raise ValueError("resume configuration/source/artifact drift")
+    if old.get("env_kw") != current.get("env_kw"):
+        if json.dumps(old.get("env_kw"), sort_keys=True) != json.dumps(
+                current.get("env_kw"), sort_keys=True):
+            raise ValueError("resume configuration/source/artifact drift")
+    if old_config.get("diagnostics", False) != new_config.get("diagnostics", False):
+        raise ValueError("resume diagnostic configuration drift")
+    if old.get("runtime", current.get("runtime")) != current.get("runtime"):
+        raise ValueError("resume runtime drift")
+    history = checkpoint.get("history", [])
+    # A killed process may have atomically saved a checkpoint but not yet
+    # rewritten its manifest. In that case the checkpoint is authoritative.
+    if "history" in old and old["history"] != history:
+        raise ValueError("resume manifest/checkpoint history drift")
+    if len(history) >= new_config.get("iters", 0):
+        raise ValueError("checkpoint already reached the requested iteration count")
+    return history
+
+
 def train(args):
     import torch as th
+    from blue.training import harness_anchor as anchor
     check_seeds(args.train_seeds)
+    red_agents = resolve_red_agents(args)
     if args.iters < 1 or args.eps_per_iter < 1 or args.temp <= 0:
         raise ValueError("invalid training budget")
+    if args.policy_version not in (CURRENT_POLICY, anchor.VERSION):
+        raise ValueError("unknown policy version")
+    if not (0 < args.reference_mass < 1 and args.reference_temp > 0
+            and args.reference_kl_coef >= 0 and args.max_update_kl > 0):
+        raise ValueError("invalid anchored-policy configuration")
     th.manual_seed(args.seed)
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -99,52 +202,84 @@ def train(args):
     out.mkdir(parents=True, exist_ok=True)
     if (out / "manifest.json").exists() and not args.resume:
         raise FileExistsError("use a new run directory; never overwrite an experiment")
+    run_config = vars(args).copy()
+    run_config["red_agent"] = red_agents[0] if len(red_agents) == 1 else "mixed"
+    run_config["red_agents"] = red_agents if len(red_agents) > 1 else None
     manifest = {"version": VERSION, "features": list(ACTOR_NAMES),
                 "scorer_sha256": scorer.sha256, "scorer": scorer.path,
-                "config": vars(args), "gamma": mg.GAMMA,
+                "config": run_config, "gamma": mg.GAMMA,
                 "source_commit": source_identity(),
                 "source_status": subprocess.check_output(
                     ["git", "status", "--porcelain"], text=True).splitlines(),
-                "env_kw": mg.ENV_KW, "status": "started",
+                "env_kw": ({name: env_kwargs(name) for name in red_agents}
+                           if len(red_agents) > 1 else env_kwargs(red_agents[0])),
+                "red_agents": red_agents,
+                "status": "started",
                 "runtime": {"python": platform.python_version(), **{
                     p: package_version(p) for p in (
                     "numpy", "scipy", "torch", "scikit-learn", "gym", "gymnasium")}},
-                "objective": "native team reward; unfiltered fresh on-policy rollouts",
-                "checkpoint_semantics": "new actor geometry; legacy checkpoints incompatible"}
+                "objective": ("native team reward reported; "
+                              + ("state-shaped PPO signal" if args.state_shaping != "off"
+                                 else "unfiltered fresh on-policy rollouts")),
+                "state_shaping": {
+                    "term": args.state_shaping if args.state_shaping != "off" else None,
+                    "weight": args.state_shaping_weight,
+                    "cap": args.state_shaping_cap,
+                    "training_only": True,
+                    "evaluation_uses": "native",
+                },
+                "red_agent": (red_agents[0] if len(red_agents) == 1
+                              else "mixed"),
+                "checkpoint_semantics": "new actor geometry; legacy checkpoints incompatible",
+                "policy_version": args.policy_version}
     # Pin actual dirty source bytes, not just HEAD.
     manifest["source_files"] = {str(p): sha256(p) for p in [
         *sorted(Path("blue/harness").glob("*.py")), Path(__file__),
-        Path(mg.__file__), Path("blue/training/residual.py"),
+        Path(mg.__file__), Path(anchor.__file__),
+        Path("blue/training/residual.py"),
         Path("blue/policies/ordered.py"), Path("blue/core/wrapper.py")]}
+    reward_hook = build_reward_hook(args)
     hist = []
     start = 0
     if args.resume:
         old = json.loads((out / "manifest.json").read_text())
-        keys = ("seed", "iters", "eps_per_iter", "steps", "hidden", "lr", "bonus", "temp", "max_age", "ml_inputs", "train_seeds")
-        if any(old["config"][k] != manifest["config"][k] for k in keys) or old["source_files"] != manifest["source_files"] or old["scorer_sha256"] != scorer.sha256:
-            raise ValueError("resume configuration/source/artifact drift")
-        if old["config"].get("diagnostics", False) != args.diagnostics:
-            raise ValueError("resume diagnostic configuration drift")
-        if old.get("runtime", manifest["runtime"]) != manifest["runtime"]:
-            raise ValueError("resume runtime drift")
+        if not (out / "checkpoint.pt").is_file():
+            raise ValueError("resume checkpoint is missing")
         ck = th.load(out / "checkpoint.pt", map_location="cpu", weights_only=False)
+        hist = validate_resume(old, manifest, ck)
         actor.load_state_dict(ck["actor"]); critic.load_state_dict(ck["critic"])
         opt.load_state_dict(ck["optimizer"])
         th.set_rng_state(ck["torch_rng"]); np.random.set_state(ck["numpy_rng"]); random.setstate(ck["python_rng"])
-        hist = ck["history"]; start = len(hist)
+        start = len(hist)
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for iteration in range(start, args.iters):
         gen = th.Generator().manual_seed(args.seed * 100003 + iteration + 1)
-        rec = HarnessRecorder(actor, scorer, args.bonus, gen, args.temp, args.ml_inputs,
-                              diagnostics=args.diagnostics)
+        rec = (HarnessRecorder(actor, scorer, args.bonus, gen, args.temp,
+                               args.ml_inputs, diagnostics=args.diagnostics)
+               if args.policy_version == CURRENT_POLICY else
+               anchor.AnchoredRecorder(actor, scorer, gen, args.ml_inputs,
+                                       args.reference_mass, args.reference_temp))
         policy = HarnessPolicy(rec, max_age=args.max_age, record_requests=args.diagnostics)
-        returns, interventions = [], []
+        returns, shaped_returns, interventions = [], [], []
         episode_diagnostics = []
+        episode_regimes = episode_red_schedule(
+            red_agents, args.eps_per_iter,
+            args.seed * 100003 + iteration + 1)
+        returns_by_regime = {name: [] for name in red_agents}
         for e in range(args.eps_per_iter):
             seed = args.train_seeds[(iteration * args.eps_per_iter + e) % len(args.train_seeds)]
-            result = mg.run_team_episode(policy, seed, args.steps, hook=rec, recorder=rec, **mg.ENV_KW)
-            print(f"iteration={iteration+1} episode={e+1} seed={seed} return={result['return']}", flush=True)
+            red_agent = episode_regimes[e]
+            result = mg.run_team_episode(policy, seed, args.steps, hook=rec,
+                                         recorder=rec,
+                                         reward_hook=reward_hook,
+                                         **env_kwargs(red_agent))
+            print(f"iteration={iteration+1} episode={e+1} seed={seed} "
+                  f"red={red_agent} "
+                  f"return={result['return']} "
+                  f"shaped={result['shaped_return']}", flush=True)
             returns.append(result["return"])
+            returns_by_regime[red_agent].append(result["return"])
+            shaped_returns.append(result["shaped_return"])
             interventions.append(policy.guard_stats())
             if args.diagnostics:
                 diagnostic = {"seed": seed, **policy.request_digest.result(),
@@ -154,13 +289,39 @@ def train(args):
                       f"iteration={iteration+1} episode={e+1} arm={args.ml_inputs}", flush=True)
         if not rec.rows:
             raise RuntimeError("no trainable sweep decisions; no update performed")
-        stats = mg.ppo_central_update(actor, critic, opt, rec.rows, bonus=args.bonus)
+        stats = (mg.ppo_central_update(actor, critic, opt, rec.rows, bonus=args.bonus)
+                 if args.policy_version == CURRENT_POLICY else
+                 anchor.ppo_update(actor, critic, opt, rec.rows,
+                                   reference_kl_coef=args.reference_kl_coef,
+                                   max_update_kl=args.max_update_kl))
         if not all(np.isfinite(v) for v in stats.values()):
             raise RuntimeError("nonfinite PPO update")
+        # The pilot calibrates the ratio under the default heuristic policy.
+        # The learned actor can visit different states, so the ratio is
+        # re-measured here on every real training episode and recorded as a
+        # diagnostic: if |added|/|native| drifts far from the pilot value, the
+        # shaped term is no longer a modifier of the objective.
+        shape_ratio = [
+            (abs(sr - r) / abs(r))
+            for r, sr in zip(returns, shaped_returns) if r
+        ] if args.state_shaping != "off" else []
         row = {"iteration": iteration + 1, "returns": returns,
+               "red_agents": episode_regimes,
+               "returns_by_regime": {
+                   name: values for name, values in returns_by_regime.items()},
+               "shaped_returns": shaped_returns,
+               "mean_shaping_ratio": (float(np.mean(shape_ratio))
+                                      if shape_ratio else None),
+               "mean_shaping_added": (float(np.mean(
+                   [sr - r for r, sr in zip(returns, shaped_returns)]))
+                   if args.state_shaping != "off" else None),
                "decisions": rec.total, "greedy_agreement": rec.agree / rec.total,
                "sampled_override_rate": rec.sampled_disagree / rec.total,
                "guard": interventions, **stats}
+        if args.policy_version == anchor.VERSION:
+            row.update(mean_sampled_reference_probability=float(np.mean(
+                           rec.reference_probabilities)),
+                       mean_sampled_base_score_gap=float(np.mean(rec.base_gaps)))
         hist.append(row)
         if args.diagnostics:
             # Per-decision sensitivity lives outside compact training history.
@@ -182,7 +343,8 @@ def train(args):
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def load_hook(model_dir, scorer_path):
+def load_hook(model_dir, scorer_path, candidate_audit_agent=None,
+              sample=False, sample_seed=None):
     import torch as th
     d = Path(model_dir)
     m = json.loads((d / "manifest.json").read_text())
@@ -196,7 +358,22 @@ def load_hook(model_dir, scorer_path):
     actor = build_actor(c["hidden"])
     actor.load_state_dict(th.load(d / "actor.th", map_location="cpu", weights_only=True))
     actor.eval()
-    return HarnessActorHook(actor, scorer, c["bonus"], c["ml_inputs"]), m
+    generator = (th.Generator().manual_seed(int(sample_seed)) if sample else None)
+    policy_version = c.get("policy_version", CURRENT_POLICY)
+    if policy_version == CURRENT_POLICY:
+        hook = HarnessActorHook(actor, scorer, c["bonus"], c["ml_inputs"],
+                                candidate_audit_agent=candidate_audit_agent,
+                                sample=sample, generator=generator,
+                                sample_temp=c["temp"])
+    else:
+        from blue.training.harness_anchor import AnchoredActorHook, VERSION as ANCHOR_VERSION
+        if policy_version != ANCHOR_VERSION:
+            raise ValueError("unknown checkpoint policy version")
+        hook = AnchoredActorHook(actor, scorer, c["ml_inputs"],
+                                 c["reference_mass"], c["reference_temp"],
+                                 sample=sample, generator=generator,
+                                 candidate_audit_agent=candidate_audit_agent)
+    return hook, m
 
 
 def main():
@@ -215,8 +392,40 @@ def main():
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--bonus", type=float, default=0.25)
     ap.add_argument("--temp", type=float, default=0.5)
+    ap.add_argument("--policy-version", choices=(CURRENT_POLICY, "anchored-categorical-v1"),
+                    default=CURRENT_POLICY)
+    ap.add_argument("--reference-mass", type=float, default=0.9)
+    ap.add_argument("--reference-temp", type=float, default=0.5)
+    ap.add_argument("--reference-kl-coef", type=float, default=0.05)
+    ap.add_argument("--max-update-kl", type=float, default=0.02)
     ap.add_argument("--max-age", type=float, default=80)
     ap.add_argument("--ml-inputs", choices=("both", "risk", "zero"), default="both")
+    ap.add_argument("--red-agent", default="discovery",
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="training attacker. 'discovery' reproduces the "
+                         "main32 checkpoints; 'finite' is the bounded "
+                         "attacker that can punish a broken sweep")
+    ap.add_argument("--red-agents", nargs="+", default=None,
+                    choices=("discovery", "finite", "verbose", "random",
+                             "sleep"),
+                    help="balanced per-episode training mixture; hidden from "
+                         "the actor. Takes precedence over --red-agent")
+    ap.add_argument("--state-shaping", default="off",
+                    choices=("off", "detection", "confirm", "both"),
+                    help="TRAINING-ONLY state-based shaping. 'off' is the "
+                         "unshaped control and is byte-identical to the "
+                         "historical native-reward path. Evaluation always "
+                         "scores native reward regardless.")
+    ap.add_argument("--state-shaping-weight", type=float, default=0.05,
+                    help="magnitude of the shaped penalty; measured "
+                         "so a full episode adds roughly the "
+                         "same order as native return")
+    ap.add_argument("--state-shaping-cap", type=float, default=20.0,
+                    help="safety ceiling on RAW debt, not on the "
+                         "penalty. Must stay above typical debt (~8) or the "
+                         "signal is silently truncated and a -10 zone "
+                         "becomes indistinguishable from a -5 zone")
     train(ap.parse_args())
 
 
