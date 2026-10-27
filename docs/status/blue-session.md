@@ -644,6 +644,59 @@ must remain outside Git. Next: review smoke checks, commit/push this branch,
 prepare private Kaggle inputs, launch fifteen separate CPU shards, download all
 outputs, and aggregate with the training-seed paired intervals.
 
+## Web research pass (2026-10-22)
+
+Branch `blue/web-research-20261022` (worktree `worktrees/research`), branched from
+`7ac8886` (same commit as main's audit tip; `origin` reachable but unchanged during
+the session). Deliverable:
+[`../research/web-research-20261022.md`](../research/web-research-20261022.md).
+This is a research-only handoff: no code changes, no training, no seed consumption
+(8433–8499 remain the last unclaimed window; `blue/training/seed_audit.py` must run
+before any pre-registered block).
+
+Two questions answered under the user-approved plan (both goals equally, ~1 week
+budget, broad ~20-entry verification): (1) what did CAGE4 winners actually do —
+verified via Kiely et al. AAAI-25 that no RL submission beat the top scripted
+heuristics, with invalid actions on non-existent hosts and missing configuration
+cues as the named failure causes; no public repos for Team UC/Lancer/Punch;
+Cybermonic (GNN MARL) needed ~10^4-scale-episode convergence and still trailed;
+H-MARL (arXiv 2410.17351 = RLJ 2025 Paper77) reports returns but has no heuristic
+baseline. (2) Does imitation→RL fine-tuning beat imitation at our budget — verdict:
+only two budget-feasible families exist, offline RL reusing collected logs
+(AWAC 2006.09359 / ReBRAC 2305.09836 protocol) and scripted-guide shrinking-horizon
+warm start (JSRL 2204.02372 / Kickstarting 1803.03835); Q-pretraining is verified
+useless (2607.27203) and MAPPO-scale re-runs are underpowered at this budget
+(Cybermonic datum).
+
+Citation verification (~20 entries + recovered batches, corrections in doc
+Section C): wrong IDs fixed for PEX (2302.00935), SPOT (2202.06239), EDAC
+(2110.01548), MSG (2205.13703), DVRL (1806.02426, Igl not Zintgraf), JSRL
+(2204.02372), RvS (2112.10751) + Brandfonbrener (2206.01079), RLPD (2302.02948),
+Codevilla (1809.04843), robomimic L3 (2108.03298), Mandlekar author corrections,
+Bates (2503.03245), Lyu (2102.04402 AAMAS 2021 + JAIR 2408.14597), HKS (2207.11584),
+blocked-CV (Bergmeir CSDA 2012/2018; Roberts Ecography 2017), SMODICE (2202.02433),
+Q-Transformer (2309.10150; regret-bound attribute dropped), Rigaki (2308.12086,
+ICAART 2024; "Model Exfiltration..." title unverified — do not cite). Do-not-cite
+list is in the report.
+
+Novelty scan: LLM-as-red-agent inside CAGE2/3/4 not found in literature (our
+LLM-Red direction appears novel); belief/hypothesis-testing-gated remediate-or-not
+not found (candidate paper angle matching our Remove≠clean rule); attacker-regime-
+conditioned imitation in cyber not found (theory exists robotics-side, so frame as
+cyber application). Eight one-pagers (OP1–OP8) in the report order the work: OP1
+wrapper-contract suite first (no training), then OP2/OP3 as the pre-registrable
+budget-feasible experiments; OP5 makes multi-seed reporting mandatory for all
+future Blue experiments.
+
+Validation: research-only diff; `git diff --check` is the relevant check; no
+simulator/training checks run and none required (no code touched). Risks: score
+figures quoted from the AAAI-25 paper are session-verified but should be re-checked
+against the published PDF before external decks; negative-search novelty claims are
+medium-high confidence, absence can never be proven. No teammate messages or review
+requests were sent; no shared schema/reward change proposed. PR checklist: docs-only
+change, no dependent branch changes, review the do-not-cite list before any deck
+reuse. Next concrete task: user decision on OP2 vs OP3 (or OP1 immediately — it
+needs no compute), then pre-registration + seed audit if either is chosen.
 
 ## Research audit (2026-10-03)
 
