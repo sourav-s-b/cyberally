@@ -302,6 +302,145 @@ dependency is cdd17647fc6f72cd374801ccf3a05ea379e63749; origin main
 episodes, bundled design changes, discount/native objective mismatch and
 stochastic exploration ceiling; no deployment or performance claim.
 
+## Local sensitivity study started
+
+Started additive `blue.training.harness_sensitivity` on the locked local
+runtime, branch gpt-blue, base commit bda8da97b434397295ec6cf58fb04b970f69aabd.
+Runner bytes and runtime are frozen in
+`blue/results/gpt_harness/v2_sensitivity/plan.json`; runner is currently
+uncommitted. Six MAPPO models: reference gamma .99/exploration .2,
+gamma 1/exploration .2, gamma .99/exploration .5; training RNG 0/1,
+four iterations with two episodes each. Original ML scorer unchanged.
+Evaluation uses reused episodes 8233/8236/8241/8229, two nested policy RNG
+replicas and matching untrained-mixture controls, recording request hashes.
+No result yet; no longer Kaggle training launched. Final seeds protected.
+Compilation passed. No core learner changes; prior tests are not claimed
+as a new run. Do not change HEAD or frozen source files during this study.
+Resume runner from the same worktree/runtime; completed models and eval
+cells are retained and incomplete training resumes from checkpoint.pt.
+
+## Sensitivity study completed
+
+All six local MAPPO models and 64 evaluation cells completed successfully.
+Four iterations, two training episodes per iteration; four reused development
+episodes and two nested policy RNG replicas. Frozen plan and full cells:
+`blue/results/gpt_harness/v2_sensitivity/`.
+Mean native return gain against each matching untrained mixture, training
+RNG 0 / 1: reference +0.250 / +0.125; undiscounted +0.375 / -0.625;
+higher exploration -1.625 / -5.125. Across the two training seeds these
+average +0.1875, -0.125 and -3.375 respectively. No superiority or convergence
+claim. Discounting and exploration changes do not establish a learning gain
+at this budget. Action-request hashes changed in 8/8 and 3/8 reference
+replicas, 8/8 and 4/8 undiscounted replicas, 8/8 and 6/8 higher-exploration
+replicas: equal returns must not be reported as unchanged trajectories.
+Next: inspect policy update magnitude and decision changes before increasing
+training budget; retain original scorer and native metric. Two training
+seeds remain the independent replication unit, not 64 evaluation cells.
+
+## Read-only update and single-request audit completed
+
+See docs/research/blue-v2-update-audit-20261007.md. Six checkpoint parameter
+comparisons confirm weights changed; clipping/KL stop were inactive. Two
+instrumented frozen evaluations reproduce return and all 1,995 request hashes.
+Average total variation from zero residual is .001779 / .001620; direct ML
+risk+entropy zeroing changes distributions by only .00004334 / .00002676.
+These are same-state diagnostic shadows, not action-value estimates.
+
+For higher-exploration s1, episode 8233, policy RNG 8208302: original -122,
+untrained -61. Replacing only tick 48 blue_agent_4's requested investigation
+from admin router to office user host 1 returns -64. Same fixed checkpoint,
+normal RNG draw consumed, later decisions allowed to diverge. One diagnostic
+intervention, no superiority claim. All checkpoint hashes unchanged.
+Next concrete task: trace completion/Blue observations/reward events around
+that tick-48 host choice to explain why its downstream consequence is large;
+do not deploy a host-specific rule or increase training based on this episode.
+Scripts compile and diff check passed; core tests not rerun (core unchanged).
+Branch gpt-blue; additive scripts/docs currently uncommitted. Final seeds
+7809–8200 untouched; no new Kaggle training or external upload.
+
+## Full decision timeline completed
+
+Read docs/research/blue-v2-decision-timeline-20261007.md. All three full
+replays reproduce frozen returns/digests (-122/-64/-61), with per-tick native
+penalty accounting. The office swap is not an early compromise discovery:
+both targets lack Red-session labels and visible files at tick 48. Office
+is already the trained policy's 53% favorite; router is a ~3% sampled pick.
+Modified sequence repairs a different admin host two ticks later.
+
+Shared controller/state/Red/Green RNG identities verified. Two 80-tick
+prefixes match saved requests; policy does not consume simulator RNG, but
+simulator RNG states split after tick 63 and NPC actions differ at 64.
+Thus the 58-point result cannot be attributed solely to better prioritization.
+Original -122 = -70 action costs and -52 attack/service events; modified
+-64 is action costs only. One scored operational user host has a 98-tick
+completed investigation gap (38 to 136), with failures starting at request
+112. This is a stronger next target than an office-host-specific rule.
+
+Next: inspect visible evidence and busy/urgent capacity on operational A
+user host 0 in that gap, and native penalty controllability. No algorithm
+change or long training until that mechanism is established. Model/scorer
+unchanged; privileged labels/logs separated from actor inputs; final seeds
+protected. Two focused logging tests pass; native reward/request/RNG checks
+complete; compile/diff checks pass. Additive scripts/docs remain uncommitted
+on gpt-blue. No external upload or simulator changes.
+
+## Operational A host gap follow-up
+
+`harness_host_gap_audit.py` records every tick's Blue view, observation
+freshness, tracker state, pending/busy status, requests/completions and native
+penalties; privileged Red-session and event traces are separate. Full replay
+matches frozen -122 return and all 1,995 requests. For operational A user 0,
+Blue completed an empty Analyse at38, then no new Files observation until136.
+The Process view went from2 to12 entries at the first diagnostic Red-session
+tick; a new SSH connection targets neighboring operational A user 1.
+
+At decision38 the approved risk model scores the host1.0, but actor selection
+probability is only .07434 versus .07295 with actor residual zero, while the
+teacher router has .606. A single frozen intervention immediately analyses
+user0: completion at40 exposes cmd.sh and CONFIRMED; the same actor requests
+Remove at40. Original next analyzes it at134, completing136 with cmd.sh and
+escalate.sh. This demonstrates potentially actionable early evidence and
+underuse of risk at this one state. It does not prove episode return benefit,
+clean removal, or generalization. Partial prefix rewards are not interpreted.
+
+Next: reuse diagnostic episodes to tabulate high-risk signal -> detection ->
+Remove completion/verification and per-episode native event outcomes before
+proposing a protected-priority rule or retraining. Do not infer that red
+session labels always imply detectable compromise. No training, Kaggle or
+simulator changes. Frozen checkpoint hash preserved. Scripts compile by
+execution; host-gap trace and 42-tick prefix request checks pass. Final seeds
+7809-8200 untouched.
+
+## High-risk sweep audit on reused development episodes
+
+On branch gpt-blue, two frozen reference MAPPO checkpoints were replayed
+locally on development episodes 8233, 8236, 8241 and 8229, with sampled-policy
+RNG `episode*997`. All eight native returns, 399-step reward ledgers, and full
+1,995-request hashes matched the saved cells. Each sweep decision records the
+real risk score, teacher and sampled choice, and Blue-visible host state;
+completion and tracker changes are in Blue JSONL, while Red-session labels
+and penalty events are in separate diagnostic JSONL. Threshold >=0.8 was
+frozen before the replays. See
+`docs/research/blue-v2-high-risk-audit-20261007.md` and ignored artifacts
+under `blue/results/gpt_harness/v2_sensitivity/high_risk_audit/`.
+
+Across the four episodes, high-risk candidates appeared in 112–252 sweep
+decisions per cell and were selected in 32–48. In each cell 11–17 distinct
+hosts were skipped at their first high-risk opportunity, then Blue-confirmed
+after a wait of >=20 ticks. Lancer's teacher selected a high-risk candidate
+about as often as the trained sampler. This is evidence of delayed
+investigation, not proof that earlier Analyse would detect or improve native
+return. Non-cost losses in these episodes occurred on contractor-network
+hosts and did not overlap the Blue-owned high-risk candidates; the other
+episodes had action costs only. No trained-policy change or new training.
+
+The original audit process was interrupted after two validated cells.
+Remaining cells were resumed under the same frozen replay code; partial
+JSONL files were retained with `.interrupted` suffixes. The new scripts
+compiled and the final diff check passed. Next: one single-request local
+mechanism check at a first high-risk opportunity with a later confirmation,
+recording detection, action cost, penalties, and simulator RNG divergence.
+
 ## Finite-Red native-reward gate, 2026-10-15
 
 Six finite-Red models (training RNG seeds 0-5; 32 iterations x 4 rollouts)
