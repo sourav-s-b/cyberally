@@ -109,7 +109,8 @@ def probabilities(actor, features, base, mask, teacher, bonus=.25, temperature=.
     single = features.ndim == 2
     if single:
         features, base, mask = features[None], base[None], mask[None]
-        teacher = torch.as_tensor([teacher], dtype=torch.long)
+        teacher = torch.as_tensor([teacher], dtype=torch.long,
+                                  device=base.device)
     else:
         teacher = torch.as_tensor(teacher, dtype=torch.long, device=base.device)
     if not mask.bool().any(-1).all() or not mask.bool().gather(1, teacher[:, None]).all():
@@ -137,7 +138,9 @@ class RedesignHook(HarnessActorHook):
         super().reset()
         if hasattr(self, 'memory'):
             self.memory.reset()
-        self.generator = torch.Generator().manual_seed(self.policy_seed)
+        device = next(self.actor.parameters()).device
+        self.generator = torch.Generator(device=device).manual_seed(
+            self.policy_seed)
 
     def observe(self, env, agent):
         raw = self.scorer.observe(env, agent)
@@ -156,9 +159,11 @@ class RedesignHook(HarnessActorHook):
         return np.concatenate((F, memory[ix], entropy[:, None]), axis=1).astype(np.float32)
 
     def distribution(self, env, agent, cands, scored):
-        features = torch.from_numpy(self.features(env, agent, cands))
-        base = torch.tensor([s for s, _ in scored], dtype=torch.float32)
-        mask = torch.ones(len(cands))
+        device = next(self.actor.parameters()).device
+        features = torch.from_numpy(self.features(env, agent, cands)).to(device)
+        base = torch.tensor([s for s, _ in scored], dtype=torch.float32,
+                            device=device)
+        mask = torch.ones(len(cands), device=device)
         teacher = cands.index(argmax_pick(scored))
         p = probabilities(self.actor, features, base, mask, teacher, self.bonus,
                           self.temperature, self.explore)

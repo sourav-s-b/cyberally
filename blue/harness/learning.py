@@ -56,23 +56,39 @@ def tensors(rows):
             'RET':torch.tensor([r['target'] for r in rows],dtype=torch.float32)}
 
 
+def reference_probabilities(base, mask, teacher, temperature, explore):
+    """Frozen zero-residual Lancer-mixture distribution for policy anchoring."""
+    valid = mask.bool()
+    logits = (base / temperature).masked_fill(~valid, -torch.inf)
+    p = explore * torch.softmax(logits, dim=-1)
+    teacher = teacher.to(device=base.device, dtype=torch.long)
+    anchor = torch.zeros_like(p).scatter(1, teacher[:, None], 1.)
+    return p + (1. - explore) * anchor
+
+
 def update(actor, critic, actor_opt, critic_opt, rows, algorithm='mappo', bonus=.25,
            temperature=.5, explore=.2, epochs=4, minibatch=256, clip=.2,
-           entropy_coef=0., target_kl=.02, max_grad_norm=1., critic_epochs=4):
+           entropy_coef=0., target_kl=.02, max_grad_norm=1., critic_epochs=4,
+           reference_kl_coef=0.):
     if algorithm not in ('mappo','a2c'):
         raise ValueError('unsupported learner')
     if epochs < 1 or critic_epochs < 1 or minibatch < 1 or not np.isfinite(
-        [clip,entropy_coef,target_kl,max_grad_norm]).all() or clip <= 0 or entropy_coef < 0 or target_kl <= 0 or max_grad_norm <= 0:
+        [clip,entropy_coef,target_kl,max_grad_norm,reference_kl_coef]).all() or clip <= 0 or entropy_coef < 0 or target_kl <= 0 or max_grad_norm <= 0 or reference_kl_coef < 0:
         raise ValueError('invalid optimizer settings')
-    x=tensors(rows); n=len(rows)
+    device = next(actor.parameters()).device
+    x={k:v.to(device) for k,v in tensors(rows).items()}; n=len(rows)
     if not all(torch.isfinite(v).all() for v in x.values()):
         raise ValueError('nonfinite fresh rollout')
     def distribution(ix):
+        ix = torch.as_tensor(ix, dtype=torch.long, device=device)
         return probabilities(actor,x['F'][ix],x['B'][ix],x['M'][ix],x['teacher'][ix],
                              bonus,temperature,explore)
+    with torch.no_grad():
+        reference = reference_probabilities(
+            x['B'], x['M'], x['teacher'], temperature, explore)
     log_old=x['P'].clamp(min=1e-12).log()
     with torch.no_grad():
-        initial=distribution(np.arange(n))
+        initial=distribution(torch.arange(n, device=device))
         if not torch.allclose(initial,x['P'],atol=1e-6,rtol=1e-5):
             raise ValueError('behavior policy drift before update')
     adv=x['ADV']; sd=adv.std(unbiased=False)
@@ -82,7 +98,9 @@ def update(actor, critic, actor_opt, critic_opt, rows, algorithm='mappo', bonus=
         order=np.random.permutation(n) if algorithm=='mappo' else np.arange(n)
         batch=minibatch if algorithm=='mappo' else n
         for start in range(0,n,batch):
-            ix=order[start:start+batch]; p=distribution(ix); logp=p.clamp(min=1e-12).log()
+            ix=torch.as_tensor(order[start:start+batch], dtype=torch.long,
+                               device=device)
+            p=distribution(ix); logp=p.clamp(min=1e-12).log()
             kl=(x['P'][ix]*(log_old[ix]-logp)).sum(-1).mean()
             if algorithm=='mappo' and float(kl.detach())>target_kl:
                 stop=True;break
@@ -94,7 +112,10 @@ def update(actor, critic, actor_opt, critic_opt, rows, algorithm='mappo', bonus=
             else:
                 policy=-(chosen*adv[ix]).mean()
             entropy=-(p*logp).sum(-1).mean()
-            actor_opt.zero_grad();(policy-entropy_coef*entropy).backward()
+            refp = reference[ix]
+            ref_kl=(refp*(refp.clamp(min=1e-12).log()-logp)).sum(-1).mean()
+            actor_loss=policy-entropy_coef*entropy+reference_kl_coef*ref_kl
+            actor_opt.zero_grad();actor_loss.backward()
             norm=torch.nn.utils.clip_grad_norm_(actor.parameters(),max_grad_norm)
             if not torch.isfinite(norm):raise ValueError('nonfinite actor gradient')
             norms.append(float(norm));actor_opt.step();count+=1
@@ -111,14 +132,17 @@ def update(actor, critic, actor_opt, critic_opt, rows, algorithm='mappo', bonus=
             if not torch.isfinite(norm):raise ValueError('nonfinite critic gradient')
             value_norms.append(float(norm));critic_opt.step()
     with torch.no_grad():
-        p=distribution(np.arange(n));logp=p.clamp(min=1e-12).log()
+        p=distribution(torch.arange(n, device=device));logp=p.clamp(min=1e-12).log()
         exact_kl=float((x['P']*(log_old-logp)).sum(-1).mean())
         oldchosen=log_old.gather(1,x['CH'][:,None]).squeeze(1)
         ratio=(logp.gather(1,x['CH'][:,None]).squeeze(1)-oldchosen).exp()
         errors=x['RET']-critic(x['J'])
         variance=float(x['RET'].var(unbiased=False))
         explained=1-float(errors.var(unbiased=False))/variance if variance>1e-8 else None
+        reference_kl_exact=float((reference*(reference.clamp(min=1e-12).log()-logp)).sum(-1).mean())
     stats={'policy_steps':count,'kl_stopped':stop,'kl_exact':max(exact_kl,0.),
+           'reference_kl':max(reference_kl_exact,0.),
+           'reference_kl_coef':float(reference_kl_coef),
            'clip_fraction':float(((ratio-1).abs()>clip).float().mean()),
            'entropy':float(-(p*logp).sum(-1).mean()),
            'actor_gradient_norm_mean':float(np.mean(norms)) if norms else 0.,
