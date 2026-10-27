@@ -438,6 +438,177 @@ is intended). Next concrete task: triage the 7 pre-existing training-test
 failures, or proceed to OP2/OP3 pre-registration + seed-audit of 8433–8499
 (user decision pending).
 
+
+## Event-time RL / Qwen Red (2026-10-24, in progress)
+
+Branch `blue/event-time-rl`, based on `7ac88861970744f5328d60434cbb07734c3a522c`;
+merged-main dependency inspected at `01140fe517c056444e4e95430b034b35bd8aadf5`.
+The GPT-Blue harness candidate to inspect/port is exactly
+`f32ba7284d7000127bacb6f09fab2dcf980d7048`; it has **not** been merged.
+Proposal: `docs/proposals/blue-event-time-qwen-20261024.md`.
+
+The user chose a smaller Qwen Red planner for the new RL experiment. Blue's
+`llmred_eval.py` now accepts `--model` (default `qwen2.5:3b`) while Red's
+shared default remains unchanged. Installed Qwen digest is
+`357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b`
+under Ollama `0.40.0`, loaded 100% on GPU. A 20-tick wiring check at spent
+seed 7629 returned 0 for both Lancer arms; a 400-tick preflight on that same
+seed returned -134 native Blue reward with 12 Red plan requests, 71 Blue
+remediation actions, and 27 confirmed hosts (399 native ticks). These are
+preflight observations, not a Qwen baseline or RL outcome. Earlier Llama 8B
+returns/variance are not compared numerically to this new attacker regime.
+
+The evaluator adds strict-guard Lancer, action-stream SHA, exact model/config/
+source/artifact fingerprinting for durable partial episodes, and refuses a
+cross-run cache. Focused same-guard no-op hook parity test passed (1 passed,
+1 warning); syntax and diff checks passed. The historical actor/risk artifacts
+were rehashed as
+`f5afa909efeee600637e3cd01279ac8e1818b469133c752f770045f254267a4e`
+and `64b3c7ae7775a1cd447de11bfd453fafa1097ea730b8ffffb7351dfd71473f93`.
+Runtime JSONs live in ignored `blue/results/event_time_rl/`. No final seeds
+eligible under this experiment's audit have been used; the nominal 7809–8200
+block already contains 20 historical seed uses, so it is not wholly fresh.
+
+The first 24-seed Qwen headroom launch stopped before any episode because the
+legacy actor constructor read an ignored initialization file missing from the
+isolated worktree. The evaluator now builds the identical 15-feature network
+directly and loads all saved weights; the aborted log is preserved. The
+restarted headroom run is in progress and persists each episode to JSONL.
+
+The tested GPT-Blue v2 actor/critic/credit modules were ported from exact
+`f32ba72`. Review found that GPT-Blue **already** implements elapsed decision
+time and lambda=1 Monte Carlo and ran a four-model, one-episode local smoke.
+The revised experiment isolates bootstrapped lambda=0.9 versus lambda=1.0,
+both with the same strict coverage guard, Qwen Red, PPO, architecture, scorer,
+and rollout budget. The new `event_time_rl.py` runner reuses the audited
+`decision_credit`/`update` code. A finite-Red 40-tick mechanics run for both
+arms yielded the same first action digest, 94 learned decisions and -17 native
+return; target means differed (-10.39 versus -4.02) and both produced finite
+nonzero actor gradients. A one-seed evaluation load also passed. These are
+mechanics checks, not policy gains. The scorer copied into ignored results
+has SHA256 `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`.
+The evaluator now includes an untrained mixture with the same sampling
+distribution, so stochastic exploration is controlled separately from
+learning. A finite-Red score-margin check on spent seed 7629 found 663 free
+strict-guard decisions, median top-two Lancer score gap 0, 97.0% gaps <=0.5.
+The frozen ±0.25 residual can therefore change host ordering on most free
+decisions; the observed small gradient is not an action-range impossibility.
+The strict-guard runner excludes single-candidate guard choices from actor
+gradient rows and reports their count. A rerun on finite seed 7706 recorded
+87 learnable and 7 forced singleton choices with the same -17 native return;
+the saved-iteration loader and an untrained-mixture evaluation control worked
+on finite seed 7641. All iteration actor/critic weights are retained for the
+predeclared development checkpoint rule. The new singleton-focused test and
+ported redesign tests passed (15 passed, 1 upstream warning).
+
+The 24-seed Qwen headroom batch completed 24 Lancer episodes and seven
+strict-guard Lancer episodes before the WSL environment restarted at 20:51
+local time (kernel boot log, no Python traceback or OOM message). Its durable
+partial JSONL retained all 31 episodes; the same run fingerprint was accepted
+on relaunch, which resumed at strict-guard seed 7648. No RL training has been
+claimed from this headroom batch.
+
+A full 400-tick finite-Red mechanics run exposed near-zero policy movement
+under the inherited update settings (exact KL 1.05e-7 despite 718 learned
+decisions). The predeclared update-magnitude calibration on spent seed 7706
+selected candidate C2: `bonus=1.0, explore=0.5, actor_lr=0.003`, with default
+`critic_lr=0.0003, temp=0.5`. C1 KL was 0.000497; C2 KL 0.003607, sampled
+override rate 0.3943, finite gradient, clip fraction 0.0445. Both C1 and C2
+initial rollouts returned -236; returns were not used in selection. These
+settings are shared by lambda=1 and lambda=0.9 Qwen pilot/main arms and are
+frozen before either Qwen RL training run.
+The Qwen trainer now rejects any tag/digest/version other than the recorded
+`qwen2.5:3b` / `357c53fb…` / Ollama `0.40.0` combination. The headroom analysis
+script checks all three arms and 24 seed pairs, then uses 10,000 whole-seed
+bootstrap resamples for descriptive development intervals. Two synthetic
+analysis checks and 15 mechanism/redesign checks passed (17 total). Historical
+actor checkpoint load plus a 40-tick finite-Red hook smoke also passed.
+The historical actor/risk checkpoint also loaded and ran a 40-tick finite-Red
+hook smoke in the isolated worktree, after removing its unnecessary dependency
+on a missing initializer file. Focused integration checks: 25 passed,
+1 upstream warning; Python compile and `git diff --check` passed. One earlier
+full focused run failed solely because a 24 KB ignored legacy test fixture was
+absent from the new worktree; copying the exact artifact made its targeted test
+pass, and the 25-test rerun passed. The fixture remains ignored.
+
+The Qwen headroom relaunch has completed both 24-seed Lancer arms and is now
+running the historical actor with the same strict guard. Training has not
+begun. The restartable pilot launcher is
+`blue/training/event_time_pilot.sh`: two RNGs each for lambda 1.0 and 0.9,
+two iterations of two 400-tick Qwen episodes per run. It skips complete runs,
+resumes from a full iteration checkpoint, and archives a start interrupted
+before its first checkpoint. The trainer now accepts a docs-only HEAD change
+on resume while checking executable source-file hashes and retaining the
+original run commit. A 40-tick finite-Red two-iteration run resumed after a
+synthetic HEAD change, retaining its original commit in the manifest. Evaluation
+also persists whole seeds atomically and resumes by seed after checking the
+run manifest and evaluation configuration; a two-seed finite test was
+interrupted after the first seed, then completed without rerunning it. The
+focused event-time tests passed (17 passed, 1 upstream warning); shell syntax,
+Python compile, and diff checks passed. No final seeds were opened.
+
+The seed audit exposed an older ledger error before final evaluation: 20
+numbers inside nominal final block 7809–8200 already occur in earlier
+seed-bearing work (7809, 7901–7908, 8001–8008, 8123–8124, 8200). This
+experiment excludes all 20 conservatively, leaving 372 eligible seeds;
+the ascending-list SHA256 is
+`5c42866da56a94d25ddb96320242e9e7372240e4ae63f8bdd3584b5d2a0c2761`.
+The final prefix length remains undecided pending Qwen variance and a fresh
+audit; the runner still refuses the entire nominal block. The unrelated
+`8501+` reservation dispute remains untouched.
+
+The completed 24-seed Qwen development headroom comparison reports native
+mean return `-183.17` for Lancer, `-165.71` for strict-guard Lancer, and
+`-171.96` for the historical guarded actor. Historical actor minus the
+**same-guard** Lancer is `-6.25`, paired 95% bootstrap interval
+`[-28.17, 13.67]`; there is no established RL gain. All arms made about
+12 Red plan requests per episode. Ignored result JSON SHA256 is
+`38b8379b56477db5a890795183f36755e16a83756c21f641ec50126c7f4577eb`;
+analysis lives in `blue/results/event_time_rl/qwen_headroom_analysis.json`.
+A Qwen trainer-factory wiring run (40 ticks, spent training seed 7706) had
+93 learnable decisions, seven forced singletons, finite gradients, KL
+`0.000637`, three Red requests, and native return `-3` (mechanics only).
+The branch was pushed to `origin/blue/event-time-rl` before the pilot.
+
+The frozen Qwen pilot completed all 16 training episodes (lambda 1.0 and
+0.9, RNGs 0/1, two iterations x two episodes/run). The no-return-selection
+audit in `blue/results/event_time_rl/pilot_gate.json` passed: same executable
+source/model/scorer pins, intact saved checkpoints, coverage 1.0, positive
+free-decision gradients, and all eight exact KL values in [0, 0.02]
+(range 0.000176–0.005844). Initial requested Blue-action hashes match
+between lambda arms for both RNGs, so the first-policy comparison isolates
+the credit target. Training returns are not efficacy evidence. A four-seed
+development evaluation of every pilot model at saved iteration 2, with
+strict-Lancer and untrained-mixture controls, is running in ignored results.
+Before those evaluation outcomes were available, the main primary checkpoint
+rule was fixed to **iteration 12 for every run**; earlier checkpoints are
+diagnostic only. This replaces a costly and selection-prone unspecified
+dev-checkpoint search in the original plan.
+
+At the user's request, the pilot development evaluation was paused after
+two complete seeds in the first model to audit GPU placement. Ollama reports
+Qwen `qwen2.5:3b` at **100% GPU** on the RTX 3050; a separate live 1,000-token
+generation sampled `nvidia-smi` 16 times and measured 48–89% GPU utilization
+(83.8% mean, about 2.2 GB VRAM). The training venv's PyTorch is CPU-only,
+but profiling a 40-tick finite-Red RL update measured 0.147 s in the PPO
+optimizer versus 6.573 s in the simulator rollout, with policy/simulator work
+dominating. Installing CUDA PyTorch would not move those CPU simulator and
+feature operations to GPU and would compete with Qwen for VRAM. No Qwen CPU
+fallback was found. The evaluation resumed from its atomic two-seed report
+without rerunning seeds 7641–7642; the independent diagnostic generation was
+outside all simulator episodes and is not evaluation data.
+
+Next: finish the four-seed Qwen pilot development evaluation, measure runtime
+and paired variance, then freeze the final power target and start the main
+equal-budget lambda comparison. No shared contract, simulator,
+Red-source, or checkpoint migration is needed for the Qwen model switch.
+PR checklist:
+confirm model digest/source and seed separation, keep native rewards/privileged
+labels out of actor input, validate fallback/action masks and pending timing,
+report lower-tail episodes and independent training seeds. No messages or review
+requests have been sent to teammates.
+
+
 ## Research audit (2026-10-03)
 
 Branch `blue/mappo-training` at `a6eab7e`; exact main dependency

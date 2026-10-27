@@ -226,7 +226,8 @@ class JointRecorder:
 
 
 def run_team_episode(policy, seed, steps, hook=None, recorder=None,
-                     guide_policy=None, guide_steps=0, **env_kw):
+                     guide_policy=None, guide_steps=0, env_factory=None,
+                     **env_kw):
     """Joint rollout. Returns per-tick team rewards plus the forced-vs-
     sampled split. Hook calls are sampled actor decisions; everything else
     is forced heuristic behavior, split into:
@@ -242,10 +243,13 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     left None and the recorder rows are unaffected (no PPO rows for
     guide decisions). Guide ticks are counted in ``n_guide`` and logged
     under forced_cats["guide"] so guide/actor accounting stays auditable.
+    ``env_factory``, when supplied, creates the environment for a particular
+    seed and horizon; this is used for injected Red/scenario variants.
     """
     from blue.core.baselines import decode_index
     from blue.core.wrapper import BLUE_AGENTS, CC4MARLEnv
-    env = CC4MARLEnv(seed=seed, steps=steps, **env_kw)
+    env = (env_factory(seed, steps) if env_factory is not None
+           else CC4MARLEnv(seed=seed, steps=steps, **env_kw))
     env.reset(seed=seed)
     policy.reset()
     policy.hook = hook  # None = reference behavior (never contaminated)
@@ -301,6 +305,9 @@ def run_team_episode(policy, seed, steps, hook=None, recorder=None,
     n_forced = sum(cats.values())
     return {"seed": seed, "return": float(sum(rewards)),
             "coverage": coverage, "ticks": n_ticks,
+            "red_plan_requests": getattr(getattr(env, "llm_client", None),
+                                         "requests", None),
+            "red_model_info": getattr(env, "llm_model", None),
             "n_actor": n_actor, "n_forced": n_forced,
             "n_guide": n_guide,
             "forced_cats": dict(cats),
