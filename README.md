@@ -1,12 +1,11 @@
 # Cyberally: self-evolving cyber defense research
 
-Shared student project for a CybORG/CAGE4 cyber-range, Red agents, Blue MARL
+Shared student project for a CybORG/CAGE4 cyber-range, Red agents, Blue
 defenders, and a measured adversarial retraining loop.
 
-**Status:** research prototype. Blue observation/masking/wrapper code exists and
-20 regression tests pass, but it lives only on `blue/foundation`; no trained Blue
-policy or real-world deployment is claimed. The first milestone is a reliable
-simulation and evaluator.
+**Status:** research prototype. The CAGE4 wrapper, baseline policies, and a
+local simulator-backed dashboard are available. No trained Blue policy,
+real-world telemetry, or real-world deployment is claimed.
 
 ## Start here
 
@@ -23,22 +22,58 @@ To resume Sourav's active Blue task in a new assistant conversation, read
 [the current Blue session update](docs/status/blue-session.md) and paste its
 resume prompt after the standard project instructions.
 
-### Branch status
+### Local CAGE4 dashboard
 
-`main` and `blue/foundation` are both at `f8a9deb` and hold identical content.
-Branch from `main` normally. Up to `05999fb`, `main` held a broken
-`blue/cc4_epymarl_wrapper.py` that truncated host observations to 16
-hosts, reset the shared simulator once per Blue agent and left `Restore`
-unreachable; `blue/foundation` has since been fast-forwarded into `main`, so
-those warnings are obsolete. Verify your clone with the commands in
-[docs/current-state.md](docs/current-state.md) section 0.
+The dashboard UI is a React + Tailwind app in `frontend/`, built with Vite.
+Build it once after checkout (Node.js 20+), then start the local-only API using
+the training virtual environment (needed for PyTorch checkpoint
+discovery/loading):
+
+```sh
+cd frontend
+npm install
+npm run build
+cd ..
+./.venv-train/bin/python -m blue.dashboard_server
+```
+
+`npm run dev` serves the UI at <http://127.0.0.1:5173> with hot reload and
+proxies `/api` to the dashboard server on port 8765. `frontend/node_modules/`
+and `frontend/dist/` stay out of Git; commit source and `package-lock.json`.
+
+On Windows PowerShell, use `.\.venv-train\Scripts\python.exe -m blue.dashboard_server`.
+If `.venv-train` does not exist, set it up with the project's training and
+simulator dependencies before launching; do not install them into the system Python.
+If the dashboard starts with a different interpreter, saved checkpoints are
+reported as unavailable (a neutral notice) while the baselines remain usable.
+
+Then open <http://127.0.0.1:8765>. The dashboard (React sources in `frontend/src/`,
+built into `frontend/dist/`) launches
+the existing CAGE4 Enterprise wrapper with a selected native Red variant and a
+Blue baseline or locally saved `agent.th` actor chosen from a fixed, friendly
+drop-down. It shows a zone-aware host graph with a cloud center, zone-type
+icons and a hover popup for each host's name, agent, subnet, evidence and
+pending status, a reward-over-steps chart, a steps-per-second speed control,
+a filterable Logs page and a separate analyst page backed only by
+Blue-visible observations. It records joint simulator steps, Blue actions and
+native team reward. Privileged Red-session counts are marked as evaluation-only
+and are not policy inputs. The episode audit trail can be downloaded as SIEM
+NDJSON (Elasticsearch `_bulk`); this is a dashboard audit export, not real host
+telemetry. The server binds to loopback and serves only the built dashboard
+assets. This is a CybORG simulator view, not a container range, packet monitor, or
+real-host control panel.
+
+Branch from the current `main` for new work. Historical branch and wrapper
+notes below this document's current-state links may be stale; read
+[docs/current-state.md](docs/current-state.md) and the role handoffs first.
 
 ## Repository layout
 
 | Path | Purpose / primary owner |
 |---|---|
 | `cage-challenge-4/CybORG/` | Existing upstream simulator, unmodified; Environment owns team changes |
-| `blue/blue_*.py`, `cc4_epymarl_wrapper.py` | Blue experiments and wrappers; Blue |
+| `blue/` | Blue core wrapper, baseline policies, experiments and dashboard server; Blue |
+| `frontend/` | React + Tailwind dashboard (Vite sources in `src/`, build in `dist/`); Blue |
 | `blue/tests_blue/` | Blue live regression suite; Blue |
 | `docs/archive/blue-agent-plan.md` | Detailed Blue design, audit and experiments |
 | `docs/archive/handoff.md` | Historical Blue handoff; read correction at its top |
@@ -49,12 +84,11 @@ those warnings are obsolete. Verify your clone with the commands in
 
 Layout rule: `cage-challenge-4/` is the pristine simulator (do not add
 role code there); Blue code lives in `blue/` (run it with cwd=`blue/`);
-only `blue/cc4_epymarl_wrapper.py` bridges to `CybORG` via a
-`__file__`-derived path insert. Keep these locations to avoid breaking
-imports.
+the Blue wrapper bridges to `CybORG` via a `__file__`-derived path insert.
+Keep simulator source pristine and use that existing bridge.
 Use one shared remote repository, separate clones/worktrees, and task branches.
-The local initial setup starts Blue on `blue/foundation`; other teammates create
-their task branches from the shared `main` after cloning.
+Create role/task branches from the current `main`; do not switch another
+contributor's branch in a shared worktree.
 
 ## Execution environment
 

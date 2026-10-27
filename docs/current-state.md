@@ -1,5 +1,48 @@
 # Current state: what exists, what is measured, what is only planned
 
+## Checkout and source-path correction (2026-10-27)
+
+The dated snapshots below predate the branch consolidation and no longer
+describe the current checkout or source paths. Current `main` is
+`926e7c3cc95384f38065377306efcb8b826ad6e8`. The working Blue wrapper is
+`blue/core/wrapper.py`, the evidence tracker is `blue/core/masking.py`, and
+the baseline policies/evaluation helpers are in `blue/core/baselines.py`.
+The older statements below that say Blue exists only on `blue/foundation`, or
+refer to a root-level `cc4_epymarl_wrapper.py`, are historical.
+
+The local dashboard integration is being drafted on
+`phase-one-final-review`, based on that exact main commit. It wraps the
+existing CAGE4 simulator locally; it does not modify
+`cage-challenge-4/CybORG/`. As of 2026-10-27 the dashboard UI is a React + Tailwind app under
+`frontend/` (Vite build into `frontend/dist/`), with a fixed actor picker,
+zone-aware interactive host graph (cloud center, zone-type icons, hover for
+host/evidence, topology first for a larger live view), Logs page,
+reward-over-steps chart, steps-per-second speed control and a dashboard
+audit-trail SIEM NDJSON export. An optional LLM Red opponent can be selected
+from the Red picker; it calls local Ollama only (`qwen2.5:3b` by default) and
+shows a Red-only planner/action trace with the validated goal, optional focus,
+native tactical action, plan status and latency. The dashboard caps LLM Red at
+12 requests and two plans per agent; this is a demonstration budget, not a
+full-strength attacker run. If the active Python
+interpreter lacks PyTorch, `/api/models` returns HTTP 200 with a
+`catalog_error`; the UI shows a neutral catalog notice and keeps baselines
+usable instead of presenting a server warning. Use `.venv-train` to load the
+142 local model options: 137 `agent.th` checkpoints, the verified `reference_s0`
+SetActor pilot (`blue/results/gpt_harness/v2_sensitivity/`), the main32
+risk+novelty PPO actor (`blue/results/gpt_harness/main32_status/`), and three
+locally retrained gate-ablation actors (`architecture_gate_ablation_v1/`:
+SetActor, fixed 0.5 blend, learned gate). The picker exposes a seven-entry
+candidate shortlist while retaining every raw checkpoint in its family group.
+The three gate-ablation entries are new local retrains from the frozen
+schedule, not recovered original artifacts. The `reference_s0` SetActor option
+is labeled historical pilot, not the later fixed 0.5 blend, and artifact
+options show actor/scorer SHA-256 hashes. The server must be restarted after
+rebuilding the frontend. That SIEM export
+is not simulator/sensor telemetry. No dashboard runtime episode has been
+recorded as validated beyond local smoke checks. Historical measurements below
+remain tied to their stated dates/commits and should not be read as
+measurements of this dashboard branch.
+
 ## RED-01 scripted baseline on a separate branch, 2026-10-01
 
 This worktree uses `red/strategy-adapter`, based on published main/telemetry

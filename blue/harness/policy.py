@@ -134,6 +134,9 @@ class StrictHarnessPolicy(HarnessPolicy):
         self.hook = hook
         self.last_request = None
         self.record_requests = bool(record_requests)
+        self.record_all_choices = False
+        self.candidate_audit_agent = None
+        self.last_candidate_audit = None
         from blue.harness.diagnostics import RequestDigest
         self.request_digest = RequestDigest()
 

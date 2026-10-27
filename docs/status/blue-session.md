@@ -1,5 +1,252 @@
 # Blue session update
 
+## All seven candidate actors available (2026-10-27)
+
+- Branch: `phase-one-final-review`; uncommitted. The dashboard now exposes a
+  dedicated `7 candidate models` group while retaining the full 142-option
+  catalog. All seven entries load through `/api/start` in short live episodes.
+- Four exact artifacts were already present: main32 risk+novelty
+  (`blue/results/gpt_harness/main32_status/s0/pilot/both_s0/actor.th`),
+  attention BC (`blue/results/models/bc_fact_attn1_20261002/0/agent.th`),
+  RvS (`blue/results/models/rvs_14/0/agent.th`), and IQL alpha 0.5
+  (`blue/results/models/iql_14a05/0/agent.th`).
+- The three missing gate-ablation artifacts were retrained locally from the
+  frozen schedule: `architecture_gate_ablation_v1/{set,fixed,hybrid}_s0`,
+  training RNG 0, train seeds 8465-8472, evaluation seeds recorded but not run,
+  6 iterations x 4 x 400-tick episodes, scorer SHA-256
+  `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`.
+  Actor hashes: set `d70e6476...03efbe`, fixed `0aad1409...021966`,
+  hybrid `da985c15...b2794`. These are new retrains from source commit
+  `926e7c3`, not recovered original artifacts; do not attach the original
+  two-seed effect sizes to them without re-evaluation.
+- main32 actor hash `33ec4c02...789354d`. The main32 loader uses
+  `blue.training.harness_rl.load_hook` with sampled execution and the
+  max-age harness guard. Gate-ablation loaders use `actor_for` +
+  `RedesignHook` + `StrictHarnessPolicy`.
+- Fixed `StrictHarnessPolicy` missing-audit-attribute crash by initializing
+  `candidate_audit_agent`, `record_all_choices`, and `last_candidate_audit`.
+  This unblocked the gate-ablation trainer without changing action selection.
+- Live Monitoring now places the interactive topology first at a wider
+  1200px maximum, with metrics and reward below it. The LLM Red option
+  (`llm-planner`) uses `red.blue_env.CC4LLMEnv` against local Ollama, defaults
+  to `qwen2.5:3b`, and exposes `/api/state.red_llm` plus a Red-only
+  `/api/state.red_trace`. Trace rows contain the validated goal/focus, native
+  action and target parameters, plan status, latency and prompt hash; they
+  never enter Blue inputs. Dashboard budget is 12 requests and two plans per
+  agent (12-turn interval), explicitly a demo cap rather than full Red strength.
+  Missing Ollama/model returns HTTP 400 with a clear message.
+- Validation: `/api/models` returns 142 options and exactly seven shortlist
+  entries; live 3-5 step episodes passed for main32, fixed, hybrid, set,
+  BC-attention, RvS, and IQL; a 4-step local `qwen2.5:3b` LLM Red run completed
+  with one accepted plan and a populated trace; missing-model start returned
+  HTTP 400; `npm run build` succeeded (bundle `index-Bn4jiRxP.js`);
+  `test_event_time_rl.py` + `test_attention_actor.py` (9 passed),
+  `test_harness.py` + `test_max_age_guard.py` (44 passed), `red/tests`
+  (56 passed) and `test_dashboard_llm_trace.py` (2 passed);
+  `scripts/check_source.py` and `git diff --check` passed.
+  Dashboard restarted on 8765; current server PID is in the session log, not
+  committed.
+
+## SetActor fixed pilot entry (2026-10-27)
+
+- Branch: `phase-one-final-review`; uncommitted. Added the verified
+  `reference_s0` SetActor checkpoint to the dashboard as a fixed picker option
+  (`setactor:gpt_harness/v2_sensitivity/reference_s0`), separate from the 137
+  `agent.th` scan. The loader in `blue/policies/setactor.py` uses the saved
+  manifest's `ages`/`belief` features, root-session flag, and policy settings.
+- Provenance: actor SHA-256
+  `75facbf39cf4bc7283e9273bb7bb8c50e7214a0ac167944bee7f26ca2c5518ea`;
+  scorer SHA-256
+  `ec4026a3c81c2746253f306fd7add00a07f42fe13533b856fb6b4d01b8402fcd`;
+  manifest `blue-harness-redesign-v2`, status `complete`, 400-tick pilot.
+- UI label is `SetActor · v2 sensitivity · reference · seed 0`, grouped under
+  `SetActor fixed pilot`, and shows both hashes plus the historical status:
+  near zero-residual control (+0.25 mean gain over four development episodes),
+  not the later fixed 0.5 SetActor/attention blend.
+- Validation: `/api/models` returns 138 options; `py_compile`,
+  `scripts/check_source.py` and `git diff --check` pass; `npm run build`
+  succeeds (1965 modules); a live 5-step API episode completed with this
+  SetActor selected and no server error. Dashboard restarted on 8765.
+
+## Zone-aware topology, model-catalog notice (2026-10-27)
+
+- Branch: `phase-one-final-review`; all work remains uncommitted. The running
+  dashboard on 8765 now uses `./.venv-train/bin/python -m blue.dashboard_server`
+  and discovers 137 local checkpoints.
+- Backend: `/api/state` and `/api/blue-view` host entries now include
+  `zone_id`, `zone_label` and `zone_kind`, derived from the CAGE4 host prefix.
+  `ZONE_INFO` maps the seven active Enterprise zones plus contractor/internet
+  fallbacks. `/api/models` now returns HTTP 200 with `models: []`,
+  `catalog_error` and `torch_available` when the interpreter lacks PyTorch,
+  instead of treating a missing catalog as a server failure. Startup prints the
+  `.venv-train` instruction.
+- Frontend warning semantics: only an unreachable dashboard API produces the
+  red warning. A catalog-only failure is a neutral blue info notice inside the
+  saved-actor picker; baseline selection and launch remain available. The
+  dropdown fallback reads "Model catalog unavailable — baselines still work".
+- Topology redesign in `frontend/src/components/Topology.jsx`: cloud center
+  instead of a "CAGE ENTERPRISE" text node; zone cards with icons for
+  restricted/operational/admin/public/office/shared zones; deliberately
+  non-uniform zone angles and radii; deterministic phyllotaxis host placement
+  with jitter; host hover scales the node and opens an HTML status popup (name,
+  agent, zone, subnet, evidence, pending action); zone legend below the graph.
+- Geometry validation with the 88 live hosts: no host-host collisions, no host
+  dot inside its own or another zone card, all dots inside the viewBox, and no
+  dot inside the central cloud. Host hit target is 13 units; dots are 6.5 units.
+- Validation: `npm run build` (1965 modules), Vite SSR render of the topology
+  with nine representative hosts, `py_compile`, and `git diff --check` passed.
+  Live API checks: `.venv-train` returned 137 models and 88 zone-tagged hosts;
+  `.venv` returned HTTP 200 with 0 models, `torch_available: false` and the
+  `.venv-train` catalog error. Manual visual review is still pending.
+
+## React + Tailwind frontend with Vite (2026-10-27)
+
+- Branch: `phase-one-final-review`. Replaced the hand-written
+  `frontend/index.html`/`script.js`/`styles.css` page with a proper npm project under
+  `frontend/`: React 19, Tailwind CSS 4 (`@tailwindcss/vite`), Vite 7 and
+  `lucide-react`. Sources live in `frontend/src/`; the built app is emitted to
+  `frontend/dist/`. `package.json` and `package-lock.json` are tracked;
+  `frontend/node_modules/` and `frontend/dist/` are gitignored.
+- `blue/dashboard_server.py` now serves `frontend/dist/index.html` plus
+  `/assets/*` and `/frontend/assets/*` with traversal-safe resolution. If the
+  build is missing it returns a 503 telling the user to run
+  `cd frontend && npm install && npm run build`. A `.well-known/*` probe now
+  returns 204, which stops Chrome DevTools' `com.chrome.devtools.json` 404 noise.
+  Static responses send `Cache-Control: no-store`.
+- Behaviour preserved and improved: hash routes for home/config/live/logs/
+  analyst, fixed grouped actor picker with friendly `run_label` names, Red agent
+  + seed + horizon config, live status/speed/pause, reward chart, interactive
+  topology with hover tooltips, filterable Logs table, recursive Blue
+  observation viewer, Episode JSON and SIEM NDJSON exports. The previously
+  dead theme toggles now switch a working light/dark theme (persisted in
+  `localStorage`), and the hidden mock Analytics/Reports/Export nav items were
+  not carried over.
+- `npm run dev` serves the UI at 5173 and proxies `/api` to the dashboard on
+  8765; production use builds `dist/` and starts `python -m blue.dashboard_server`.
+  README build/run instructions and the repository-layout row were updated.
+- Validation: `npm run build` succeeds (Vite 7.3.7, 1965 modules); rerun
+  `python -m py_compile` and `scripts/check_source.py`; HTTP smoke on a spare
+  port returned 200 for `/`, `/index.html`, `/frontend/`, hashed JS/CSS under
+  `/assets/` and `/frontend/assets/`, `/api/state`, `/api/models`, and 204 for
+  the DevTools probe. No headless browser was available, so no automated visual
+  test was run. The running server on 8765 must be restarted to load the new
+  backend code; the old process cannot serve the Vite entry.
+
+## Frontend folder, fixed actor picker, interactive graph, logs and SIEM export (2026-10-27)
+
+- Branch: `phase-one-final-review`. Moved the dashboard page/script/styles from
+  the repo root into `frontend/` (`index.html`, `script.js`, `styles.css`).
+  `blue/dashboard_server.py` now serves the frontend folder (bare `/` and
+  `/frontend/*` both work). README layout/link updated.
+- Actor selection is now a fixed, friendly list. Removed the free-text checkpoint
+  search; `blue/model_catalog.py` produces a readable `run_label`
+  (`MAPPO · CAGE4 · seed 7 · 2026-10-04`) plus `checkpoint_step`, so users no
+  longer see or type raw run folders. Weights still live in the gitignored
+  `blue/results/models/`; nothing is copied into `frontend/`, matching the repo
+  rule that model weights stay outside Git.
+- Interactive topology: removed always-on per-host labels (clutter). Host groups
+  now carry native hover tooltips with host name, owning Blue agent, evidence
+  state, subnet and pending status; hover highlights the node, evidence colours
+  are explained by an on-panel legend, and pending hosts pulse. Subnet nodes
+  gained hover tooltips.
+- New Logs tab (friendly event page): step/time/type badges, friendly Blue-agent
+  labels, host/target, readable description and status pills; filter pills and
+  an empty state. The live event table moved here; Live Monitoring links to it.
+- Added a reward-over-steps line chart (`reward_history` from `/api/state`) and a
+  live speed control (0.25×/0.5×/1×/2×/4×) posted to `/api/control` as `speed`;
+  the status timer shows current steps/s. Backend validates `speed` in 0.1–8.
+- SIEM export: `Export SIEM NDJSON` (toolbar and Logs page) downloads the episode
+  audit trail as Elasticsearch `_bulk` pairs (`cyberally-blue-audit` index),
+  labelled `cyberally-dashboard-siem-v1`, with Blue-visible risk tags and
+  evaluation rows flagged `evaluation_only`. This exports dashboard events, not
+  host/sensor telemetry.
+- Remote check: `origin/ml-anomaly-scoring` advanced `f708710..8957795` with
+  `c668711 eval: add SIEM audit trail, metrics evaluator, NDJSON exporter and
+  tests` and `8957795` (ASCII console/test paths). Those commits touch only
+  `loop_eval/` (`eval_siem_metrics.py`, `siem_export_ndjson.py`,
+  `test_eval_siem.py`, `run_baseline_eval.py`) and contain no UI changes. They
+  reference older module paths (`cc4_epymarl_wrapper`, `blue_baselines`), so they
+  were not merged or consumed here; Evaluation owns `loop_eval/`.
+- Merge caveat: that branch still keeps `index.html`/`script.js`/`styles.css` at
+  the repo root. Integrating it later must resolve against this `frontend/` move
+  rather than reintroducing root duplicates.
+- Validation: `node --check frontend/script.js`, `py_compile` for
+  `blue/dashboard_server.py` and `blue/model_catalog.py`, `git diff --check`.
+  Live smoke: a 6-step `round_robin` episode completed under the venv-train
+  interpreter with `reward_history`, `speed`/`tick_seconds`, and defense
+  events carrying `action`; pause/resume + speed change validated; HTTP checks
+  confirmed `/`, `/frontend/script.js`, `/frontend/styles.css`, `/api/models`
+  and `/api/state`. No full test suite was run.
+
+## Local checkpoint inventory and dashboard selector (2026-10-27)
+
+- Branch remains `phase-one-final-review` at `926e7c3` with the pre-existing
+  dashboard edits preserved. The ignored `blue/results/models/` folder contains
+  137 `agent.th` checkpoints; cleanup did not remove these files.
+- Inspected checkpoint state dicts with PyTorch `weights_only=True`. Inventory:
+  86 online MAPPO, 23 behavior-cloning, 25 IQL/offline-AWR and 3 return-
+  conditioned RvS checkpoints. Architectures: 80 vanilla recurrent, 53
+  factorized recurrent, 1 factorized recurrent with one attention layer, and 3
+  factorized recurrent with return conditioning. All 137 match a recognized
+  architecture and supported CAGE4 observation/action layout.
+- Added `blue/model_catalog.py` to read local checkpoint metadata and added an
+  API-backed selector for every checkpoint plus Sleep, masked-random and
+  round-robin controls. Neural choices reconstruct their saved architecture and
+  temporal observation groups; RvS uses its return-conditioned loader. Results
+  are labeled experimental and not treated as model endorsements.
+- Replaced static host cards with a centered SVG graph: CAGE4 is the central
+  node, linked to actual subnet groups and their hosts, colored only by Blue
+  tracker evidence. Added a
+  separate analyst page whose `/api/blue-view` response contains only Blue-owned
+  hosts, retained Blue observations and tracker/pending-action state; the page
+  polls that endpoint instead of `/api/state`.
+- Simplified policy choice into baseline vs experiment groups with searchable
+  checkpoint names and readable architecture/result notes. Tightened the event
+  table into a compact, sticky-header scroll region. Replaced raw JSON on the
+  analyst page with expandable, human-readable Blue observation fields.
+- Experiment context shown by family: MAPPO checkpoints include regressions;
+  BC attention distillation reached teacher parity in one held-out screen but
+  did not confirm a gain; IQL held-out gates failed or were inconclusive; RvS
+  was near teacher parity without confirmed improvement.
+- Checkpoint weights remain ignored/local. The SetActor/fixed-blend architecture
+  pilot artifacts use `actor.th`, not `agent.th`, so they are not included in
+  this `agent.th` selector. The Oct 25 architecture result directories were not
+  found in this checkout or the searched local project paths.
+- Validation: catalog inspection found all 137 and marked all 137 compatible;
+  Python compilation, JavaScript syntax check and `git diff --check` passed.
+  No simulator episode or test suite was run. Dashboard now needs
+  `.venv-train/bin/python` to inspect and load neural checkpoints.
+
+## Phase-one dashboard integration (2026-10-27)
+
+- Current branch: `phase-one-final-review`, based on `main` commit `926e7c3`.
+- Frontend source: page, script and styles from `origin/ml-anomaly-scoring` commit
+  `f708710`; replaced its LLM/MARL hero artwork with a CAGE4-labeled CSS graphic.
+- Added `blue/dashboard_server.py`, a loopback-only local HTTP server using the
+  existing `blue.core.wrapper.CC4MARLEnv` and `blue.core.baselines` APIs. The UI
+  initially configured seed, horizon, one native CAGE4 Red variant and the
+  RoundRobin or Sleep Blue baseline. It shows CAGE4 hosts, Blue belief state, actions, native
+  team reward and an episode JSON export. Privileged red-session counts are
+  clearly isolated as evaluation labels.
+- Removed the prototype's generated fake live events, hardcoded network diagram,
+  sample analytics/reports and unsupported LLM/MARL claims from the connected
+  interface. This remains a CybORG simulator UI, not packet telemetry or a
+  container range.
+- The default system interpreter here is Python 3.14 without NumPy; the local
+  `.venv` and `.venv-train` are Python 3.12 and import the CAGE4 wrapper. README
+  now launches with `.venv-train/bin/python` for PyTorch checkpoint access, and
+  missing dependencies produce a direct
+  environment hint.
+- Validation: wrapper import under `.venv`, Python syntax compilation,
+  JavaScript syntax check and `git diff --check` passed. No simulator episode or
+  test suite was run in this turn.
+- Documentation mismatch: `docs/current-state.md` and older README history still
+  describe earlier wrapper paths/branch positions; current `main` has the
+  `blue/core/wrapper.py` implementation at the commit above.
+- Next task: run `./.venv-train/bin/python -m blue.dashboard_server`, launch a short
+  seeded episode in the browser, then record runtime fixes and confirm the
+  displayed observations/actions match the live wrapper.
+
 ## OP3 v5 complete: DEV GATE FAILED (2026-10-24)
 
 Branch `blue/contract-suite`; frozen source commit `c2c6cb6`, logged npz
