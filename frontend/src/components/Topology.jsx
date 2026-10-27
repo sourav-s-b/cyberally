@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { friendlyAgent, resultInfo } from '../format.js';
 import {
   Briefcase,
   Building2,
@@ -99,6 +100,24 @@ function hostEvidence(host) {
   return KNOWN_EVIDENCE.has(value) ? value : 'unknown';
 }
 
+function hostActionClass(host) {
+  if (host.pending_action === 'Remove') return 'edge-pending edge-remove';
+  if (host.pending_action === 'Restore') return 'edge-pending edge-restore';
+  if (host.last_action === 'Remove') return 'edge-remove-soft';
+  if (host.last_action === 'Restore') return 'edge-restore-soft';
+  return '';
+}
+
+function redActionClass(host, actionsByTarget) {
+  const activity = actionsByTarget.get(String(host.name || '').toLowerCase());
+  if (!activity) return '';
+  const action = activity.action.toLowerCase();
+  const actionClass = action === 'remove' || action === 'restore' || action === 'analyse'
+    ? `edge-red-${action}`
+    : 'edge-red-other';
+  return `red-action-edge ${actionClass}`;
+}
+
 function zoneFor(host) {
   if (host.zone_id) {
     return {
@@ -158,8 +177,19 @@ function tooltipStyle(x, y) {
   return style;
 }
 
-export default function Topology({ hosts }) {
+export default function Topology({ hosts, redAnimation = false, redTrace = [] }) {
   const [hovered, setHovered] = useState(null);
+  const redActionsByTarget = new Map();
+  for (const entry of redTrace) {
+    const target = String(entry.target || '').trim().toLowerCase();
+    if (target && !redActionsByTarget.has(target)) {
+      redActionsByTarget.set(target, {
+        action: String(entry.action || 'Action'),
+        step: entry.step,
+        result: entry.result,
+      });
+    }
+  }
 
   const zones = useMemo(() => {
     const grouped = new Map();
@@ -226,6 +256,10 @@ export default function Topology({ hosts }) {
     setHovered((current) => (current?.key === key ? null : current));
   };
 
+  const hoveredRedActivity = hovered
+    ? redActionsByTarget.get(String(hovered.host.name || '').toLowerCase()) || null
+    : null;
+
   return (
     <div>
       <div className="relative mx-auto aspect-[5/4] w-full max-w-[1200px]">
@@ -233,7 +267,7 @@ export default function Topology({ hosts }) {
           viewBox={`0 0 ${VIEW.width} ${VIEW.height}`}
           role="img"
           aria-label="CAGE4 zones, hosts and Blue-visible evidence status"
-          className="absolute inset-0 h-full w-full"
+          className={`absolute inset-0 h-full w-full ${redAnimation ? 'red-action-animate' : ''}`}
         >
           <defs>
             <radialGradient id="topology-glow" cx="50%" cy="50%" r="50%">
@@ -268,7 +302,7 @@ export default function Topology({ hosts }) {
               y1={zone.y}
               x2={point.x}
               y2={point.y}
-              className="topology-host-edge"
+              className={`topology-host-edge ${hostActionClass(point.host)} ${redActionClass(point.host, redActionsByTarget)}`}
             />
           )))}
 
@@ -329,6 +363,8 @@ export default function Topology({ hosts }) {
             const key = `${point.host.agent}-${point.host.name}-${point.hostIndex}`;
             const isHovered = hovered?.key === key;
             const isRouter = point.host.name.includes('_router');
+            const redActivity = redActionsByTarget.get(String(point.host.name || '').toLowerCase());
+            const redActionType = String(redActivity?.action || '').toLowerCase();
             return (
               <g
                 key={`host-${key}`}
@@ -336,7 +372,7 @@ export default function Topology({ hosts }) {
                 className="topology-host-group"
                 tabIndex={0}
                 role="button"
-                aria-label={`${point.host.name}, ${EVIDENCE_LABEL[evidence]}${point.host.pending ? ', action pending' : ''}`}
+                aria-label={`${point.host.name}, ${EVIDENCE_LABEL[evidence]}${point.host.pending ? ', action pending' : ''}${redActivity ? `, latest Red action ${redActivity.action}` : ''}`}
                 onMouseEnter={() => setHostHover(point, zone)}
                 onMouseLeave={() => clearHostHover(key)}
                 onFocus={() => setHostHover(point, zone)}
@@ -354,6 +390,15 @@ export default function Topology({ hosts }) {
                   className="topology-host-scale"
                   style={{ transform: isHovered ? 'scale(1.65)' : 'scale(1)' }}
                 >
+                  {redAnimation && redActivity ? (
+                    <circle
+                      r={11}
+                      className={`topology-host-red-action ${
+                        ['remove', 'restore', 'analyse'].includes(redActionType)
+                          ? `edge-red-${redActionType}` : ''
+                      }`}
+                    />
+                  ) : null}
                   {isRouter ? (
                     <rect
                       x={-6}
@@ -366,7 +411,15 @@ export default function Topology({ hosts }) {
                   ) : (
                     <circle r={6.5} className={`topology-host-dot evidence-${evidence}`} />
                   )}
-                  {point.host.pending ? <circle r={11} className="topology-host-pending" /> : null}
+                  {point.host.pending ? (
+                    <circle
+                      r={11}
+                      className={`topology-host-pending ${
+                        point.host.pending_action === 'Restore' ? 'pending-restore'
+                          : point.host.pending_action === 'Analyse' ? 'pending-analyse' : ''
+                      }`}
+                    />
+                  ) : null}
                 </g>
               </g>
             );
@@ -380,7 +433,7 @@ export default function Topology({ hosts }) {
                 <div className="min-w-0">
                   <p className="truncate font-mono text-[11px] font-semibold text-ink">{hovered.host.name}</p>
                   <p className="mt-0.5 truncate text-[10px] text-dim">
-                    {hovered.zoneLabel} · {hovered.host.agent}
+                    {hovered.zoneLabel} · {friendlyAgent(hovered.host.agent)}
                   </p>
                 </div>
                 <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold ${EVIDENCE_BADGE[hostEvidence(hovered.host)]}`}>
@@ -393,9 +446,21 @@ export default function Topology({ hosts }) {
                   <span className="truncate font-mono">{hovered.host.subnet || 'unknown'}</span>
                 </p>
                 <p className="flex justify-between gap-3">
-                  <span className="text-dim">Status</span>
-                  <span className={hovered.host.pending ? 'text-brand-orange' : 'text-muted'}>
-                    {hovered.host.pending ? 'Action pending' : 'No action pending'}
+                  <span className="text-dim">Blue action</span>
+                  <span className="truncate text-right">
+                    {hovered.host.pending_action
+                      ? `${hovered.host.pending_action} pending`
+                      : hovered.host.last_action
+                        ? `${hovered.host.last_action} · ${resultInfo(hovered.host.last_result).label}`
+                        : 'None'}
+                  </span>
+                </p>
+                <p className="flex justify-between gap-3" title={hoveredRedActivity?.action || 'No Red action recorded'}>
+                  <span className="text-dim">Red activity</span>
+                  <span className="truncate text-right font-medium text-brand-red">
+                    {hoveredRedActivity
+                      ? `${hoveredRedActivity.action} · ${resultInfo(hoveredRedActivity.result).label}${hoveredRedActivity.step != null ? ` · step ${hoveredRedActivity.step}` : ''}`
+                      : 'No Red action recorded'}
                   </span>
                 </p>
               </div>
@@ -405,7 +470,6 @@ export default function Topology({ hosts }) {
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 pb-3 text-[10px] text-dim">
-        <span className="font-semibold uppercase tracking-wider">Zones</span>
         <span className="inline-flex items-center gap-1.5">
           <ShieldAlert size={12} className="text-brand-red" /> Restricted
         </span>
@@ -417,6 +481,12 @@ export default function Topology({ hosts }) {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full border border-white/70 bg-brand-blue" /> Host
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-full bg-brand-orange" /> Remove
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded-full bg-brand-green" /> Restore
         </span>
       </div>
     </div>

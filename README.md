@@ -31,7 +31,7 @@ discovery/loading):
 
 ```sh
 cd frontend
-npm install
+npm ci
 npm run build
 cd ..
 ./.venv-train/bin/python -m blue.dashboard_server
@@ -40,6 +40,13 @@ cd ..
 `npm run dev` serves the UI at <http://127.0.0.1:5173> with hot reload and
 proxies `/api` to the dashboard server on port 8765. `frontend/node_modules/`
 and `frontend/dist/` stay out of Git; commit source and `package-lock.json`.
+
+Dashboard actor weights and verified dashboard models are bundled in
+`blue/assets/dashboard-models.zip` (about 43 MB). The server unpacks missing
+files into ignored `blue/results/` on first start, so clones need no separate
+model download. Existing local model files are left untouched. PyTorch is
+required to inspect and run neural checkpoints; simulator baselines remain
+available without it.
 
 On Windows PowerShell, use `.\.venv-train\Scripts\python.exe -m blue.dashboard_server`.
 If `.venv-train` does not exist, set it up with the project's training and
@@ -51,12 +58,12 @@ Then open <http://127.0.0.1:8765>. The dashboard (React sources in `frontend/src
 built into `frontend/dist/`) launches
 the existing CAGE4 Enterprise wrapper with a selected native Red variant and a
 Blue baseline or locally saved `agent.th` actor chosen from a fixed, friendly
-drop-down. It shows a zone-aware host graph with a cloud center, zone-type
-icons and a hover popup for each host's name, agent, subnet, evidence and
-pending status, a reward-over-steps chart, a steps-per-second speed control,
-a filterable Logs page and a separate analyst page backed only by
-Blue-visible observations. It records joint simulator steps, Blue actions and
-native team reward. Privileged Red-session counts are marked as evaluation-only
+drop-down. It shows a zone-aware host graph with coloured pending/recent
+Remove and Restore connectors, compact Red/Blue traces, a reward-over-steps
+chart, speed control, a filterable Logs page and an interactive analyst page
+backed only by Blue-visible decisions and observations. It records joint
+simulator steps, Blue actions and native team reward. Privileged Red-session
+counts are marked as evaluation-only
 and are not policy inputs. The episode audit trail can be downloaded as SIEM
 NDJSON (Elasticsearch `_bulk`); this is a dashboard audit export, not real host
 telemetry. The server binds to loopback and serves only the built dashboard

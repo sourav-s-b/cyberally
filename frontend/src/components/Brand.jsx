@@ -6,6 +6,7 @@ export default function Brand({ onClick, compact = false, className = '' }) {
     <button
       type="button"
       onClick={onClick}
+      disabled={!onClick}
       className={`flex items-center gap-2.5 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/40 ${className}`}
     >
       <svg

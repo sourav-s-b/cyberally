@@ -72,3 +72,43 @@ def test_llm_red_state_reports_budget_and_model():
         "planner_interval": 12,
         "max_plans_per_agent": 2,
     }
+
+
+class ExploitRemoteService:
+    def get_params(self):
+        return {
+            "agent": "red_agent_0",
+            "hostname": "user_host_1",
+            "ip_address": "10.0.0.5",
+        }
+
+
+def test_native_red_trace_records_executed_action_without_planner():
+    dashboard = Dashboard.__new__(Dashboard)
+    dashboard.env = SimpleNamespace(
+        env=SimpleNamespace(
+            agent_interfaces={
+                "red_agent_0": SimpleNamespace(
+                    agent=SimpleNamespace(last_action=ExploitRemoteService())),
+            },
+            action={"red_agent_0": [ExploitRemoteService()]},
+            get_last_observation=lambda name: SimpleNamespace(
+                data={"success": "TRUE"}),
+        ),
+    )
+    dashboard.red_name = "discovery"
+    dashboard.tick = 7
+    dashboard.red_trace = deque(maxlen=MAX_RED_TRACE)
+    dashboard._red_marks = {}
+
+    dashboard._capture_red_trace()
+
+    assert len(dashboard.red_trace) == 1
+    entry = dashboard.red_trace[0]
+    assert entry["agent"] == "red_agent_0"
+    assert entry["action"] == "ExploitRemoteService"
+    assert entry["target"] == "user_host_1"
+    assert entry["result"] == "TRUE"
+    assert entry["plan_status"] == "native"
+    assert entry["goal"] is None
+    assert entry["parameters"]["hostname"] == "user_host_1"

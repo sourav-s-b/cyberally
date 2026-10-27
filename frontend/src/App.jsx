@@ -89,6 +89,30 @@ export default function App() {
     };
   }, [view]);
 
+  useEffect(() => {
+    if (view !== 'home') return undefined;
+    let cancelled = false;
+    let polling = false;
+    const pollState = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const data = await request('/api/state');
+        if (!cancelled) setEpisode(data);
+      } catch {
+        if (!cancelled) setEpisode(null);
+      } finally {
+        polling = false;
+      }
+    };
+    pollState();
+    const timer = window.setInterval(pollState, 1200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [view]);
+
   const updateConfig = useCallback((patch) => {
     setConfig((current) => ({ ...current, ...patch }));
   }, []);
@@ -124,10 +148,31 @@ export default function App() {
     }
   }, [toast]);
 
+  const resumeEpisode = useCallback(() => {
+    if (!episode || !['running', 'paused'].includes(episode.status)) return;
+    if (episode.status === 'paused') control({ running: true }, 'Simulation resumed');
+    navigate('live-monitoring');
+  }, [episode, control, navigate]);
+
   const togglePause = useCallback(() => {
     if (!episode || !['running', 'paused'].includes(episode.status)) return;
     control({ running: episode.status !== 'running' });
   }, [episode, control]);
+
+  const stopEpisode = useCallback(async () => {
+    if (!episode || !['running', 'paused'].includes(episode.status)) {
+      toast('Launch a CAGE4 episode before stopping.', 'info');
+      return;
+    }
+    try {
+      const data = await request('/api/stop', { method: 'POST' });
+      setEpisode(data);
+      setServerError('');
+      toast('CAGE4 episode stopped', 'success');
+    } catch (error) {
+      toast(error.message, 'error');
+    }
+  }, [episode, toast]);
 
   const changeSpeed = useCallback((value) => {
     if (!episode || !['running', 'paused'].includes(episode.status)) {
@@ -174,6 +219,8 @@ export default function App() {
       {view === 'home' ? (
         <HomeView
           onStart={() => navigate('config')}
+          onResume={resumeEpisode}
+          episode={episode}
           onToast={toast}
           theme={theme}
           onToggleTheme={toggleTheme}
@@ -204,6 +251,7 @@ export default function App() {
           serverError={serverError}
           onNavigate={navigate}
           onTogglePause={togglePause}
+          onStop={stopEpisode}
           onSpeed={changeSpeed}
           onExportJson={exportJson}
           onExportSiem={exportSiem}

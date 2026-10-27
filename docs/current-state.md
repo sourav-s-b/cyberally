@@ -23,11 +23,18 @@ from the Red picker; it calls local Ollama only (`qwen2.5:3b` by default) and
 shows a Red-only planner/action trace with the validated goal, optional focus,
 native tactical action, plan status and latency. The dashboard caps LLM Red at
 12 requests and two plans per agent; this is a demonstration budget, not a
-full-strength attacker run. If the active Python
+full-strength attacker run. A compact Blue action trace sits beside it; Red
+details open a modal, while Blue details open the analyst page. Analyst and
+state payloads expose `pending_action`, `last_action` and `last_result` per
+host, and topology connectors colour pending or recent Remove (orange),
+Restore (green) and Analyse (purple). CAGE4's enabled host actions remain
+Remove and Restore; zone-level traffic blocking is not enabled. If the active Python
 interpreter lacks PyTorch, `/api/models` returns HTTP 200 with a
 `catalog_error`; the UI shows a neutral catalog notice and keeps baselines
-usable instead of presenting a server warning. Use `.venv-train` to load the
-142 local model options: 137 `agent.th` checkpoints, the verified `reference_s0`
+usable instead of presenting a server warning. Dashboard model files are
+bundled in `blue/assets/dashboard-models.zip` and unpacked into ignored result
+paths on server startup. Use `.venv-train` to load the 142 model options: 137
+`agent.th` checkpoints, the verified `reference_s0`
 SetActor pilot (`blue/results/gpt_harness/v2_sensitivity/`), the main32
 risk+novelty PPO actor (`blue/results/gpt_harness/main32_status/`), and three
 locally retrained gate-ablation actors (`architecture_gate_ablation_v1/`:

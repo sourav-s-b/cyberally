@@ -1,7 +1,30 @@
 import { Fragment, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { friendlyFieldName } from '../format.js';
-import { FieldLabel, Panel, PanelHeader, selectClass } from '../ui.jsx';
+import {
+  actionBadgeClass, friendlyAgent, friendlyFieldName, resultInfo,
+} from '../format.js';
+import { Badge, FieldLabel, Panel, PanelHeader, selectClass } from '../ui.jsx';
+
+const EVIDENCE_BADGE = {
+  CLEAN: 'border-brand-green/40 bg-brand-green/10 text-brand-green',
+  SUSPICIOUS: 'border-brand-yellow/40 bg-brand-yellow/10 text-brand-yellow',
+  CONFIRMED: 'border-brand-red/40 bg-brand-red/10 text-brand-red',
+  VERIFY: 'border-brand-orange/40 bg-brand-orange/10 text-brand-orange',
+  UNKNOWN: 'border-line-strong bg-surface-2 text-muted',
+};
+
+function EvidenceBadge({ value }) {
+  const evidence = String(value || 'UNKNOWN').toUpperCase();
+  return (
+    <Badge className={EVIDENCE_BADGE[evidence] || EVIDENCE_BADGE.UNKNOWN}>
+      {evidence.charAt(0) + evidence.slice(1).toLowerCase()}
+    </Badge>
+  );
+}
+
+function ActionBadge({ action }) {
+  return <Badge className={actionBadgeClass(action)}>{action || '—'}</Badge>;
+}
 
 function ObservationValue({ value, depth = 0 }) {
   if (value === null || value === undefined || value === '') {
@@ -66,17 +89,52 @@ function ObservationSection({ title, value, defaultOpen }) {
   );
 }
 
+function Metric({ label, value, tone }) {
+  return (
+    <div className="rounded-xl border border-line bg-surface-2 px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-dim">{label}</p>
+      <p className={`mt-0.5 font-mono text-lg font-bold ${tone}`}>{value}</p>
+    </div>
+  );
+}
+
 export default function AnalystView({ blueView }) {
   const [agentName, setAgentName] = useState('');
   const [hostName, setHostName] = useState('');
+  const [streamAgent, setStreamAgent] = useState('all');
+  const [showSleep, setShowSleep] = useState(false);
 
   const agents = blueView?.agents || [];
+  const trace = blueView?.blue_trace || [];
   const agent = agents.find((item) => item.name === agentName) || agents[0];
   const hosts = agent?.hosts || [];
   const host = hosts.find((item) => item.name === hostName) || hosts[0];
-  const scope = blueView
-    ? `${blueView.status || 'idle'} · step ${blueView.tick || 0}/${blueView.horizon || 0} · ${blueView.view_scope || 'Blue view only'}`
-    : 'Launch a CAGE4 episode to inspect Blue-visible observations.';
+  const stream = trace
+    .filter((entry) => streamAgent === 'all' || entry.agent === streamAgent)
+    .filter((entry) => showSleep || entry.action !== 'Sleep')
+    .slice(0, 80);
+  const hostActions = trace
+    .filter((entry) => entry.agent === agent?.name && entry.target === host?.name)
+    .slice(0, 6);
+  const pendingHosts = agents.reduce(
+    (count, item) => count + item.hosts.filter((entry) => entry.pending).length, 0,
+  );
+  const confirmedHosts = agents.reduce(
+    (count, item) => count + item.hosts.filter(
+      (entry) => String(entry.evidence).toUpperCase() === 'CONFIRMED',
+    ).length, 0,
+  );
+  const failedActions = trace.filter(
+    (entry) => String(entry.result).toLowerCase() === 'false',
+  ).length;
+  const scope = !blueView || blueView.status === 'idle'
+    ? 'No episode launched.'
+    : `${blueView.blue_policy || 'No policy'} · step ${blueView.tick || 0}/${blueView.horizon || 0}`;
+
+  const selectAgent = (name) => {
+    setAgentName(name);
+    setHostName('');
+  };
 
   return (
     <Panel className="overflow-hidden">
@@ -84,71 +142,187 @@ export default function AnalystView({ blueView }) {
         title="Blue analyst view"
         subtitle={scope}
         actions={(
-          <div className="w-full sm:w-48">
-            <FieldLabel htmlFor="analyst-agent">Blue agent</FieldLabel>
+          <div className="w-full sm:w-52">
+            <FieldLabel htmlFor="analyst-agent">Inspecting</FieldLabel>
             <select
               id="analyst-agent"
               className={selectClass}
               value={agent?.name || ''}
-              onChange={(event) => {
-                setAgentName(event.target.value);
-                setHostName('');
-              }}
+              onChange={(event) => selectAgent(event.target.value)}
               disabled={!agents.length}
             >
               {agents.length ? agents.map((item) => (
-                <option key={item.name} value={item.name}>{item.name}</option>
+                <option key={item.name} value={item.name}>{friendlyAgent(item.name)}</option>
               )) : <option value="">No agents</option>}
             </select>
           </div>
         )}
       />
 
-      <div className="grid gap-4 p-4 lg:grid-cols-[250px_1fr]">
-        <aside className="space-y-3">
-          <div>
-            <FieldLabel htmlFor="analyst-host">Owned host</FieldLabel>
-            <select
-              id="analyst-host"
-              className={selectClass}
-              value={host?.name || ''}
-              onChange={(event) => setHostName(event.target.value)}
-              disabled={!hosts.length}
-            >
-              {hosts.length ? hosts.map((item) => (
-                <option key={item.name} value={item.name}>{item.name}</option>
-              )) : <option value="">No hosts</option>}
-            </select>
-          </div>
-          <div className="rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted">
-            {host
-              ? `Evidence: ${host.evidence} · ${host.pending ? 'action pending' : 'no action pending'} · subnet: ${(host.subnets || []).join(', ') || 'unknown'}`
-              : 'No Blue-owned hosts are available.'}
-          </div>
-          <p className="rounded-xl border border-line bg-surface-2 px-3 py-2.5 text-[11px] leading-relaxed text-dim">
-            Only Blue-visible observations are shown here. Privileged simulator state stays in the
-            separate evaluation labels.
-          </p>
-        </aside>
+      <div className="space-y-4 p-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Metric label="Actions" value={trace.length} tone="text-brand-blue" />
+          <Metric label="Pending" value={pendingHosts} tone="text-brand-yellow" />
+          <Metric label="Confirmed" value={confirmedHosts} tone="text-brand-red" />
+          <Metric label="Failed" value={failedActions} tone="text-brand-orange" />
+        </div>
 
-        <div className="min-w-0">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-dim">Retained Blue observation</h4>
-          {!host || !Object.keys(host.observation || {}).length ? (
-            <p className="rounded-xl border border-line bg-surface-2 px-3 py-4 text-sm italic text-dim">
-              No detailed fields are visible yet. Blue may need to observe or analyse this host.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {Object.entries(host.observation).map(([key, value], index) => (
-                <ObservationSection
-                  key={key}
-                  title={friendlyFieldName(key)}
-                  value={value}
-                  defaultOpen={index < 2}
-                />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+          <div className="overflow-hidden rounded-xl border border-line">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface-2/60 px-3 py-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-dim">Blue action stream</h4>
+              <div className="flex items-center gap-2">
+                <select
+                  className={`${selectClass} w-auto px-2 py-1 text-xs`}
+                  value={streamAgent}
+                  onChange={(event) => setStreamAgent(event.target.value)}
+                  aria-label="Filter trace by agent"
+                >
+                  <option value="all">All agents</option>
+                  {agents.map((item) => (
+                    <option key={item.name} value={item.name}>{friendlyAgent(item.name)}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setShowSleep((current) => !current)}
+                  className={`rounded-lg border px-2 py-1 text-[10px] font-semibold ${
+                    showSleep
+                      ? 'border-brand-indigo/40 bg-brand-indigo/15 text-ink'
+                      : 'border-line bg-surface-2 text-muted'
+                  }`}
+                >
+                  {showSleep ? 'Hide Sleep' : 'Show Sleep'}
+                </button>
+              </div>
+            </div>
+            <div className="scrollbar-thin max-h-[30rem] overflow-auto">
+              {stream.length ? stream.map((entry, index) => {
+                const result = resultInfo(entry.result);
+                return (
+                  <button
+                    key={`${entry.time}-${entry.agent}-${entry.step}-${index}`}
+                    type="button"
+                    onClick={() => {
+                      setAgentName(entry.agent);
+                      setHostName(entry.target || '');
+                    }}
+                    className="flex w-full items-center gap-2 border-b border-line px-3 py-2 text-left text-[10px] last:border-0 hover:bg-surface-hover"
+                  >
+                    <span className="w-8 shrink-0 font-mono text-dim">#{entry.step}</span>
+                    <span className="w-20 shrink-0 truncate text-muted">{friendlyAgent(entry.agent)}</span>
+                    <ActionBadge action={entry.action} />
+                    <span className="min-w-0 flex-1 truncate font-mono text-ink">{entry.target || '—'}</span>
+                    <Badge className={`shrink-0 ${result.badge}`}>{result.label}</Badge>
+                  </button>
+                );
+              }) : (
+                <p className="px-4 py-10 text-center text-xs text-dim">No matching actions yet.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1">
+              {agents.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  onClick={() => selectAgent(item.name)}
+                  className={`rounded-lg border px-2 py-1 text-[10px] font-semibold ${
+                    item.name === agent?.name
+                      ? 'border-brand-indigo/40 bg-brand-indigo/15 text-ink'
+                      : 'border-line bg-surface-2 text-muted hover:bg-surface-hover'
+                  }`}
+                >
+                  {friendlyAgent(item.name)}
+                  {item.pending_action ? (
+                    <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-brand-yellow" />
+                  ) : null}
+                </button>
               ))}
             </div>
-          )}
+
+            <div className="scrollbar-thin max-h-44 overflow-auto rounded-xl border border-line bg-surface-2 p-1.5">
+              <div className="grid grid-cols-2 gap-1">
+                {hosts.map((item) => (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => setHostName(item.name)}
+                    className={`min-w-0 rounded-lg border px-2 py-1.5 text-left ${
+                      item.name === host?.name
+                        ? 'border-brand-indigo/40 bg-brand-indigo/15'
+                        : 'border-transparent hover:border-line'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full bg-current evidence-${String(item.evidence || 'unknown').toLowerCase()}`} />
+                      <span className="truncate font-mono text-[10px] text-ink">{item.name}</span>
+                    </span>
+                    <span className="mt-0.5 block truncate text-[9px] text-dim">
+                      {item.pending_action ? `${item.pending_action} pending`
+                        : item.last_action ? `${item.last_action} · ${resultInfo(item.last_result).label}`
+                          : 'No action'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {host ? (
+              <div className="rounded-xl border border-line bg-surface-2 px-3 py-3">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold text-ink">{host.name}</span>
+                  <EvidenceBadge value={host.evidence} />
+                  {host.pending_action ? (
+                    <ActionBadge action={host.pending_action} />
+                  ) : host.last_action ? (
+                    <ActionBadge action={host.last_action} />
+                  ) : null}
+                </div>
+                <p className="mt-1 truncate font-mono text-[9px] text-dim">
+                  {(host.subnets || []).join(', ') || 'subnet unknown'}
+                </p>
+
+                <div className="mt-3 space-y-1">
+                  {hostActions.length ? hostActions.map((entry, index) => {
+                    const result = resultInfo(entry.result);
+                    return (
+                      <div key={`${entry.step}-${entry.action}-${index}`} className="flex items-center gap-2 text-[10px]">
+                        <span className="w-8 font-mono text-dim">#{entry.step}</span>
+                        <ActionBadge action={entry.action} />
+                        <span className="min-w-0 flex-1 truncate text-muted">{friendlyAgent(entry.agent)}</span>
+                        <Badge className={result.badge}>{result.label}</Badge>
+                      </div>
+                    );
+                  }) : (
+                    <p className="text-[10px] italic text-dim">No actions on this host.</p>
+                  )}
+                </div>
+
+                <div className="mt-3 border-t border-line pt-2">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-dim">Retained observation</p>
+                  {!Object.keys(host.observation || {}).length ? (
+                    <p className="text-[10px] italic text-dim">No fields observed yet.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {Object.entries(host.observation).map(([key, value], index) => (
+                        <ObservationSection
+                          key={key}
+                          title={friendlyFieldName(key)}
+                          value={value}
+                          defaultOpen={index < 1}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-line bg-surface-2 px-3 py-4 text-xs italic text-dim">No owned hosts.</p>
+            )}
+          </div>
         </div>
       </div>
     </Panel>

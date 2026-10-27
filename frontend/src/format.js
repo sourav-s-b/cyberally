@@ -19,28 +19,43 @@ export function friendlyFieldName(value) {
 }
 
 export function friendlyAgent(value) {
-  const match = String(value || '').match(/^blue_agent_(\d+)$/);
-  return match ? `Blue agent ${Number(match[1]) + 1}` : value || 'CAGE4';
+  const blue = String(value || '').match(/^blue_agent_(\d+)$/);
+  if (blue) return `Blue agent ${Number(blue[1]) + 1}`;
+  const red = String(value || '').match(/^red_agent_(\d+)$/);
+  if (red) return `Red agent ${Number(red[1]) + 1}`;
+  return value || 'CAGE4';
 }
 
-export function friendlyResult(event) {
-  if (event.type === 'evaluation') {
-    return { label: 'Evaluation only', badge: 'border-brand-purple/30 bg-brand-purple/10 text-brand-purple' };
-  }
-  const result = String(event.result ?? '').toLowerCase();
+export function resultInfo(value) {
+  const result = String(value ?? '').toLowerCase();
   if (result === 'true' || result === 'success') {
     return { label: 'Success', badge: 'border-brand-green/30 bg-brand-green/10 text-brand-green' };
   }
   if (result === 'false' || result === 'failed') {
     return { label: 'Failed', badge: 'border-brand-red/30 bg-brand-red/10 text-brand-red' };
   }
-  if (result === 'pending') {
-    return { label: 'Pending', badge: 'border-brand-yellow/30 bg-brand-yellow/10 text-brand-yellow' };
+  if (result === 'pending' || result === 'in_progress') {
+    return { label: result === 'in_progress' ? 'In progress' : 'Pending', badge: 'border-brand-yellow/30 bg-brand-yellow/10 text-brand-yellow' };
   }
   if (result === 'issued') {
     return { label: 'Issued', badge: 'border-brand-blue/30 bg-brand-blue/10 text-brand-blue' };
   }
-  return { label: event.result ? String(event.result) : 'Recorded', badge: 'border-line bg-surface-2 text-muted' };
+  return { label: value ? String(value) : 'Recorded', badge: 'border-line bg-surface-2 text-muted' };
+}
+
+export function friendlyResult(event) {
+  if (event.type === 'evaluation') {
+    return { label: 'Evaluation only', badge: 'border-brand-purple/30 bg-brand-purple/10 text-brand-purple' };
+  }
+  return resultInfo(event.result);
+}
+
+export function actionBadgeClass(action) {
+  if (action === 'Remove') return 'border-brand-orange/30 bg-brand-orange/10 text-brand-orange';
+  if (action === 'Restore') return 'border-brand-green/30 bg-brand-green/10 text-brand-green';
+  if (action === 'Analyse') return 'border-brand-purple/30 bg-brand-purple/10 text-brand-purple';
+  if (action === 'Monitor') return 'border-brand-blue/30 bg-brand-blue/10 text-brand-blue';
+  return 'border-line bg-surface-2 text-muted';
 }
 
 export function formatTime(value) {

@@ -36,7 +36,7 @@ const PIPELINE = [
 const KEY_FEATURES = [
   { icon: Network, tone: 'text-brand-red', box: 'bg-brand-red/10', title: 'Native CAGE4 Red policies', desc: 'Choose from the Red agent variants available in the local CAGE4 wrapper.' },
   { icon: Users, tone: 'text-brand-blue', box: 'bg-brand-blue/10', title: 'Blue baseline policies', desc: 'Compare the round-robin, masked-random and Sleep policies in seeded episodes.' },
-  { icon: Activity, tone: 'text-brand-cyan', box: 'bg-brand-cyan/10', title: 'Blue-visible simulator observations', desc: 'The dashboard shows CAGE4 observations and does not claim real host or packet telemetry.' },
+  { icon: Activity, tone: 'text-brand-cyan', box: 'bg-brand-cyan/10', title: 'Blue-visible simulator observations', desc: 'Blue-visible CAGE4 fields only.' },
   { icon: ShieldCheck, tone: 'text-brand-green', box: 'bg-brand-green/10', title: 'Custom scenarios', desc: 'Configure vulnerable apps, networks and policies.' },
   { icon: BarChart3, tone: 'text-brand-purple', box: 'bg-brand-purple/10', title: 'Performance analytics', desc: 'Review the current CAGE4 episode event log and host evidence.' },
 ];
@@ -64,7 +64,8 @@ function SimNode({ side, title, subtitle }) {
   );
 }
 
-export default function HomeView({ onStart, onToast, theme, onToggleTheme }) {
+export default function HomeView({ onStart, onResume, episode, onToast, theme, onToggleTheme }) {
+  const hasOngoingEpisode = ['running', 'paused'].includes(episode?.status);
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="hero-grid-bg pointer-events-none absolute inset-0" aria-hidden="true" />
@@ -106,24 +107,24 @@ export default function HomeView({ onStart, onToast, theme, onToggleTheme }) {
               evaluation labels.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <PrimaryButton onClick={onStart} className="px-6 py-3">
-                Start Simulation
-                <ArrowRight size={18} />
-              </PrimaryButton>
-              <SecondaryButton
-                onClick={() => onToast('Launch a local CAGE4 episode to see simulator-backed activity.', 'info')}
-                className="px-5 py-3"
-              >
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-blue/15 text-brand-blue">
-                  <Play size={11} fill="currentColor" />
-                </span>
-                Watch Demo
-              </SecondaryButton>
+              {hasOngoingEpisode ? (
+                <>
+                  <PrimaryButton onClick={onResume} className="px-6 py-3">
+                    <Play size={16} fill="currentColor" />
+                    Resume Simulation
+                  </PrimaryButton>
+                  <SecondaryButton onClick={onStart} className="px-5 py-3">
+                    Start New Simulation
+                    <ArrowRight size={16} />
+                  </SecondaryButton>
+                </>
+              ) : (
+                <PrimaryButton onClick={onStart} className="px-6 py-3">
+                  Start Simulation
+                  <ArrowRight size={18} />
+                </PrimaryButton>
+              )}
             </div>
-            <p className="mt-6 text-xs leading-relaxed text-dim">
-              No cloud deployment, real network or packet capture is involved. Everything runs in
-              the isolated CybORG simulator.
-            </p>
           </div>
 
           <div className="relative">

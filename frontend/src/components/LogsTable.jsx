@@ -18,7 +18,7 @@ export default function LogsTable({ events, filter, onFilter, onExportSiem }) {
     <Panel className="overflow-hidden">
       <PanelHeader
         title="Episode log"
-        subtitle="Newest first. Blue actions show the agent, host and outcome; evaluation rows are privileged simulator labels."
+        subtitle="Newest first."
         actions={(
           <>
             <div className="flex flex-wrap items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">

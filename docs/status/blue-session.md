@@ -1,9 +1,47 @@
 # Blue session update
 
+## Blue trace, connector states and interactive analyst (2026-10-27)
+
+- Baseline committed as `5429349` (`Add local CAGE4 dashboard with LLM Red
+  monitoring`). Follow-on dashboard changes are on `phase-one-final-review`.
+- Pullable dashboard package: `blue/assets/dashboard-models.zip` contains 137
+  dashboard actor checkpoints plus the verified planner/harness actors,
+  manifests and scorers. Server startup installs missing bundle files into the
+  ignored `blue/results/` tree without replacing existing local files.
+- Distribution checks: clean temporary extraction installed 149 files and a
+  second extraction made no changes; the local catalog loaded 142 model options.
+  Frontend build passed and the three dashboard trace/control test files passed
+  (7 tests). Model selection requires PyTorch; native baselines remain usable
+  without it.
+- Backend now records a bounded Blue decision trace (`MAX_BLUE_TRACE=200`) in
+  both `/api/state` and `/api/blue-view`. Host entries expose
+  `pending_action`, `last_action` and `last_result`, so remediation state is
+  visible without treating an issued action as a verified clean host.
+- Topology connectors now colour recent or pending Blue actions: Remove is
+  orange, Restore green and Analyse purple; pending connectors animate. The
+  host tooltip reports the pending/last action and simulator result. CAGE4's
+  host-level wrapper actions are Remove and Restore; zone-level
+  `BlockTrafficZone`/`AllowTrafficZone` remain excluded.
+- Live Monitoring now pairs a compact Red planner trace with a compact Blue
+  action trace. Red `Details` opens a modal containing every retained trace
+  entry, prompt hash and collapsed raw parameters; Blue `Open analyst` routes
+  to the analyst page.
+- Blue Analyst View was reworked around operations: summary counts, filterable
+  Blue action stream, per-agent host grid, host action history and collapsible
+  retained observations. Clicking a trace row focuses its owner and target.
+- Removed repeated scope/help copy from Home, Config, Live, Logs and Analyst;
+  the remaining simulator-scope statement appears once.
+- Validation: dashboard trace, event-time/attention, harness and max-age tests
+  (57 passed); live 13-step fixed-SetActor, 12-step BC and 4-step
+  `qwen2.5:3b` episodes; `/api/blue-view` trace/host parity; `npm run build`
+  (bundle `index-C-ro0gvz.js`); `py_compile`; `scripts/check_source.py`
+  (367 tracked Python files) and `git diff --check` passed. No headless
+  browser is available; visual review remains manual.
+
 ## All seven candidate actors available (2026-10-27)
 
-- Branch: `phase-one-final-review`; uncommitted. The dashboard now exposes a
-  dedicated `7 candidate models` group while retaining the full 142-option
+- Branch: `phase-one-final-review`; committed as `5429349`. The dashboard now
+  exposes a dedicated `7 candidate models` group while retaining the full 142-option
   catalog. All seven entries load through `/api/start` in short live episodes.
 - Four exact artifacts were already present: main32 risk+novelty
   (`blue/results/gpt_harness/main32_status/s0/pilot/both_s0/actor.th`),

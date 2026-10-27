@@ -1,6 +1,7 @@
 """Discover locally saved CAGE4 ``agent.th`` actors for the dashboard.
 
-Model weights are intentionally ignored by Git and remain local.  Metadata is
+Dashboard model weights are bundled in ``blue/assets/dashboard-models.zip``
+and unpacked into ignored results paths when the server starts. Metadata is
 read from the tensor state dict, never by executing a checkpoint as Python.
 """
 

@@ -20,6 +20,7 @@ from pathlib import Path
 import threading
 import time
 from urllib.parse import urlparse
+from zipfile import BadZipFile
 
 try:
     from blue.core import wrapper
@@ -31,6 +32,7 @@ try:
         decode_index,
     )
     from blue.model_catalog import catalog as model_catalog, get_model
+    from blue.model_bundle import install_bundled_models
 except ModuleNotFoundError as exc:
     raise SystemExit(
         "CAGE4 dashboard dependencies are missing from this Python interpreter. "
@@ -45,6 +47,8 @@ DIST_ROOT = FRONTEND_ROOT / "dist"
 TICK_SECONDS = 0.6
 MAX_EVENTS = 500
 MAX_RED_TRACE = 90
+MAX_BLUE_TRACE = 200
+MAX_STEPS = 1500
 MAX_SPEED = 8.0
 MIN_SPEED = 0.1
 LLM_RED_AGENT = "llm-planner"
@@ -99,6 +103,7 @@ class Dashboard:
         self.reward_history = deque(maxlen=400)
         self.red_trace = deque(maxlen=MAX_RED_TRACE)
         self._red_marks = {}
+        self.blue_trace = deque(maxlen=MAX_BLUE_TRACE)
         self.error = None
         self._worker = threading.Thread(target=self._run, daemon=True)
         self._worker.start()
@@ -133,8 +138,9 @@ class Dashboard:
             raise ValueError("seed must be an integer")
         if seed < 0:
             raise ValueError("seed must be non-negative")
-        if isinstance(steps, bool) or not isinstance(steps, int) or not 3 <= steps <= 400:
-            raise ValueError("steps must be an integer from 3 to 400")
+        if (isinstance(steps, bool) or not isinstance(steps, int)
+                or not 3 <= steps <= MAX_STEPS):
+            raise ValueError(f"steps must be an integer from 3 to {MAX_STEPS}")
         red_choices = set(wrapper.RED_AGENTS) | {LLM_RED_AGENT}
         if not isinstance(red_name, str) or red_name not in red_choices:
             raise ValueError(f"unknown CAGE4 Red variant: {red_name}")
@@ -248,6 +254,7 @@ class Dashboard:
             self.reward_history.clear()
             self.red_trace.clear()
             self._red_marks.clear()
+            self.blue_trace.clear()
             self.error = None
             self.started_at = time.monotonic()
             self.status = "running"
@@ -262,14 +269,24 @@ class Dashboard:
         with self.lock:
             if self.env is None:
                 raise ValueError("launch a CAGE4 episode first")
-            if self.status in ("complete", "error"):
-                raise ValueError("the episode has ended; launch a new one")
+            if self.status in ("complete", "error", "stopped"):
+                raise ValueError("the episode has already ended; launch a new one")
             if speed is not None:
                 self.speed = self._validate_speed(speed)
             self.status = "running" if running else "paused"
             self._event("system", "CAGE4 episode resumed" if running else "CAGE4 episode paused", {
                 "speed": self.speed,
             })
+            return self._state_locked()
+
+    def stop(self) -> dict:
+        with self.lock:
+            if self.env is None:
+                raise ValueError("launch a CAGE4 episode first")
+            if self.status in ("complete", "error", "stopped"):
+                raise ValueError("the episode has already ended; launch a new one")
+            self.status = "stopped"
+            self._event("system", "CAGE4 episode stopped", {"step": self.tick})
             return self._state_locked()
 
     def _event(self, kind: str, description: str, details: dict) -> None:
@@ -321,8 +338,16 @@ class Dashboard:
                             "agent": agent, "action": action, "target": host,
                             "result": result, "reward": reward,
                         })
-                    if self.red_name == LLM_RED_AGENT:
-                        self._capture_red_trace()
+                        self.blue_trace.appendleft({
+                            "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                            "step": self.tick,
+                            "agent": agent,
+                            "action": action,
+                            "target": host,
+                            "result": result,
+                            "reward": round(reward, 4),
+                        })
+                    self._capture_red_trace()
                     red_total, red_root = count_compromised(self.env)
                     self._event("evaluation", "Privileged CAGE4 Red-session snapshot", {
                         "red_occupied_hosts": red_total,
@@ -338,32 +363,62 @@ class Dashboard:
                     self._event("system", "CAGE4 episode stopped with an error", {"error": self.error})
 
     def _capture_red_trace(self) -> None:
-        """Record Red planner decisions; never feed them into a Blue policy."""
+        """Record Red actions and planner metadata; never feed them to Blue."""
         interfaces = getattr(self.env.env, "agent_interfaces", {})
+        executed = getattr(self.env.env, "action", {}) or {}
         for name in sorted(interfaces):
             if not name.startswith("red_agent_"):
                 continue
-            decision = getattr(interfaces[name].agent, "last_decision", None)
+            agent = interfaces[name].agent
+            decision = getattr(agent, "last_decision", None)
             if not isinstance(decision, dict):
-                continue
-            marker = (decision.get("agent_id"), decision.get("decision"))
+                decision = None
+            actions = executed.get(name) or []
+            action = actions[-1] if actions else getattr(agent, "last_action", None)
+            action_name = (decision.get("selected_action") if decision else None)
+            if action_name is None and action is not None:
+                action_name = type(action).__name__
+            parameters = (decision.get("selected_parameters") if decision else None)
+            if parameters is None and action is not None:
+                parameters = action.get_params()
+            parameters = self._json_safe(parameters or {})
+            target = None
+            for key in ("hostname", "ip_address", "subnet"):
+                if parameters.get(key) not in (None, ""):
+                    target = parameters[key]
+                    break
+            result = None
+            try:
+                success = self.env.env.get_last_observation(name).data.get("success")
+                if success is not None:
+                    result = getattr(success, "name", None) or str(success)
+            except (AttributeError, KeyError, TypeError):
+                pass
+            marker = (
+                self.tick,
+                action_name,
+                json.dumps(parameters, sort_keys=True, default=str),
+                decision.get("decision") if decision else None,
+            )
             if self._red_marks.get(name) == marker:
                 continue
             self._red_marks[name] = marker
-            latency = decision.get("latency_seconds")
+            latency = decision.get("latency_seconds") if decision else None
             self.red_trace.appendleft({
                 "time": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "step": self.tick,
                 "agent": name,
-                "goal": decision.get("goal"),
-                "focus_ip": decision.get("focus_ip"),
-                "action": decision.get("selected_action"),
-                "parameters": self._json_safe(
-                    decision.get("selected_parameters") or {}),
-                "plan_status": (decision.get("plan_status")
-                                or decision.get("fallback_reason")),
-                "plan_attempts": decision.get("plan_attempts"),
-                "prompt_sha256": decision.get("prompt_sha256"),
+                "goal": decision.get("goal") if decision else None,
+                "focus_ip": decision.get("focus_ip") if decision else None,
+                "action": action_name,
+                "target": target,
+                "result": result,
+                "parameters": parameters,
+                "plan_status": ((decision.get("plan_status")
+                                 or decision.get("fallback_reason"))
+                                if decision else "native"),
+                "plan_attempts": decision.get("plan_attempts") if decision else None,
+                "prompt_sha256": decision.get("prompt_sha256") if decision else None,
                 "latency_seconds": (round(float(latency), 3)
                                     if isinstance(latency, (int, float)) else None),
             })
@@ -393,14 +448,16 @@ class Dashboard:
                 "status": "idle", "connected": True, "simulator": "CybORG CAGE4",
                 "tick": 0, "horizon": self.steps, "events": [],
                 "speed": self.speed, "reward_history": [],
-                "red_llm": None, "red_trace": [],
+                "red_llm": None, "red_trace": [], "blue_trace": [],
             }
         compromised, root = count_compromised(self.env)
         hosts = []
         for agent in wrapper.BLUE_AGENTS:
             tracker = self.env.trackers[agent]
+            awaiting = self.env._awaiting.get(agent)
             for host in self.env.hostnames[agent]:
                 zone_id, zone_label, zone_kind = _host_zone(host)
+                last_result = tracker.last_result.get(host)
                 hosts.append({
                     "name": host,
                     "agent": agent,
@@ -410,6 +467,10 @@ class Dashboard:
                     "zone_kind": zone_kind,
                     "blue_evidence": tracker.state.get(host, "UNKNOWN"),
                     "pending": host in tracker.pending_until,
+                    "pending_action": (awaiting[1] if awaiting and awaiting[0] == host
+                                       else None),
+                    "last_action": last_result[0] if last_result else None,
+                    "last_result": last_result[1] if last_result else None,
                 })
         elapsed = max(0, int(time.monotonic() - self.started_at)) if self.started_at else 0
         return {
@@ -419,8 +480,8 @@ class Dashboard:
             "scenario": "CAGE4 Enterprise",
             "red_agent": self.red_name,
             "red_llm": self._red_llm_state(),
-            "red_trace": (list(self.red_trace)
-                          if self.red_name == LLM_RED_AGENT else []),
+            "red_trace": list(self.red_trace),
+            "blue_trace": list(self.blue_trace),
             "blue_policy": self.policy_name,
             "blue_policy_model": self.policy_meta,
             "seed": self.seed,
@@ -472,8 +533,10 @@ class Dashboard:
             for agent in wrapper.BLUE_AGENTS:
                 tracker = self.env.trackers[agent]
                 hosts = []
+                awaiting = self.env._awaiting.get(agent)
                 for host in self.env.hostnames[agent]:
                     zone_id, zone_label, zone_kind = _host_zone(host)
+                    last_result = tracker.last_result.get(host)
                     hosts.append({
                         "name": host,
                         "subnets": sorted(map(str, self.env.subnets[agent].get(host, []))),
@@ -482,6 +545,10 @@ class Dashboard:
                         "zone_kind": zone_kind,
                         "evidence": tracker.state.get(host, "UNKNOWN"),
                         "pending": host in tracker.pending_until,
+                        "pending_action": (awaiting[1] if awaiting and awaiting[0] == host
+                                           else None),
+                        "last_action": last_result[0] if last_result else None,
+                        "last_result": last_result[1] if last_result else None,
                         "observation": self._json_safe(self.env.views[agent].get(host, {})),
                     })
                 pending_action = self.env._awaiting.get(agent)
@@ -499,6 +566,7 @@ class Dashboard:
                 "horizon": self.steps,
                 "blue_policy": self.policy_name,
                 "agents": agents,
+                "blue_trace": list(self.blue_trace),
                 "view_scope": "Blue-owned hosts, retained Blue observations and Blue evidence tracker only.",
             }
 
@@ -607,12 +675,21 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(running, bool):
                     raise ValueError("running must be a boolean")
                 return self._json(200, dashboard.control(running, payload.get("speed")))
+            if path == "/api/stop":
+                return self._json(200, dashboard.stop())
             return self._json(404, {"error": "unknown API endpoint"})
         except (ValueError, json.JSONDecodeError) as exc:
             return self._json(400, {"error": str(exc)})
 
 
 def main() -> None:
+    try:
+        installed_models = install_bundled_models()
+    except (BadZipFile, OSError, ValueError) as exc:
+        raise SystemExit(f"Could not install bundled dashboard models: {exc}") from exc
+    if installed_models:
+        print(f"[dashboard] Installed {installed_models} bundled model files.")
+
     port = int(os.environ.get("CYBERALLY_DASHBOARD_PORT", "8765"))
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"CAGE4 dashboard: http://127.0.0.1:{port}")
