@@ -1,0 +1,11 @@
+# Blue-local runtime draft; Environment review required before shared adoption.
+# Python 3.12. EPyMARL source: uoe-agents/epymarl at cbc38c09588064eab978501d0f12c2cf58fa7fc2.
+numpy==1.26.4
+gym==0.26.2
+networkx==3.2.1
+PyYAML==6.0.2
+pytest==8.3.5
+torch==2.8.0
+gymnasium==0.29.1
+# Imported unconditionally by EPyMARL envs, even though CAGE4 does not use it.
+smaclite @ git+https://github.com/uoe-agents/smaclite.git@0d6abbea1334011984ae4704a0ef7a33c36057d6

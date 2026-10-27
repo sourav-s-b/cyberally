@@ -1,0 +1,4 @@
+# SMAClite is only an EPyMARL import dependency here (not the training scenario).
+# Its Rtree 1.0.0 source package lacks the Windows spatialindex DLL.
+# The 1.4.1 binary wheel provides it. Pass this file to uv pip --overrides.
+rtree==1.4.1

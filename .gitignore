@@ -1,5 +1,6 @@
 # Local environments and downloaded tools
 .venv/
+.venv-train/
 venv/
 env/
 .tools/
@@ -33,6 +34,7 @@ frames/
 *.pt
 *.pth
 *.ckpt
+*.th
 *.pkl
 *.joblib
 *.log
