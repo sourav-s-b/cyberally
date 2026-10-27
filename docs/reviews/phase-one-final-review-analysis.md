@@ -167,6 +167,28 @@ Recommended staged sequence:
 
 Do not take on Docker + eBPF + Juice Shop/DVWA + MITRE/SIEM + EWC/federated MARL as one Phase 2 deliverable. The project’s own team instructions prioritize simulator correctness, strong baselines, fresh rollouts, and reviewed cross-role contracts first.
 
+### 5.2 Tracks required to realize the Zeroth vision
+
+The full vision needs coordinated workstreams. They can start partly in parallel, but each integration depends on shared interfaces and a common evaluation plan. The sequence below translates the Zeroth slides into buildable deliverables; it does not promise that the numerical performance goals will be met.
+
+| Track | Deliverable | Zeroth claims addressed |
+|---|---|---|
+| 1. Contracts and evaluation foundation | Agree on scenario, observation/action, event-log, metric, and artifact contracts across Blue, Red, and Environment. Define training, development, and held-out scenarios/seeds. | Makes later results comparable and traceable. |
+| 2. Isolated container range | Run one deliberately vulnerable application in a resettable lab, then add zones and services. Verify network isolation and egress policy. | Docker range, actual software targets, multi-zone environment. |
+| 3. Telemetry and detection | Add one real telemetry source, map it into versioned Blue-visible features, then test anomaly scoring against a fixed baseline and held-out data. | eBPF/packet telemetry, anomaly scoring, benign-noise suppression. |
+| 4. Red strategy generation | Extend the bounded planner with versioned, validated strategy variants for the chosen environment. Restrict generated choices to authorized targets and supported actions. | LLM Red planning and attack variation. |
+| 5. Blue defense and coordination | Adapt and compare Blue policies against strong controls on CAGE4 and the container environment. Add a message channel and bandwidth limits only if cooperative communication is required. | MAPPO, decentralized execution, low-bandwidth coordination. |
+| 6. Response actions | Add and validate supported actions, measuring service impact and verified outcomes. Real host actions need a separate actuator and safety review. | Containment, isolation, traffic control, recovery. |
+| 7. Evolution and retention | Add Red strategies, collect fresh Blue rollouts, train a candidate, evaluate on new and old suites, then promote or reject. Test EWC only if simpler mixture training leaves a measured forgetting problem. | Closed-loop retraining, co-evolution, EWC. |
+| 8. Audit and SIEM integration | Produce structured action/evidence/result records, review MITRE ATT&CK mappings, and validate SIEM ingestion. Add an LLM auditor only after the evidence trail is reliable. | Reasoning audit, MITRE trail, enterprise SIEM. |
+| 9. Benchmark and claim validation | Freeze definitions and protocols for detection delay, verified clearance, service impact, false-positive rate, actor latency, and end-to-end response time. | Sub-100 ms, MTTR under five seconds, >90% false-positive reduction, benchmark report. |
+
+**Recommended order:** begin the CAGE4 evolutionary-training study and isolated container-range build in parallel; add telemetry, Red variants, and a Blue adapter for one containerized app; complete a small end-to-end slice; then expand zones, actions, agents, and integrations after reset/evaluation are reliable. A CAGE4 checkpoint will not directly control a web app; it needs an adapter and fresh evaluation on that app.
+
+Juice Shop and DVWA are deliberately vulnerable training targets, not production applications. Keep the range isolated and test egress. Docker documents internal networks without a default external gateway; avoid attaching a dual-homed service that restores external access. See the [OWASP Juice Shop guide](https://owasp.org/www-project-developer-guide/assets/exports/OWASP_Developer_Guide.pdf), [OWASP DVWA listing](https://vwad.owasp.org/app/damn-vulnerable-web-application-dvwa/), and [Docker Compose networking](https://docs.docker.com/compose/how-tos/networking).
+
+Even after these tracks, the Zeroth targets remain empirical gates, not guaranteed outcomes. The current controlled Blue comparison did not establish learned superiority over both strong controls. A CAGE4 result also does not establish response time or false-positive reduction on real software/SOC telemetry.
+
 ## 6. Zeroth → First → Phase 1 Final Review
 
 The final-review column is proposed evidence-based content; no final presentation file has been created here.
