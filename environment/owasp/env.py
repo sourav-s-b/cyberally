@@ -7,6 +7,14 @@ from .results import TernaryEnum
 
 
 class OWASPEnvironment:
+    """
+    Simulated OWASP Juice Shop environment integrated with CAGE4.
+
+    Maintains simulated application-layer state and provides:
+    - Native OWASP step() interface.
+    - CAGE4-compatible execute_red_action() interface.
+    """
+
     def __init__(self, max_steps=50):
         self.max_steps = max_steps
         self.state = JuiceShopState()
@@ -166,7 +174,7 @@ class OWASPEnvironment:
     def _execute_red_action(self, action):
 
         # ---------------------------------------------------------
-        # Attacker blocked
+        # Attacker blocked: blocked attacker cannot trigger new incidents
         # ---------------------------------------------------------
 
         if self.state.attacker_blocked:
@@ -219,41 +227,36 @@ class OWASPEnvironment:
             return "already_discovered"
 
         # ---------------------------------------------------------
-        # SQL Injection
+        # SQL Injection (simulated OWASP incident)
         # ---------------------------------------------------------
 
         if action == RedAction.SQL_INJECTION:
 
-            # The existing CAGE4 Red agent can choose
-            # ExploitRemoteService immediately after
-            # discovering the application.
-            #
-            # Therefore, API discovery is treated as an
-            # implicit part of remote exploitation in this
-            # simplified OWASP simulation.
-
+            # Preconditions
             if not self.state.application_discovered:
                 return "application_not_discovered"
 
             if not self.state.sql_injection_exposed:
                 return "vulnerability_not_available"
 
-            # Exploitation discovers/reaches the API as
-            # part of the attack.
+            # Exploitation reaches the API as part of the attack.
             self.state.api_discovered = True
 
+            # Application-layer simulated incident state
+            self.state.incident_active = True
+            self.state.incident_type = "sql_injection"
             self.state.user_access = True
             self.state.authenticated = True
             self.state.compromised = True
 
             self.state.add_event(
-                "SQL injection succeeded"
+                "Simulated OWASP incident: SQL injection on port 3000 succeeded"
             )
 
             return "exploit_success"
 
         # ---------------------------------------------------------
-        # Broken Authentication
+        # Broken Authentication (simulated OWASP incident)
         # ---------------------------------------------------------
 
         if action == RedAction.BROKEN_AUTHENTICATION:
@@ -264,18 +267,20 @@ class OWASPEnvironment:
             if not self.state.broken_auth_exposed:
                 return "vulnerability_not_available"
 
+            self.state.incident_active = True
+            self.state.incident_type = "broken_authentication"
             self.state.authenticated = True
             self.state.user_access = True
             self.state.compromised = True
 
             self.state.add_event(
-                "Authentication bypass succeeded"
+                "Simulated OWASP incident: Authentication bypass succeeded"
             )
 
             return "exploit_success"
 
         # ---------------------------------------------------------
-        # IDOR
+        # IDOR (simulated OWASP incident)
         # ---------------------------------------------------------
 
         if action == RedAction.IDOR:
@@ -286,17 +291,19 @@ class OWASPEnvironment:
             if not self.state.idor_exposed:
                 return "vulnerability_not_available"
 
+            self.state.incident_active = True
+            self.state.incident_type = "idor"
             self.state.user_access = True
             self.state.compromised = True
 
             self.state.add_event(
-                "IDOR exploitation succeeded"
+                "Simulated OWASP incident: IDOR exploitation succeeded"
             )
 
             return "exploit_success"
 
         # ---------------------------------------------------------
-        # XSS
+        # XSS (simulated OWASP incident)
         # ---------------------------------------------------------
 
         if action == RedAction.XSS:
@@ -307,10 +314,12 @@ class OWASPEnvironment:
             if not self.state.xss_exposed:
                 return "vulnerability_not_available"
 
+            self.state.incident_active = True
+            self.state.incident_type = "xss"
             self.state.compromised = True
 
             self.state.add_event(
-                "XSS attack succeeded"
+                "Simulated OWASP incident: XSS attack succeeded"
             )
 
             return "exploit_success"
@@ -372,17 +381,21 @@ class OWASPEnvironment:
 
         if action == BlueAction.DETECT:
 
-            if self.state.compromised:
+            # Only detect if there is an active incident or compromise
+            if not (self.state.incident_active or self.state.compromised):
+                return "no_attack_detected"
 
-                self.state.attack_detected = True
+            # Prevent duplicate detection rewards if already detected
+            if self.state.attack_detected:
+                return "already_detected"
 
-                self.state.add_event(
-                    "Blue detected malicious activity"
-                )
+            self.state.attack_detected = True
 
-                return "attack_detected"
+            self.state.add_event(
+                "Blue detected malicious activity"
+            )
 
-            return "no_attack_detected"
+            return "attack_detected"
 
         # ---------------------------------------------------------
         # Block
@@ -390,17 +403,21 @@ class OWASPEnvironment:
 
         if action == BlueAction.BLOCK:
 
-            if self.state.attack_detected:
+            # Blocking requires prior detection
+            if not self.state.attack_detected:
+                return "nothing_to_block"
 
-                self.state.attacker_blocked = True
+            # Prevent duplicate blocking rewards if already blocked
+            if self.state.attacker_blocked:
+                return "already_blocked"
 
-                self.state.add_event(
-                    "Blue blocked the attacker"
-                )
+            self.state.attacker_blocked = True
 
-                return "attack_blocked"
+            self.state.add_event(
+                "Blue blocked the attacker"
+            )
 
-            return "nothing_to_block"
+            return "attack_blocked"
 
         # ---------------------------------------------------------
         # Restore
@@ -408,10 +425,25 @@ class OWASPEnvironment:
 
         if action == BlueAction.RESTORE:
 
+            # Only restore if there is an active incident, compromise, or unauthorized access
+            if not (
+                self.state.compromised
+                or self.state.incident_active
+                or self.state.user_access
+                or self.state.admin_access
+                or self.state.authenticated
+            ):
+                return "already_clean"
+
             self.state.compromised = False
+            self.state.incident_active = False
+            self.state.incident_type = "none"
             self.state.authenticated = False
             self.state.user_access = False
             self.state.admin_access = False
+
+            # Note: self.state.attacker_blocked is intentionally NOT cleared,
+            # ensuring the attacker remains blocked after application restoration.
 
             self.state.add_event(
                 "Blue restored the application state"

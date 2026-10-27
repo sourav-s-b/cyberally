@@ -10,6 +10,8 @@ def get_red_observation(state):
         "user_access": state.user_access,
         "admin_access": state.admin_access,
         "compromised": state.compromised,
+        "incident_active": state.incident_active,
+        "incident_type": state.incident_type,
         "attacker_blocked": state.attacker_blocked,
         "step_count": state.step_count,
     }
@@ -19,14 +21,16 @@ def get_blue_observation(state):
     """
     Generate information visible to the Blue agent.
 
-    Blue should not automatically receive hidden
-    vulnerability information.
+    Blue receives service health and observable incident indicators.
+    Blue does not receive hidden vulnerability information, attacker credentials,
+    or internal Red access level state.
     """
 
     return {
         "web_server_up": state.web_server_up,
         "api_available": state.api_available,
         "database_available": state.database_available,
+        "incident_active": state.incident_active,
         "attack_detected": state.attack_detected,
         "attacker_blocked": state.attacker_blocked,
         "compromised": state.compromised,

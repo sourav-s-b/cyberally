@@ -33,7 +33,7 @@ def calculate_rewards(state, red_result, blue_result):
         blue_reward += 5.0
 
     # Defensive penalty
-    if state.compromised:
+    if state.compromised or state.incident_active:
         blue_reward -= 10.0
 
     return {

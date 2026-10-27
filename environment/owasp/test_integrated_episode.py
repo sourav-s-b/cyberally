@@ -1,3 +1,4 @@
+
 from red.llm_agent import LLMConfig, OllamaClient
 from red.planned_agent import PlannedRedAgent, PlannerConfig
 
@@ -20,10 +21,10 @@ def print_state(state):
     print(f"compromised            = {state.compromised}")
     print(f"attack_detected        = {state.attack_detected}")
     print(f"attacker_blocked       = {state.attacker_blocked}")
+    print(f"incident_active        = {state.incident_active}")
 
 
 def main():
-
     print("=" * 70)
     print("INTEGRATED OWASP RED + BLUE EPISODE")
     print("=" * 70)
@@ -32,12 +33,8 @@ def main():
     # OWASP ENVIRONMENT
     # ---------------------------------------------------------
 
-    environment = OWASPEnvironment(
-        max_steps=20
-    )
-
+    environment = OWASPEnvironment(max_steps=20)
     environment.reset()
-
     state = environment.state
 
     # ---------------------------------------------------------
@@ -65,35 +62,31 @@ def main():
     # RED ACTION SPACE
     # ---------------------------------------------------------
 
-    action_space = build_action_space(
-        "red_agent"
-    )
+    action_space = build_action_space("red_agent")
 
     # ---------------------------------------------------------
     # EXISTING BLUE POLICY
     # ---------------------------------------------------------
 
-    blue = OWASPBluePolicyAdapter(
-        agent="blue_agent_0"
-    )
+    blue = OWASPBluePolicyAdapter(agent="blue_agent_0")
 
     # ---------------------------------------------------------
     # INITIAL RED OBSERVATION
     # ---------------------------------------------------------
 
-    red_observation = build_red_observation(
-        state
-    )
+    red_observation = build_red_observation(state)
 
     print("\nINITIAL RED OBSERVATION")
     print(red_observation)
 
+    restoration_success = False
+
     # ---------------------------------------------------------
     # EPISODE
+    # Continue after blocking so Blue can verify and restore.
     # ---------------------------------------------------------
 
     for step in range(1, 11):
-
         print("\n")
         print("=" * 70)
         print(f"STEP {step}")
@@ -104,7 +97,6 @@ def main():
         # =====================================================
 
         if not state.attacker_blocked:
-
             print("\n[RED] Asking existing PlannedRedAgent...")
 
             red_action = red.get_action(
@@ -112,36 +104,20 @@ def main():
                 action_space,
             )
 
-            print(
-                f"[RED] Selected: "
-                f"{type(red_action).__name__}"
-            )
+            print(f"[RED] Selected: {type(red_action).__name__}")
 
-            red_result = environment.execute_red_action(
-                red_action
-            )
+            red_result = environment.execute_red_action(red_action)
 
-            print(
-                f"[RED] Result: "
-                f"{red_result}"
-            )
+            print(f"[RED] Result: {red_result}")
 
-            # -------------------------------------------------
             # Update Red observation
-            # -------------------------------------------------
-
             red_observation = build_red_observation(
                 state,
                 success=red_result,
                 action=red_action,
             )
-
         else:
-
-            print(
-                "\n[RED] Attacker is blocked. "
-                "Red turn skipped."
-            )
+            print("\n[RED] Attacker is blocked. Red turn skipped.")
 
         print_state(state)
 
@@ -155,24 +131,11 @@ def main():
             blue_index,
             blue_cage4_action,
             blue_owasp_action,
-        ) = blue.select_action(
-            state
-        )
+        ) = blue.select_action(state)
 
-        print(
-            f"[BLUE] Action index: "
-            f"{blue_index}"
-        )
-
-        print(
-            f"[BLUE] CAGE4 action: "
-            f"{blue_cage4_action}"
-        )
-
-        print(
-            f"[BLUE] OWASP action: "
-            f"{blue_owasp_action}"
-        )
+        print(f"[BLUE] Action index: {blue_index}")
+        print(f"[BLUE] CAGE4 action: {blue_cage4_action}")
+        print(f"[BLUE] OWASP action: {blue_owasp_action}")
 
         blue_result = blue.execute_action(
             environment,
@@ -180,54 +143,37 @@ def main():
             blue_owasp_action,
         )
 
-        print(
-            f"[BLUE] Result: "
-            f"{blue_result}"
-        )
-
+        print(f"[BLUE] Result: {blue_result}")
         print_state(state)
 
         # =====================================================
-        # TERMINATION
+        # RESTORATION CHECK
         # =====================================================
 
-        if state.attacker_blocked:
+        restoration_success = (
+            state.attacker_blocked
+            and not state.incident_active
+            and not state.compromised
+            and not state.admin_access
+        )
 
-            print(
-                "\n" + "!" * 70
-            )
-            print(
-                "ATTACKER HAS BEEN BLOCKED"
-            )
-            print(
-                "!" * 70
-            )
-
+        if restoration_success:
+            print("\n" + "=" * 70)
+            print("INCIDENT RESTORED SUCCESSFULLY")
+            print("Attacker remains blocked.")
+            print("Unauthorized access has been cleared.")
+            print("=" * 70)
             break
 
-        if (
-            state.admin_access
-            and not state.attacker_blocked
-        ):
-
+        if state.attacker_blocked:
             print(
-                "\n" + "!" * 70
-            )
-            print(
-                "RED HAS ACHIEVED ADMIN ACCESS"
-            )
-            print(
-                "BLUE DID NOT BLOCK THE ATTACKER YET"
-            )
-            print(
-                "!" * 70
+                "\n[INFO] Attacker is blocked, but restoration "
+                "is not complete. Continuing the episode."
             )
 
-            # IMPORTANT:
-            # Do NOT terminate here.
-            #
-            # Blue must still get a chance to
-            # detect and respond.
+        if state.admin_access and not state.attacker_blocked:
+            print("\n[WARNING] Red has achieved admin access.")
+            print("[INFO] Continuing so Blue can respond.")
 
     # ---------------------------------------------------------
     # FINAL RESULT
@@ -240,16 +186,19 @@ def main():
 
     print_state(state)
 
+    print(f"\nrestoration_success = {restoration_success}")
+
+    if not restoration_success:
+        print(
+            "\n[WARNING] Restoration was not confirmed within "
+            "the episode limit."
+        )
+
     print("\nEVENT LOG")
     print("-" * 50)
 
-    for index, event in enumerate(
-        state.events,
-        start=1,
-    ):
-        print(
-            f"{index}. {event}"
-        )
+    for index, event in enumerate(state.events, start=1):
+        print(f"{index}. {event}")
 
     print("\n")
     print("=" * 70)

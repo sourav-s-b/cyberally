@@ -149,7 +149,7 @@ class OWASPBluePolicyAdapter:
             }
         ]
 
-        if state.compromised:
+        if state.compromised or state.incident_active:
             host["Processes"] = [
                 {
                     "Properties": [
@@ -192,7 +192,7 @@ class OWASPBluePolicyAdapter:
             "Files": [],
         }
 
-        if state.compromised:
+        if state.compromised or state.incident_active:
             revealed_host["Files"].append(
                 {
                     "Known File": "UNKNOWN",
@@ -227,7 +227,10 @@ class OWASPBluePolicyAdapter:
         # -----------------------------------------------------
         if isinstance(cage4_action, Analyse):
 
-            if result == "attack_detected":
+            # In OWASP simulation, attack_detected is initial detection,
+            # while already_detected indicates post-remediation verification scan
+            # where the incident/compromise remains active.
+            if result in {"attack_detected", "already_detected"}:
 
                 revealed_host = self.build_analyse_result(
                     state

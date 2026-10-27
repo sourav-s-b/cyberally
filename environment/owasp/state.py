@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 class JuiceShopState:
     """
     Simulated state of the OWASP Juice Shop environment.
+
+    Maintains explicit distinction between application-layer
+    OWASP incidents (e.g. simulated web application attacks)
+    and host-level operating system compromise.
     """
 
     # Application state
@@ -27,7 +31,9 @@ class JuiceShopState:
     idor_exposed: bool = True
     xss_exposed: bool = True
 
-    # Attack state
+    # Simulated incident / attack state
+    incident_active: bool = False
+    incident_type: str = "none"
     compromised: bool = False
     attack_detected: bool = False
 
@@ -56,6 +62,8 @@ class JuiceShopState:
         self.idor_exposed = True
         self.xss_exposed = True
 
+        self.incident_active = False
+        self.incident_type = "none"
         self.compromised = False
         self.attack_detected = False
         self.attacker_blocked = False
